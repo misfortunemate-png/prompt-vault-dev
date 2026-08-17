@@ -1,7 +1,7 @@
 # Prompt Vault 作業指示書（M1: 基盤構築）
 
 文書種別: 権威文書
-作成日: 2026-08-17 ／ PM: クリーデ ／ 対応仕様: docs/20260817_prompt-vault_spec_m1.md v1.1 ／ 本書一枚で完結（追補なし）
+作成日: 2026-08-17 ／ PM: クリーデ ／ 対応仕様: docs/20260817_prompt-vault_spec_m1.md v1.2 ／ 本書一枚で完結（追補なし）
 
 ## 添付マニフェスト（着工前照合・必須）
 
@@ -34,7 +34,7 @@
 
 ### 手順1: ポート衝突確認
 
-8788番ポートの使用状況を確認する。`netstat -an | findstr 8788` または同等の方法で衝突がないことを確認。衝突がある場合のみ docs/reports/ に報告し代替ポートを提案する。
+8789番ポートの使用状況を確認する。`netstat -an | findstr 8789` または同等の方法で衝突がないことを確認。衝突がある場合のみ docs/reports/ に報告し代替ポートを提案する。
 
 ### 手順2: リポジトリ初期セットアップ
 
@@ -45,20 +45,20 @@
 - vite.config.js: `base: '/vault/'`、React plugin、server.hmr設定（Express統合用）
 - .env.example:
   ```
-  PORT=8788
+  PORT=8789
   NOVELAI_API_KEY=
   VAULT_ROOT=
   ```
 - .gitignore: node_modules, dist, data/, logs/, .env
 - docs/supplied/tokens.css → src/tokens.css にコピー（内容不変）
-- CLAUDE.md: テンプレートに従い作成。文書階層に発注文書（ai-family-ops docs/20260817_prompt-vault_requirements_v1.1.md）、権威文書（docs/内）を記載。規約に「base URL /vault/ を前提とすること」「ポート8788」を含める
+- CLAUDE.md: テンプレートに従い作成。文書階層に発注文書（ai-family-ops docs/20260817_prompt-vault_requirements_v1.1.md）、権威文書（docs/内）を記載。規約に「base URL /vault/ を前提とすること」「ポート8789」を含める
 - _STATUS.md: テンプレートに従い作成
 
 ### 手順3: サーバー骨格（仕様§1）
 
 server.js を作成。
 
-- Express、PORT は process.env.PORT || 8788
+- Express、PORT は process.env.PORT || 8789
 - 開発モード（NODE_ENV !== 'production'）: Vite createServer → middlewares を Express にマウント
 - 本番モード: `express.static('dist')` を `/vault` にマウント
 - API名前空間 `/vault/api/` のルーター
@@ -183,7 +183,7 @@ src/screens/SettingsScreen.jsx を作成。フルスクリーンオーバーレ�
 - D:\AI\start-all.bat を改訂（**ASCII・CRLF厳守**）
 - 追加内容:
   1. prompt-vault-devサーバー起動行（chat-pwaの起動行の後）
-  2. serve設定に `/vault` パスの追加: `tailscale serve --set-path /vault 127.0.0.1:8788`
+  2. serve設定に `/vault` パスの追加: `tailscale serve --set-path /vault 127.0.0.1:8789`
 - 改訂後のbatがASCII・CRLFであることを検証手段で確認
 
 ### 手順9: inspect.mjs
@@ -212,8 +212,8 @@ scripts/inspect.mjs を作成。npm scripts に `"inspect": "node scripts/inspec
 ## テスト
 
 - PG自己完結分:
-  - `node server.js` → `curl localhost:8788/vault/api/healthz` で version: "3.0.0" 応答
-  - ブラウザで localhost:8788/vault/ → Header(タブ名+⚙)+Footer(3タブ)+空画面
+  - `node server.js` → `curl localhost:8789/vault/api/healthz` で version: "3.0.0" 応答
+  - ブラウザで localhost:8789/vault/ → Header(タブ名+⚙)+Footer(3タブ)+空画面
   - ⚙タップ→設定画面表示→戻るで閉じる
   - テーマ変更 → 設定閉じる → リロード → 設定保持
   - 生成既定値変更 → 保存 → data/settings.json に反映確認
