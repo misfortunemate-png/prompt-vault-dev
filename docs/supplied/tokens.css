@@ -1,0 +1,68 @@
+/* design-standard v1.1 */
+
+:root {
+  /* --- Color tokens (default: light) --- */
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --text-secondary: #555555;
+  --accent: #8b4513;
+  --accent-contrast: #ffffff;
+  --line: #eee7df;
+  --code-bg: #f0ece6;
+
+  /* --- Typography --- */
+  --fs-heading: 22px;
+  --fs-title: 18px;
+  --fs-body: 16px;
+  --fs-label: 13px;
+  --lh-body: 1.7;
+  --font-heading: "Noto Serif JP", "Yu Mincho", serif;
+  --font-body: "BIZ UDPGothic", "Meiryo UI", sans-serif;
+
+  /* --- Radius --- */
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 14px;
+
+  /* --- Space --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+}
+
+[data-theme="light"] {
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --text-secondary: #555555;
+  --accent: #8b4513;
+  --accent-contrast: #ffffff;
+  --line: #eee7df;
+  --code-bg: #f0ece6;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --surface: #242424;
+  --text: #d4d0c8;
+  --text-secondary: #999999;
+  --accent: #c4956a;
+  --accent-contrast: #1a1a1a;
+  --line: #2a2a2a;
+  --code-bg: #252525;
+}
+
+[data-theme="sepia"] {
+  --bg: #f4ecd8;
+  --surface: #fbf5e6;
+  --text: #3b2e1a;
+  --text-secondary: #6b5c47;
+  --accent: #7a3030;
+  --accent-contrast: #ffffff;
+  --line: #8b7355;
+  --code-bg: #e8dfc6;
+}
+
