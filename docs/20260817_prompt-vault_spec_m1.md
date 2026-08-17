@@ -86,7 +86,7 @@ SQLiteはM4（ハッシュベース検索・大量レコード）で導入する
 
 ### §1 サーバー骨格
 
-- server.js: Express、ポート8788（.env `PORT`、既定8788）
+- server.js: Express、ポート8789（.env `PORT`、既定8789）
 - ルーティング: すべて `/vault` プレフィックス配下（要件定義裁定#11）
 - 開発モード（`NODE_ENV !== 'production'`）: Vite dev middleware を Express にマウント
 - 本番モード: `dist/` の静的配信
@@ -126,11 +126,11 @@ SQLiteはM4（ハッシュベース検索・大量レコード）で導入する
 
 ### §3 配線
 
-- tailscale serve: `tailscale serve --set-path /vault 127.0.0.1:8788`
+- tailscale serve: `tailscale serve --set-path /vault 127.0.0.1:8789`
 - start-all.bat改訂（ASCII・CRLF厳守）:
   - chat-pwaの起動行の後にprompt-vault-devのサーバー起動を追加
   - serve設定行に `/vault` パスを追加
-- ポート衝突確認: PGがM1着工時に8788の使用状況を機械確認する（要件定義裁定#12）
+- ポート衝突確認: PGがM1着工時に8789の使用状況を機械確認する（要件定義裁定#12）
 
 ### §4 設定画面
 
@@ -263,7 +263,7 @@ Anlas警告の判定: `width * height > 1_048_576 || steps > 28` のときセク
 | テスト対象 | 方法 | 合格条件 |
 |---|---|---|
 | サーバー起動 | `node server.js` → healthz | JSON応答・version一致 |
-| 画面構成 | ブラウザでlocalhost:8788/vault/ | Header(タブ名+⚙)+Footer(3タブ)+空画面 |
+| 画面構成 | ブラウザでlocalhost:8789/vault/ | Header(タブ名+⚙)+Footer(3タブ)+空画面 |
 | 設定開閉 | ⚙タップ→設定表示→戻るで閉じる | フルスクリーンオーバーレイの開閉 |
 | 表示設定の永続化 | テーマ変更→設定閉じる→リロード | 設定が保持される |
 | 生成既定値の保存 | 値変更→保存→APIで確認 | data/settings.jsonに反映 |
@@ -271,7 +271,7 @@ Anlas警告の判定: `width * height > 1_048_576 || steps > 28` のときセク
 | トースト | 保存成功・エラー発生 | type別色分け・自動消去 |
 | PWA（実機） | Pixel 10でstandalone起動 | ホーム画面追加・起動・SW登録 |
 | tailscale serve | /vault でアクセス | Pixel 10からhttps://fraine.tail204746.ts.net/vault/ |
-| ポート衝突 | 8788で起動 | chat-pwa（8787）と共存 |
+| ポート衝突 | 8789で起動 | chat-pwa（8787）・mkb-reader（8788）と共存 |
 
 実機系テスト（発注者に依頼）: PWA standaloneのSW更新挙動（Pixel 10）、tailscale経由のモバイル表示確認
 
@@ -281,3 +281,4 @@ Anlas警告の判定: `width * height > 1_048_576 || steps > 28` のときセク
 |---|---|---|
 | 2026-08-17 | v1.0 | 初版（M1: 基盤構築） |
 | 2026-08-17 | v1.1 | 画面構成改訂: Header+Footer方式、設定フルスクリーン化、デバッグを設定内包、解像度プリセットをM2生成画面に移動 |
+| 2026-08-17 | v1.2 | ポート8788→8789に変更（mkb-readerとの衝突回避） |
