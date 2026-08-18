@@ -87,11 +87,11 @@ SQLiteはM4（ハッシュベース検索・大量レコード）で導入する
 ### §1 サーバー骨格
 
 - server.js: Express、ポート8789（.env `PORT`、既定8789）
-- ルーティング: すべて `/vault` プレフィックス配下（要件定義裁定#11）
+- ルーティング: ルート `/` 配下（v1.3改訂: 専用ポート採用によりベースパス撤去。要件定義裁定#11→上書き）
 - 開発モード（`NODE_ENV !== 'production'`）: Vite dev middleware を Express にマウント
 - 本番モード: `dist/` の静的配信
-- API名前空間: `/vault/api/`
-- ヘルスチェック: `GET /vault/api/healthz` → `{ status: "ok", version: "3.0.0" }`
+- API名前空間: `/api/`
+- ヘルスチェック: `GET /api/healthz` → `{ status: "ok", version: "3.0.0" }`
 
 ### §2 画面構成・フロント基盤・PWA
 
@@ -116,21 +116,27 @@ SQLiteはM4（ハッシュベース検索・大量レコード）で導入する
 
 #### フロント基盤
 
-- Vite設定: `base: '/vault/'`
+- Vite設定: `base: '/'`
 - React: 画面遷移はuseState（React Routerは使わない）。タブ切替（generate / album / template）＋設定オーバーレイ（boolean）
 - PWA:
-  - manifest.json: `scope: "/vault/"`, `start_url: "/vault/"`, `display: "standalone"`
-  - Service Worker: `/vault/sw.js`。基本キャッシュ戦略（Cache First for assets, Network First for API）
-  - 登録: `navigator.serviceWorker.register('/vault/sw.js', { scope: '/vault/' })`
-- **M1検証項目**: サブパスPWAのSW更新挙動をPixel 10で確認する（要件定義リスク#2）
+  - manifest.json: `scope: "/"`, `start_url: "/"`, `display: "standalone"`
+  - Service Worker: `/sw.js`。基本キャッシュ戦略（Cache First for assets, Network First for API）
+  - 登録: `navigator.serviceWorker.register('/sw.js', { scope: '/' })`
+- **M1検証項目**: PWAのSW更新挙動をPixel 10で確認する（要件定義リスク#2。ベースパス撤去により「サブパスPWA」固有の問題は解消）
 
 ### §3 配線
 
-- tailscale serve: `tailscale serve --set-path /vault 127.0.0.1:8789`
+NW台帳（ai-family-memory ops/state/network.yaml）に予約登記済み。NW配線ガイドラインv1.0に従う。
+
+- ローカルポート: 8789（.env `PORT`、既定8789）
+- tailscale serve: `tailscale serve --bg --https=8445 http://127.0.0.1:8789`
+- 公開範囲: tailnet専用（Funnelなし）。C-SERVE-PORTSにより3ポート制限の対象外（mkb-reader 8444で実証済み）
+- アクセスURL: `https://fraine.tail204746.ts.net:8445/`
 - start-all.bat改訂（ASCII・CRLF厳守）:
   - chat-pwaの起動行の後にprompt-vault-devのサーバー起動を追加
-  - serve設定行に `/vault` パスを追加
-- ポート衝突確認: PGがM1着工時に8789の使用状況を機械確認する（要件定義裁定#12）
+  - serve設定行に `tailscale serve --bg --https=8445 http://127.0.0.1:8789` を追加
+- ポート衝突確認（工程0）: PGがM1着工時に8789（ローカル）と8445（tailscale）の使用状況を `netstat -ano` / `tailscale serve status` で機械確認する
+- 巻き添え確認: 台帳url_dependentsに影響なし（新規ポートのため既存クライアントへの影響なし）
 
 ### §4 設定画面
 
@@ -197,7 +203,7 @@ Anlas警告の判定: `width * height > 1_048_576 || steps > 28` のときセク
 
 #### §4.5 保存ボタン
 
-設定画面下部に配置。生成既定値・ガードの変更を `PUT /vault/api/settings` で一括保存。表示設定はlocalStorageに即時反映（保存ボタン不要）。
+設定画面下部に配置。生成既定値・ガードの変更を `PUT /api/settings` で一括保存。表示設定はlocalStorageに即時反映（保存ボタン不要）。
 
 #### §4.6 デバッグ（折りたたみ・設定画面最下部）
 
@@ -208,9 +214,9 @@ Anlas警告の判定: `width * height > 1_048_576 || steps > 28` のときセク
 | バージョン表示 | package.jsonのversionを表示 |
 | SWキャッシュクリア＋リロード | SWにメッセージ送信→caches.delete→location.reload |
 | 全データリセット | confirm×2→localStorage全消去＋サーバー側data/リセット→リロード |
-| NovelAI疎通テスト | `POST /vault/api/debug/test-api`→APIキーの有効性確認 |
-| FS書込テスト | `POST /vault/api/debug/test-fs`→VAULT_ROOTへの書込・読取・削除テスト |
-| 直近エラー一覧 | `GET /vault/api/debug/errors`→ログファイルから直近20件を表示 |
+| NovelAI疎通テスト | `POST /api/debug/test-api`→APIキーの有効性確認 |
+| FS書込テスト | `POST /api/debug/test-fs`→VAULT_ROOTへの書込・読取・削除テスト |
+| 直近エラー一覧 | `GET /api/debug/errors`→ログファイルから直近20件を表示 |
 
 ### §5 エラーハンドリング基盤
 
@@ -239,14 +245,14 @@ Anlas警告の判定: `width * height > 1_048_576 || steps > 28` のときセク
 
 | メソッド | パス | 用途 |
 |---|---|---|
-| GET | /vault/api/healthz | ヘルスチェック |
-| GET | /vault/api/settings | 全設定取得（server側） |
-| PUT | /vault/api/settings | 設定更新（server側） |
-| GET | /vault/api/system-info | VAULT_ROOT・APIキー状態 |
-| POST | /vault/api/debug/test-api | NovelAI疎通テスト |
-| POST | /vault/api/debug/test-fs | FS書込テスト |
-| GET | /vault/api/debug/errors | 直近エラー一覧 |
-| POST | /vault/api/debug/reset | 全データリセット |
+| GET | /api/healthz | ヘルスチェック |
+| GET | /api/settings | 全設定取得（server側） |
+| PUT | /api/settings | 設定更新（server側） |
+| GET | /api/system-info | VAULT_ROOT・APIキー状態 |
+| POST | /api/debug/test-api | NovelAI疎通テスト |
+| POST | /api/debug/test-fs | FS書込テスト |
+| GET | /api/debug/errors | 直近エラー一覧 |
+| POST | /api/debug/reset | 全データリセット |
 
 ### §7 全体アーキテクチャ方針（後続Mへの申し送り）
 
@@ -262,15 +268,15 @@ Anlas警告の判定: `width * height > 1_048_576 || steps > 28` のときセク
 
 | テスト対象 | 方法 | 合格条件 |
 |---|---|---|
-| サーバー起動 | `node server.js` → healthz | JSON応答・version一致 |
-| 画面構成 | ブラウザでlocalhost:8789/vault/ | Header(タブ名+⚙)+Footer(3タブ)+空画面 |
+| サーバー起動 | `node server.js` → `GET /api/healthz` | JSON応答・version一致 |
+| 画面構成 | ブラウザで `localhost:8789/` | Header(タブ名+⚙)+Footer(3タブ)+空画面 |
 | 設定開閉 | ⚙タップ→設定表示→戻るで閉じる | フルスクリーンオーバーレイの開閉 |
 | 表示設定の永続化 | テーマ変更→設定閉じる→リロード | 設定が保持される |
 | 生成既定値の保存 | 値変更→保存→APIで確認 | data/settings.jsonに反映 |
 | デバッグ折りたたみ | ▶デバッグ展開→各機能 | バージョン表示・SW消去・リセット動作 |
 | トースト | 保存成功・エラー発生 | type別色分け・自動消去 |
 | PWA（実機） | Pixel 10でstandalone起動 | ホーム画面追加・起動・SW登録 |
-| tailscale serve | /vault でアクセス | Pixel 10からhttps://fraine.tail204746.ts.net/vault/ |
+| tailscale serve | 専用ポートでアクセス | Pixel 10から `https://fraine.tail204746.ts.net:8445/` |
 | ポート衝突 | 8789で起動 | chat-pwa（8787）・mkb-reader（8788）と共存 |
 
 実機系テスト（発注者に依頼）: PWA standaloneのSW更新挙動（Pixel 10）、tailscale経由のモバイル表示確認
@@ -282,3 +288,4 @@ Anlas警告の判定: `width * height > 1_048_576 || steps > 28` のときセク
 | 2026-08-17 | v1.0 | 初版（M1: 基盤構築） |
 | 2026-08-17 | v1.1 | 画面構成改訂: Header+Footer方式、設定フルスクリーン化、デバッグを設定内包、解像度プリセットをM2生成画面に移動 |
 | 2026-08-17 | v1.2 | ポート8788→8789に変更（mkb-readerとの衝突回避） |
+| 2026-08-18 | v1.3 | 配線方式変更: 443パス同居→専用ポート8445（tailnet専用serve）。ベースパス `/vault/` 撤去→ルート `/`。NW台帳登記済み・NW-1/NW-2解決。発注者裁定 |
