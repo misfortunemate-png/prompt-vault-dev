@@ -153,20 +153,20 @@ async function start() {
     }
   });
 
-  app.use('/vault/api', api);
+  app.use('/api', api);
 
-  app.use('/vault/sw.js', (_req, res) => {
+  app.use('/sw.js', (_req, res) => {
     res.setHeader('Content-Type', 'application/javascript');
-    res.setHeader('Service-Worker-Allowed', '/vault/');
+    res.setHeader('Service-Worker-Allowed', '/');
     res.sendFile(join(__dirname, 'public', 'sw.js'));
   });
-  app.use('/vault/manifest.json', (_req, res) => {
+  app.use('/manifest.json', (_req, res) => {
     res.sendFile(join(__dirname, 'public', 'manifest.json'));
   });
-  app.use('/vault/icon-192.png', (_req, res) => {
+  app.use('/icon-192.png', (_req, res) => {
     res.sendFile(join(__dirname, 'public', 'icon-192.png'));
   });
-  app.use('/vault/icon-512.png', (_req, res) => {
+  app.use('/icon-512.png', (_req, res) => {
     res.sendFile(join(__dirname, 'public', 'icon-512.png'));
   });
 
@@ -177,7 +177,7 @@ async function start() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use('/vault', express.static(join(__dirname, 'dist')));
+    app.use(express.static(join(__dirname, 'dist')));
   }
 
   app.use((err, _req, res, _next) => {
@@ -186,7 +186,7 @@ async function start() {
   });
 
   app.listen(PORT, () => {
-    console.log(`Prompt Vault v${pkg.version} listening on http://localhost:${PORT}/vault/`);
+    console.log(`Prompt Vault v${pkg.version} listening on http://localhost:${PORT}/`);
   });
 }
 

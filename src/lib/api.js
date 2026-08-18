@@ -1,4 +1,4 @@
-const BASE = '/vault/api';
+const BASE = '/api';
 
 async function request(path, opts = {}) {
   const res = await fetch(`${BASE}${path}`, {

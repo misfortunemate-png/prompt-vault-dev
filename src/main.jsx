@@ -10,5 +10,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 );
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/vault/sw.js', { scope: '/vault/' });
+  navigator.serviceWorker.register('/sw.js', { scope: '/' });
 }

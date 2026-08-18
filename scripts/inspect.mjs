@@ -79,7 +79,7 @@ check('版確認', () => {
   console.log(`  package.json version: ${pkg.version}`);
   try {
     const port = process.env.PORT || 8789;
-    const resp = execSync(`curl -s http://localhost:${port}/vault/api/healthz`, { timeout: 5000 });
+    const resp = execSync(`curl -s http://localhost:${port}/api/healthz`, { timeout: 5000 });
     const data = JSON.parse(resp.toString());
     console.log(`  healthz version: ${data.version}`);
     if (pkg.version !== data.version) {

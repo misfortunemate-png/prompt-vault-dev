@@ -6,10 +6,11 @@
 - 権威文書:
   - docs/20260817_prompt-vault_spec_m1.md（実装仕様書）
   - docs/instructions/20260817_prompt-vault_m1_instructions.md（作業指示書）
+  - docs/instructions/20260818_prompt-vault_m1-nw_instructions.md（NW改修指示書）
 
 ## 規約
 
-- base URL は `/vault/` を前提とすること
+- base URL はルート `/` 。ベースパスなし
 - ポート 8789（.env PORT で変更可能）
 - React Router 不使用。画面遷移は useState で管理
 - docs/supplied/ 配下は支給物。内容変更禁止
@@ -19,7 +20,7 @@
 
 - サーバー: Node.js + Express
 - フロント: Vite + React（SPA）
-- 配信: tailscale serve --set-path /vault
+- 配信: tailscale serve --https=8445（tailnet専用）
 
 ## コマンド
 
