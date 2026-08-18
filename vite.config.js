@@ -5,6 +5,7 @@ export default defineConfig({
   base: '/',
   plugins: [react()],
   server: {
+    allowedHosts: ['fraine.tail204746.ts.net'],
     hmr: {
       protocol: 'ws',
       port: 5173,
