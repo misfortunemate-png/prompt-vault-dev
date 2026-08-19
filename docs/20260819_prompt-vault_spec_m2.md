@@ -1,86 +1,117 @@
-# Prompt Vault M2 仕様書 v1.0
+# Prompt Vault M2 仕様書 v1.1
 
 文書種別: 権威文書
-作成日: 2026-08-19 ／ PM: クリーデ ／ 承認: 未 ／ 根拠: 要件定義v1.3 R-2（単発生成）・R-3（保管）・R-4（最小一覧）
+作成日: 2026-08-19 ／ PM: クリーデ ／ 承認: モックアップv4承認済み ／ 根拠: 要件定義v1.3 R-2（単発生成）・R-3（保管）・R-4（最小一覧）
 
 ## §1 スコープ
 
-M2 = 単発生成 → フラット保存 → 最小一覧。
+M2 = プリセット選択 → 単発生成 → 保存（フォルダ振り分け）→ アルバム閲覧。
 
-- In: NovelAI API V4.5対応の単発生成、パラメータUI、無料枠ガード、VAULT_ROOTへのフラット保存、「アルバム」タブの最小一覧
-- Out: カード合成（M3）、パスセグメント規則保存（M3）、ギャラリー本装（M4）、ジョブキュー（M5）、サムネイルキャッシュ（M4）
+- In: プリセット＋個別プルダウンによるプロンプト構成、NovelAI API V4.5対応の単発生成、パラメータUI、無料枠ガード、保存（第一プリセットでフォルダ振り分け）、アルバム（新着＋フォルダ＋4象限ナビ）
+- Out: プリセットのCRUD UI（M3・テンプレートタブ）、ギャラリー本装（M4）、ジョブキュー（M5）、サムネイルキャッシュ（M4）
 
 ## §2 生成画面（フッター「生成」タブ）
 
-### §2.1 レイアウト
+### §2.1 レイアウト（上から下へスクロール）
 
-- プロンプト入力欄（正・テキストエリア・複数行）
-- ネガティブプロンプト入力欄（テキストエリア・折りたたみ可・既定開）
-- パラメータセクション（折りたたみ可・既定閉）:
-  - モデル選択: セレクトボックス。選択肢は §3.1 参照
-  - 解像度プリセット: セレクトボックス。選択肢は §2.2 参照
-  - ステップ数: 数値入力（既定28・1〜50）
-  - プロンプトガイダンス（scale）: 数値入力（既定5・1〜10・0.1刻み）
-  - サンプラー: セレクトボックス（既定 `k_euler_ancestral`）
-  - シード: 数値入力（空欄=ランダム）
-- 生成ボタン（画面下部固定）
-- 結果表示エリア（生成ボタンの上に最後の生成結果を表示）
+1. **プリセット選択**（プルダウン）: プリセット＝正プロンプト＋ネガティブのセット
+2. **個別プルダウン群**: キャラ / シチュエーション / 衣装 / その他。各プルダウンの先頭は「（なし）」。選択した値がプリセットの正プロンプトに結合される
+3. **プロンプト確認・編集**（折りたたみ・既定閉）: 結合結果（正）とネガティブのテキストエリア。直接編集可
+4. **パラメータ**（折りたたみ・既定閉）: §2.3参照
+5. **生成ボタン**: スクロール内に配置（固定フッターにしない）
+6. **生成結果一覧**: 生成ボタンの下にカードが降順に積み上がる。§2.5参照
 
-### §2.2 解像度プリセット
+### §2.2 プリセットデータ
 
-Opus無料枠条件: 合計ピクセル数 ≤ 1,048,576（1MP）。プリセットはすべてこの範囲内。
+M2ではプリセットをJSONファイル（`VAULT_ROOT/presets.json`）で管理する。プリセットのUI編集はM3（テンプレートタブ）で実装。M2では初期データを同梱し、手動でJSONを編集可能。
 
-| 名称 | 幅 | 高さ | 用途 |
-|---|---|---|---|
-| Portrait（既定） | 832 | 1216 | 縦長・標準 |
-| Landscape | 1216 | 832 | 横長 |
-| Square | 1024 | 1024 | 正方形 |
-| Wide Portrait | 768 | 1344 | 細長縦 |
-| Wide Landscape | 1344 | 768 | 細長横 |
+```json
+{
+  "presets": [
+    {
+      "name": "ポートレート標準",
+      "positive": "portrait, upper body, looking at viewer, smile, best quality, very aesthetic",
+      "negative": "blurry, lowres, error, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration"
+    }
+  ],
+  "characters": ["キャラA", "キャラB"],
+  "situations": ["放課後", "戦闘", "日常"],
+  "outfits": ["制服", "私服", "ドレス"],
+  "extras": ["雨", "夜景", "桜"]
+}
+```
 
-カスタム入力は置かない（枠外サイズでAnlasを消費するリスクを構造的に排除）。
+サーバー起動時にファイルが存在しなければ初期データで生成する。
 
-### §2.3 無料枠ガード
+プロンプト結合ルール: `{preset.positive}, {character}, {situation}, {outfit}, {extra}`。「（なし）」の項目はスキップ。
 
-生成リクエスト前に以下を機械チェック。違反時は生成を阻止しトーストで通知。
+### §2.3 パラメータ
+
+2列グリッド配置。
+
+| 項目 | 型 | 既定値 |
+|---|---|---|
+| モデル | セレクト | V4.5 Full |
+| 解像度 | セレクト | Portrait (832×1216) |
+| ステップ | 数値 | 28（1〜50） |
+| ガイダンス（scale） | 数値 | 5（1〜10・0.1刻み） |
+| サンプラー | セレクト | k_euler_ancestral |
+| シード | 数値 | 空欄=ランダム |
+
+解像度プリセット（すべて≤1MP・Opus無料枠内）:
+
+| 名称 | 幅 | 高さ |
+|---|---|---|
+| Portrait（既定） | 832 | 1216 |
+| Landscape | 1216 | 832 |
+| Square | 1024 | 1024 |
+
+### §2.4 無料枠ガード
+
+- ステップ > 28: 「Anlas消費」警告、続行/キャンセル選択
 - 解像度: プリセット強制のため違反は起こらない
-- ステップ: > 28 の場合「Anlas消費」警告を表示し、続行/キャンセルを選択させる
 - n_samples: 常に1（UIに露出しない）
-- action: 常に `generate`（txt2imgのみ）
 
-### §2.4 生成中UI
+### §2.5 生成結果カード
 
-- 生成ボタンをスピナー付き「生成中…」に変更、再押下不可
-- エラー時: トースト通知 + 生成ボタン復帰
-- 成功時: 結果表示エリアに画像表示 + 生成ボタン復帰
+生成ごとに1枚のカードが追加される（降順）。カードの構成:
+
+- 正方形サムネイル（72×72px・ブラウザリサイズ）
+- パラメータ表示（解像度・seed・キャラ名/衣装名）
+- **保存ボタン** → 押すと「✓ 保存済み」に変化
+
+未保存の画像はサーバー側の一時ディレクトリ（`VAULT_ROOT/.tmp/`）に保持。保存ボタンで正式フォルダに移動。
+
+### §2.6 生成中UI
+
+- 生成ボタンを「生成中…」に変更、再押下不可
+- エラー時: トースト通知 + ボタン復帰
 
 ## §3 NovelAI APIアダプター（server側）
 
 ### §3.1 対応モデル
 
-| 表示名 | API文字列 | 備考 |
-|---|---|---|
-| V4.5 Full（既定） | `nai-diffusion-4-5-full` | 最新・フルデータセット |
-| V4.5 Curated | `nai-diffusion-4-5-curated` | 最新・キュレーション |
-| V4 Full | `nai-diffusion-4-full` | 前世代 |
-| V3 | `nai-diffusion-3` | 旧モデル（レガシー互換） |
+| 表示名 | API文字列 |
+|---|---|
+| V4.5 Full（既定） | nai-diffusion-4-5-full |
+| V4.5 Curated | nai-diffusion-4-5-curated |
+| V4 Full | nai-diffusion-4-full |
+| V3 | nai-diffusion-3 |
 
 ### §3.2 APIリクエスト構造
 
 エンドポイント: `POST https://image.novelai.net/ai/generate-image`
 認証: `Authorization: Bearer {NOVELAI_TOKEN}`
 
-V4/V4.5モデルのリクエストボディ:
-
+V4/V4.5リクエスト:
 ```json
 {
-  "input": "{positive_prompt}",
-  "model": "{model_string}",
+  "input": "{positive}",
+  "model": "{model}",
   "action": "generate",
   "parameters": {
     "params_version": 3,
-    "width": 832,
-    "height": 1216,
+    "width": 832, "height": 1216,
     "scale": 5,
     "sampler": "k_euler_ancestral",
     "steps": 28,
@@ -95,150 +126,158 @@ V4/V4.5モデルのリクエストボディ:
     "legacy_v3_extend": false,
     "use_coords": false,
     "v4_prompt": {
-      "caption": {
-        "base_caption": "{positive_prompt}",
-        "char_captions": []
-      },
-      "use_coords": false,
-      "use_order": true
+      "caption": { "base_caption": "{positive}", "char_captions": [] },
+      "use_coords": false, "use_order": true
     },
     "v4_negative_prompt": {
-      "caption": {
-        "base_caption": "{negative_prompt}",
-        "char_captions": []
-      }
+      "caption": { "base_caption": "{negative}", "char_captions": [] }
     },
-    "negative_prompt": "{negative_prompt}"
+    "negative_prompt": "{negative}"
   }
 }
 ```
 
-V3モデルのリクエストボディ（レガシー互換）:
+V3リクエスト（レガシー）: `params_version`・`v4_prompt`・`v4_negative_prompt`を除外、`sampler`既定を`k_euler`にする。
 
-```json
-{
-  "input": "{positive_prompt}",
-  "model": "nai-diffusion-3",
-  "action": "generate",
-  "parameters": {
-    "width": 832,
-    "height": 1216,
-    "scale": 5,
-    "sampler": "k_euler",
-    "steps": 28,
-    "seed": 0,
-    "n_samples": 1,
-    "cfg_rescale": 0,
-    "noise_schedule": "karras",
-    "negative_prompt": "{negative_prompt}"
-  }
-}
-```
-
-モデル文字列が `nai-diffusion-3` のときはV3形式、それ以外はV4形式で送信する。分岐はサーバー側アダプターが行う。
+モデル文字列が`nai-diffusion-3`のときV3形式、それ以外はV4形式。
 
 ### §3.3 レスポンス処理
 
-- レスポンスはZIP形式（`application/zip` or `application/x-zip-compressed`）
-- chat-pwa novelai.jsのZIP手動パーサー（PK\x03\x04ヘッダー走査・deflate展開・bit3データデスクリプタ対応）を移植する。npm依存追加なし
-- ZIP内のPNGを1枚取り出して保存
+- ZIPレスポンス（PK\x03\x04ヘッダー走査・deflate展開・bit3データデスクリプタ対応）
+- chat-pwa novelai.jsのZIPパーサーを移植。npm依存追加なし
+- ZIP内のPNGを1枚取り出し、一時ディレクトリ（`VAULT_ROOT/.tmp/`）に保存
 
 ### §3.4 APIルート
 
-`POST /api/generate` — 生成リクエスト
+`POST /api/generate`:
 
-リクエストボディ:
+リクエスト:
 ```json
 {
-  "prompt": "1girl, ...",
-  "negative_prompt": "worst quality, ...",
+  "prompt": "portrait, upper body, ..., キャラA, 制服",
+  "negative_prompt": "blurry, lowres, ...",
   "model": "nai-diffusion-4-5-full",
-  "width": 832,
-  "height": 1216,
-  "steps": 28,
-  "scale": 5,
+  "width": 832, "height": 1216,
+  "steps": 28, "scale": 5,
   "sampler": "k_euler_ancestral",
-  "seed": null
+  "seed": null,
+  "save_meta": { "character": "キャラA", "outfit": "制服" }
 }
 ```
 
-レスポンス（成功）:
+レスポンス:
 ```json
 {
   "success": true,
   "image": {
-    "filename": "20260819_143052_a1b2c3d4.png",
-    "path": "20260819_143052_a1b2c3d4.png",
-    "size": 1234567,
-    "width": 832,
-    "height": 1216
+    "filename": "tmp_1724034652_a1b2c3d4.png",
+    "seed": 2847103956,
+    "width": 832, "height": 1216
   }
 }
 ```
 
-`seed: null` の場合はサーバー側でランダム生成（`crypto.randomInt(0, 2**32)`）し、レスポンスに含める。
+`POST /api/save`:
 
-### §3.5 エラー処理
+リクエスト:
+```json
+{ "filename": "tmp_1724034652_a1b2c3d4.png", "character": "キャラA", "outfit": "制服" }
+```
 
-- NOVELAI_TOKEN未設定 → 400 + メッセージ
-- NovelAI API 4xx/5xx → エラーテキスト先頭200文字をログ、クライアントへは丸めたメッセージ
-- ZIP内にPNG未検出 → 500 + メッセージ
+処理: `.tmp/{filename}` → `{character}/{outfit}_{YYYYMMDD}_{HHmmss}_{hex}.png` にリネーム移動。キャラフォルダが存在しなければ作成。
 
-## §4 保存（M2暫定・フラット方式）
+レスポンス:
+```json
+{ "success": true, "saved_path": "キャラA/制服_20260819_143052_a1b2.png" }
+```
 
-### §4.1 保存先
+## §4 保存とフォルダ構成
 
-`VAULT_ROOT`（.env指定・必須）。VAULT_ROOT未設定の場合、生成ボタンを無効化し設定画面への誘導メッセージを表示。
+### §4.1 VAULT_ROOT
 
-### §4.2 ファイル名
+.env `VAULT_ROOT` で指定（絶対パス・必須）。未設定時は生成ボタン無効＋設定画面誘導。
 
-`{YYYYMMDD}_{HHmmss}_{ランダム8hex}.png`
+### §4.2 フォルダ構成
 
-例: `20260819_143052_a1b2c3d4.png`
+```
+VAULT_ROOT/
+  .tmp/                          ← 未保存の一時画像
+  presets.json                   ← プリセット定義
+  キャラA/                       ← 第一プリセット（キャラ）= フォルダ
+    制服_20260818_211503_c9d0.png  ← 第二プリセット（衣装）がファイル名先頭
+    制服_20260817_163045_7e8f.png
+    私服_20260819_143052_a1b2.png
+    私服_20260818_195722_3a4b.png
+  キャラB/
+    ...
+  オリジナル/                    ← キャラ「（なし）」の場合のフォルダ名
+    ...
+```
 
-M2ではVAULT_ROOT直下にフラット配置。パスセグメント（作品/キャラ/衣装）によるフォルダ構成はM3で導入する。
+### §4.3 ファイル名規則
 
-### §4.3 メタデータ
+`{第二プリセット}_{YYYYMMDD}_{HHmmss}_{ランダム4hex}.png`
 
-NovelAI APIレスポンスのPNGにはExifチャンクとして生成パラメータが埋め込まれている（NovelAI標準仕様）。M2ではこの埋め込みをそのまま保存する（上書き・除去しない）。
+第二プリセットは衣装 → シチュエーション → その他の優先順で最初の「（なし）」でない値を使う。すべて「（なし）」の場合は `gen` をプレフィックスにする。
 
-## §5 最小一覧（フッター「アルバム」タブ）
+名前順ソートにより、同じ第二プリセット（衣装・シチュ等）の画像がフォルダ内で自然にまとまる。
 
-### §5.1 表示内容
+### §4.4 メタデータ
 
-- VAULT_ROOT内のPNGファイルを更新日時の降順で一覧表示
-- 表示方式: グリッド（横2列・レスポンシブ）
-- 画像の読み込み: `GET /api/images/:filename`（サーバー側でVAULT_ROOTから読み出し）
-- サムネイルは生成しない（M4のsharpサムネイルまではブラウザリサイズで代替）。`loading="lazy"` で遅延読み込み
-- 画像タップ → 簡易ビューア（画像の拡大表示・閉じるボタン。本格ビューアはM4）
+NovelAI APIレスポンスのPNG Exifチャンク（生成パラメータ埋め込み）をそのまま保存する。
 
-### §5.2 画像配信API
+## §5 アルバム画面（フッター「アルバム」タブ）
 
-- `GET /api/images` — ファイル一覧（ファイル名・サイズ・更新日時）
-- `GET /api/images/:filename` — 画像本体（Content-Type: image/png）
+### §5.1 ルート表示
 
-一覧取得時にVAULT_ROOTを `fs.readdir` → `.png` フィルタ → `stat` で更新日時取得 → 降順ソート。M4のインデックス（ハッシュベース中央DB）導入までの暫定。
+1. **新着欄**: 直近の保存画像を4列グリッドで表示（最新N件・既定8件）。各画像の下にフォルダ名
+2. **フォルダ欄**: VAULT_ROOT直下のフォルダを4列グリッドで表示。フォルダアイコン＋名前＋件数
 
-### §5.3 上限
+### §5.2 フォルダ内表示
 
-M2時点ではページネーションを置かない。ファイル数が少ない段階（数十〜百枚）を想定。M4でインデックス＋サムネイル＋ページネーションが入る。
+- パンくず（VAULT > フォルダ名）
+- 4列グリッド、名前順（=第二プリセットごとにまとまる）
+- 各画像の下にラベル（第二プリセント名）
+
+### §5.3 4象限ナビゲーション
+
+画像タップで全画面ビューアに入る。画面を4象限に分割:
+
+| 位置 | 操作 |
+|---|---|
+| 左上 | メニュー（一覧）に戻る |
+| 右上 | 次のフォルダに移動 |
+| 右下 | 次の画像 |
+| 左下 | 前の画像 |
+
+象限ガイドは半透明で四隅に表示。下部にファイル名と現在位置（n/total）。
+
+### §5.4 画像配信API
+
+- `GET /api/images` — フォルダ一覧 + 新着
+- `GET /api/images/:folder` — フォルダ内画像一覧（名前順）
+- `GET /api/images/:folder/:filename` — 画像本体
+- `GET /api/images/.tmp/:filename` — 一時画像本体
 
 ## §6 設定画面拡張
 
 M1の設定画面に以下を追加:
 
-- VAULT_ROOT表示（読み取り専用・.envから取得）
-- 既定モデル選択（§3.1の選択肢。設定保存で永続化）
-- NOVELAI_TOKEN状態表示（設定済み/未設定。値はマスク。.env管理）
-- 既定ネガティブプロンプト（テキストエリア。生成画面の初期値に使用。既定値: `blurry, lowres, error, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration`）
+- VAULT_ROOT表示（読み取り専用）
+- NOVELAI_TOKEN状態表示（設定済み/未設定・マスク表示）
+- 既定モデル選択
 
 ## §7 API一覧（M2追加分）
 
 | メソッド | パス | 用途 |
 |---|---|---|
+| GET | /api/presets | プリセット定義取得 |
 | POST | /api/generate | 画像生成 |
-| GET | /api/images | 画像一覧 |
-| GET | /api/images/:filename | 画像本体 |
+| POST | /api/save | 画像保存（.tmp→フォルダ移動） |
+| GET | /api/images | フォルダ一覧＋新着 |
+| GET | /api/images/:folder | フォルダ内画像一覧（名前順） |
+| GET | /api/images/:folder/:filename | 画像本体 |
+| GET | /api/images/.tmp/:filename | 一時画像本体 |
 
 ## §8 テスト方針
 
@@ -246,27 +285,30 @@ M1の設定画面に以下を追加:
 
 | 項目 | 手順 | 合格基準 |
 |---|---|---|
+| プリセット読み込み | 起動→生成タブ | プルダウンにプリセット名が表示 |
+| プロンプト結合 | キャラ・衣装選択→編集展開 | 結合結果が正しい |
 | API疎通 | デバッグ画面のNovelAIテスト | 200応答 |
-| 単発生成 | 生成タブでプロンプト入力→生成 | 画像表示・VAULT_ROOTにPNG保存 |
-| V4.5リクエスト | V4.5 Fullで生成、サーバーログでリクエスト構造確認 | v4_prompt構造が含まれること |
-| V3フォールバック | V3モデル選択→生成 | v4_prompt構造が含まれないこと |
-| 無料枠ガード | ステップ数29に設定→生成 | Anlas警告が表示されること |
-| VAULT_ROOT未設定 | .envからVAULT_ROOT削除→再起動 | 生成ボタン無効・誘導メッセージ |
-| 一覧表示 | アルバムタブ表示 | 生成した画像がグリッド表示 |
-| 簡易ビューア | 一覧の画像タップ | 拡大表示・閉じるで一覧に戻る |
-| build | `npm run build` | 警告なし |
-| inspect | `npm run inspect` | ALL GREEN |
+| V4.5生成 | V4.5 Fullで生成 | 画像表示・.tmpに保存 |
+| V3生成 | V3モデル選択→生成 | v4_prompt構造なし |
+| 保存 | 保存ボタン→確認 | フォルダに移動・ファイル名規則準拠 |
+| 名前順 | 同一フォルダに衣装違いで複数保存→アルバム | 同じ衣装がまとまる |
+| 新着 | 保存後アルバムタブ | 新着欄に表示 |
+| 4象限 | ビューアで各象限タップ | 前後移動・フォルダ移動・閉じる |
+| 無料枠ガード | ステップ29で生成 | 警告表示 |
+| VAULT_ROOT未設定 | .envからVAULT_ROOT削除 | 生成ボタン無効 |
+| build | npm run build | 警告なし |
+| inspect | npm run inspect | ALL GREEN |
 
 ### 実機（発注者に依頼）
 
-- Pixel 10から `https://fraine.tail204746.ts.net:8445/` で生成→保存→一覧の一連動作
-- 生成画像の品質確認（V4.5 vs V3の比較）
+- Pixel 10から生成→保存→アルバム閲覧→4象限ナビの一連動作
+- 生成画像の品質確認（V4.5 vs V3）
 
 ## §9 .env追加項目
 
 ```
-NOVELAI_TOKEN=    # NovelAI Persistent API Token（pst-から始まる）
-VAULT_ROOT=       # 画像保存ルートディレクトリの絶対パス（例: D:\AI\vault）
+NOVELAI_TOKEN=    # NovelAI Persistent API Token
+VAULT_ROOT=       # 画像保存ルートディレクトリの絶対パス
 ```
 
 ## 改訂履歴
@@ -274,3 +316,4 @@ VAULT_ROOT=       # 画像保存ルートディレクトリの絶対パス（例
 | 日付 | 版 | 変更内容 |
 |---|---|---|
 | 2026-08-19 | v1.0 | 初版（PM起草） |
+| 2026-08-19 | v1.1 | モックアップv4承認を反映。プリセット＋個別プルダウン構成、生成結果カード＋保存ボタン、フォルダ振り分け（第一プリセット）、ファイル名規則（第二プリセント先頭・名前順まとまり）、新着欄、4象限ナビ、API設計改訂 |
