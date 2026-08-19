@@ -4,6 +4,7 @@ import Footer from './components/Footer';
 import Toast from './components/Toast';
 import GenerateScreen from './screens/GenerateScreen';
 import AlbumScreen from './screens/AlbumScreen';
+import TemplateScreen from './screens/TemplateScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { api } from './lib/api';
 
@@ -130,8 +131,10 @@ export default function App() {
     mainContent = <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} />;
   } else if (activeTab === 'album') {
     mainContent = <AlbumScreen addToast={addToast} />;
+  } else if (activeTab === 'template') {
+    mainContent = <TemplateScreen addToast={addToast} />;
   } else {
-    mainContent = <PlaceholderView message="M3以降で実装します" />;
+    mainContent = <PlaceholderView message="未実装のタブです" />;
   }
 
   return (

@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.2.0
-milestone: M2-B
+version: 3.3.0
+milestone: M3
 status: done
 updated: 2026-08-19
 ---
@@ -10,20 +10,18 @@ updated: 2026-08-19
 
 - [x] サーバー骨格・設定画面・PWA・tailscale配線・NW改修
 
-## M2-A: サーバーAPI＋生成画面（完了）
+## M2: 生成画面＋アルバム（完了）
 
-- [x] server/providers/novelai.js（ZIPパーサー・V4.5対応）
-- [x] generate/save/images API群
-- [x] 生成画面UI（プリセット・個別・パラメータ・結果カード）
-- [x] 結果state持ち上げ（タブ切り替え保持・maxResults上限）
+- [x] novelai.js（ZIPパーサー・V4.5）・generate/save/images API
+- [x] AlbumScreen.jsx（新着・フォルダ・4象限ナビ）
 
-## M2-B: アルバム画面（完了）
+## M3: カードシステム（完了）
 
-- [x] AlbumScreen.jsx（新着・フォルダ一覧・フォルダ内・4象限ナビ）
-- [x] App.jsx接続（albumタブ）
-
-## 残課題（次マイルストーン以降）
-
-- [ ] トーストの自動消去（10秒程度でフェードアウト）
-- [ ] 連続生成（生成ボタン連打 or 枚数指定での連続実行）
-- [ ] danbooruタグ予測変換（支給物: docs/supplied/danbooru-filtered.csv）
+- [x] data/cards.json・data/presets.json 初期化・CRUD API
+- [x] danbooruタグ検索API（GET /api/tags/search）
+- [x] M2マイグレーション（VAULT_ROOT/presets.json→cards.json）
+- [x] 保存API M3形式（folderSegments/filenameSegments/seed）
+- [x] TemplateScreen（スロット・カード・プリセット管理）
+- [x] TagSuggest・TagInput コンポーネント
+- [x] GenerateScreen カードベース合成・インライン編集
+- [x] Toastの10秒自動フェードアウト

@@ -18,9 +18,34 @@ export const api = {
   testApi: () => request('/debug/test-api', { method: 'POST' }),
   testFs: () => request('/debug/test-fs', { method: 'POST' }),
   reset: () => request('/debug/reset', { method: 'POST' }),
+
+  // Cards / Slots
+  getCards: () => request('/cards'),
+  putCards: (data) => request('/cards', { method: 'PUT', body: JSON.stringify(data) }),
+  addSlot: (data) => request('/cards/slot', { method: 'POST', body: JSON.stringify(data) }),
+  updateSlot: (id, data) => request(`/cards/slot/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSlot: (id) => request(`/cards/slot/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  addCard: (data) => request('/cards/card', { method: 'POST', body: JSON.stringify(data) }),
+  updateCard: (id, data) => request(`/cards/card/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCard: (id) => request(`/cards/card/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  duplicateCard: (id) => request(`/cards/card/${encodeURIComponent(id)}/duplicate`, { method: 'POST' }),
+
+  // Presets
   getPresets: () => request('/presets'),
+  getPresetTags: () => request('/presets/tags'),
+  addPreset: (data) => request('/presets', { method: 'POST', body: JSON.stringify(data) }),
+  updatePreset: (id, data) => request(`/presets/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePreset: (id) => request(`/presets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  duplicatePreset: (id) => request(`/presets/${encodeURIComponent(id)}/duplicate`, { method: 'POST' }),
+
+  // Tags
+  searchTags: (q) => request(`/tags/search?q=${encodeURIComponent(q)}`),
+
+  // Generate / Save
   generate: (data) => request('/generate', { method: 'POST', body: JSON.stringify(data) }),
   saveImage: (data) => request('/save', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Images
   getImages: () => request('/images'),
   getImageFolder: (folder) => request(`/images/${encodeURIComponent(folder)}`),
 };

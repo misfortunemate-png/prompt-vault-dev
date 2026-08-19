@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const typeStyles = {
   success: { background: 'var(--accent)', color: 'var(--accent-contrast)' },
@@ -6,12 +6,17 @@ const typeStyles = {
   info: { background: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--line)' },
 };
 
+const AUTO_DISMISS_MS = 10000;
+const FADE_MS = 300;
+
 function ToastItem({ toast, onRemove }) {
+  const [fading, setFading] = useState(false);
+
   useEffect(() => {
-    if (toast.type !== 'error') {
-      const t = setTimeout(() => onRemove(toast.id), 3000);
-      return () => clearTimeout(t);
-    }
+    if (toast.type === 'error') return;
+    const fadeTimer = setTimeout(() => setFading(true), AUTO_DISMISS_MS - FADE_MS);
+    const removeTimer = setTimeout(() => onRemove(toast.id), AUTO_DISMISS_MS);
+    return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); };
   }, [toast, onRemove]);
 
   return (
@@ -24,6 +29,8 @@ function ToastItem({ toast, onRemove }) {
       gap: '8px',
       fontSize: 'var(--fs-label)',
       boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+      opacity: fading ? 0 : 1,
+      transition: `opacity ${FADE_MS}ms ease`,
       ...typeStyles[toast.type] || typeStyles.info,
     }}>
       <span>{toast.message}</span>

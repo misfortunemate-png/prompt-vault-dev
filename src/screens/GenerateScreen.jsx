@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import TagSuggest from '../components/TagSuggest';
 import { api } from '../lib/api';
 
 const MODELS = [
@@ -9,34 +10,31 @@ const MODELS = [
 ];
 
 const RESOLUTIONS = [
-  { value: 'portrait', label: 'Portrait (832×1216)', width: 832, height: 1216 },
-  { value: 'landscape', label: 'Landscape (1216×832)', width: 1216, height: 832 },
-  { value: 'square', label: 'Square (1024×1024)', width: 1024, height: 1024 },
+  { value: 'portrait',  label: 'Portrait (832×1216)',  width: 832,  height: 1216 },
+  { value: 'landscape', label: 'Landscape (1216×832)', width: 1216, height: 832  },
+  { value: 'square',    label: 'Square (1024×1024)',   width: 1024, height: 1024 },
 ];
 
 const SAMPLERS = ['k_euler_ancestral', 'k_euler', 'k_dpmpp_2m_sde'];
 
-const NONE = '（なし）';
+const NONE = null;
+
+const fieldStyle = {
+  width: '100%',
+  padding: '8px 10px',
+  border: '1px solid var(--line)',
+  borderRadius: 'var(--radius-s)',
+  background: 'var(--bg)',
+  color: 'var(--text-primary)',
+  fontSize: 'var(--fs-body)',
+  boxSizing: 'border-box',
+};
 
 const labelStyle = {
   display: 'block',
   fontSize: 'var(--fs-label)',
   color: 'var(--text-secondary)',
   marginBottom: '4px',
-};
-
-const selectStyle = {
-  width: '100%',
-  padding: '8px 10px',
-  border: '1px solid var(--line)',
-  borderRadius: 'var(--radius-s)',
-  background: 'var(--bg)',
-  color: 'var(--text)',
-  fontSize: 'var(--fs-body)',
-};
-
-const inputStyle = {
-  ...selectStyle,
 };
 
 const sectionStyle = {
@@ -46,77 +44,8 @@ const sectionStyle = {
   marginBottom: '10px',
 };
 
-const collapseHeaderStyle = {
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
-  color: 'var(--text)',
-  fontSize: 'var(--fs-body)',
-  padding: '0',
-  width: '100%',
-  textAlign: 'left',
-};
-
-function SelectField({ label, value, options, onChange }) {
-  return (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} style={selectStyle}>
-        {options.map(o => (
-          <option key={o} value={o}>{o}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function ParamSelect({ label, value, options, onChange }) {
-  return (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} style={selectStyle}>
-        {options.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function ParamNumber({ label, value, min, max, step, onChange }) {
-  return (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <input
-        type="number"
-        value={value}
-        min={min}
-        max={max}
-        step={step || 1}
-        onChange={e => onChange(Number(e.target.value))}
-        style={inputStyle}
-      />
-    </div>
-  );
-}
-
-function ParamText({ label, value, placeholder, onChange }) {
-  return (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <input
-        type="number"
-        value={value}
-        placeholder={placeholder}
-        min={0}
-        onChange={e => onChange(e.target.value)}
-        style={inputStyle}
-      />
-    </div>
-  );
-}
-
 function ResultCard({ item, onSave }) {
+  const label = item.filenameSegments?.filter(Boolean).join(' / ') || '（選択なし）';
   return (
     <div style={{
       background: 'var(--surface)',
@@ -130,21 +59,14 @@ function ResultCard({ item, onSave }) {
       <img
         src={`/api/images/.tmp/${item.filename}`}
         alt=""
-        style={{
-          width: 72,
-          height: 72,
-          objectFit: 'cover',
-          borderRadius: 'var(--radius-s)',
-          flexShrink: 0,
-          background: 'var(--line)',
-        }}
+        style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)' }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '2px' }}>
           {item.width}×{item.height} • seed: {item.seed}
         </div>
         <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {[item.character, item.outfit].filter(v => v && v !== NONE).join(' / ') || '（選択なし）'}
+          {label}
         </div>
         <button
           onClick={onSave}
@@ -159,26 +81,22 @@ function ResultCard({ item, onSave }) {
             cursor: item.saved ? 'default' : 'pointer',
             minHeight: '32px',
           }}
-        >
-          {item.saved ? '✓ 保存済み' : '保存'}
-        </button>
+        >{item.saved ? '✓ 保存済み' : '保存'}</button>
       </div>
     </div>
   );
 }
 
 export default function GenerateScreen({ addToast, results, setResults, maxResults }) {
-  const [presetData, setPresetData] = useState(null);
+  const [cardsData, setCardsData] = useState(null);
+  const [presetsData, setPresetsData] = useState(null);
   const [vaultReady, setVaultReady] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const [presetIdx, setPresetIdx] = useState(0);
-  const [character, setCharacter] = useState(NONE);
-  const [situation, setSituation] = useState(NONE);
-  const [outfit, setOutfit] = useState(NONE);
-  const [extra, setExtra] = useState(NONE);
+  const [selectedPresetId, setSelectedPresetId] = useState(null);
+  const [selectedCardMap, setSelectedCardMap] = useState({});
 
-  const [editedPrompt, setEditedPrompt] = useState('');
+  const [editedPositive, setEditedPositive] = useState('');
   const [editedNegative, setEditedNegative] = useState('');
   const [showPromptEdit, setShowPromptEdit] = useState(false);
   const [showParams, setShowParams] = useState(false);
@@ -192,38 +110,60 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const [generating, setGenerating] = useState(false);
 
-  const computePrompt = useCallback(() => {
-    if (!presetData || !presetData.presets.length) return '';
-    const preset = presetData.presets[presetIdx] || presetData.presets[0];
-    const parts = [preset.positive];
-    if (character !== NONE) parts.push(character);
-    if (situation !== NONE) parts.push(situation);
-    if (outfit !== NONE) parts.push(outfit);
-    if (extra !== NONE) parts.push(extra);
-    return parts.join(', ');
-  }, [presetData, presetIdx, character, situation, outfit, extra]);
+  // Inline edit state
+  const [inlineSlotId, setInlineSlotId] = useState(null);
+  const [inlinePos, setInlinePos] = useState('');
+  const [inlineNeg, setInlineNeg] = useState('');
+  const [inlineSaving, setInlineSaving] = useState(false);
+
+  const sortedSlots = cardsData ? [...cardsData.slots].sort((a, b) => a.order - b.order) : [];
+
+  const computePositive = useCallback((cardMap, data) => {
+    if (!data) return '';
+    const slots = [...data.slots].sort((a, b) => a.order - b.order);
+    return slots
+      .map(s => {
+        const cardId = cardMap[s.id];
+        if (!cardId) return '';
+        return data.cards.find(c => c.id === cardId)?.positive || '';
+      })
+      .filter(Boolean)
+      .join(', ');
+  }, []);
+
+  const computeNegative = useCallback((cardMap, data) => {
+    if (!data) return '';
+    const slots = [...data.slots].sort((a, b) => a.order - b.order);
+    return slots
+      .map(s => {
+        const cardId = cardMap[s.id];
+        if (!cardId) return '';
+        return data.cards.find(c => c.id === cardId)?.negative || '';
+      })
+      .filter(Boolean)
+      .join(', ');
+  }, []);
+
+  const refreshPrompts = useCallback((cardMap, data) => {
+    setEditedPositive(computePositive(cardMap, data));
+    setEditedNegative(computeNegative(cardMap, data));
+  }, [computePositive, computeNegative]);
 
   useEffect(() => {
-    if (!presetData) return;
-    setEditedPrompt(computePrompt());
-    const preset = presetData.presets[presetIdx] || presetData.presets[0];
-    if (preset) setEditedNegative(preset.negative || '');
-  }, [computePrompt, presetData, presetIdx]);
+    if (cardsData) refreshPrompts(selectedCardMap, cardsData);
+  }, [selectedCardMap, cardsData, refreshPrompts]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [info, settings] = await Promise.all([
-          api.getSystemInfo(),
-          api.getSettings(),
-        ]);
+        const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
+        if (settings.generation?.model) setModel(settings.generation.model);
         const ready = !!info.vaultRoot;
         setVaultReady(ready);
-        if (settings.generation?.model) setModel(settings.generation.model);
-
         if (ready) {
-          const presets = await api.getPresets();
-          setPresetData(presets);
+          const [cd, pd] = await Promise.all([api.getCards(), api.getPresets()]);
+          setCardsData(cd);
+          setPresetsData(pd);
         }
       } catch {
         addToast('error', 'データの読み込みに失敗しました');
@@ -234,26 +174,87 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     loadData();
   }, [addToast]);
 
-  const resolveSecondPreset = () => {
-    if (outfit !== NONE) return outfit;
-    if (situation !== NONE) return situation;
-    if (extra !== NONE) return extra;
-    return NONE;
+  const handlePresetSelect = (presetId) => {
+    setSelectedPresetId(presetId);
+    if (!presetId) { setSelectedCardMap({}); return; }
+    const preset = presetsData?.presets.find(p => p.id === presetId);
+    if (preset) setSelectedCardMap({ ...preset.cards });
+  };
+
+  const handleSlotChange = (slotId, cardId) => {
+    setSelectedPresetId(null);
+    setSelectedCardMap(prev => ({ ...prev, [slotId]: cardId || null }));
+    if (inlineSlotId === slotId) setInlineSlotId(null);
+  };
+
+  const openInlineEdit = (slot) => {
+    if (inlineSlotId === slot.id) { setInlineSlotId(null); return; }
+    const cardId = selectedCardMap[slot.id];
+    const card = cardId ? cardsData?.cards.find(c => c.id === cardId) : null;
+    setInlinePos(card?.positive || '');
+    setInlineNeg(card?.negative || '');
+    setInlineSlotId(slot.id);
+  };
+
+  const handleInlineOverwrite = async () => {
+    const cardId = selectedCardMap[inlineSlotId];
+    if (!cardId) return;
+    setInlineSaving(true);
+    try {
+      await api.updateCard(cardId, { positive: inlinePos, negative: inlineNeg });
+      const cd = await api.getCards();
+      setCardsData(cd);
+      addToast('success', 'カードを上書き保存しました');
+      setInlineSlotId(null);
+    } catch (e) {
+      addToast('error', e.message);
+    } finally {
+      setInlineSaving(false);
+    }
+  };
+
+  const handleInlineSaveAsNew = async () => {
+    const nameVal = window.prompt('新しいカード名を入力してください:');
+    if (!nameVal?.trim()) return;
+    setInlineSaving(true);
+    try {
+      const newCard = await api.addCard({ slotId: inlineSlotId, name: nameVal.trim(), positive: inlinePos, negative: inlineNeg });
+      const cd = await api.getCards();
+      setCardsData(cd);
+      setSelectedCardMap(prev => ({ ...prev, [inlineSlotId]: newCard.id }));
+      addToast('success', '新しいカードを作成しました');
+      setInlineSlotId(null);
+    } catch (e) {
+      addToast('error', e.message);
+    } finally {
+      setInlineSaving(false);
+    }
   };
 
   const handleGenerate = async () => {
-    if (steps > 28) {
-      if (!confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
-    }
-
+    if (steps > 28 && !window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
     setGenerating(true);
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
-    const currentCharacter = character;
-    const currentOutfit = resolveSecondPreset();
+
+    const folderSegments = sortedSlots
+      .filter(s => s.useAsFolder)
+      .map(s => {
+        const cardId = selectedCardMap[s.id];
+        return cardId ? cardsData.cards.find(c => c.id === cardId)?.name : null;
+      })
+      .filter(Boolean);
+
+    const filenameSegments = sortedSlots
+      .filter(s => s.useInFilename)
+      .map(s => {
+        const cardId = selectedCardMap[s.id];
+        return cardId ? cardsData.cards.find(c => c.id === cardId)?.name : null;
+      })
+      .filter(Boolean);
 
     try {
       const result = await api.generate({
-        prompt: editedPrompt,
+        prompt: editedPositive,
         negative_prompt: editedNegative,
         model,
         width: res.width,
@@ -262,11 +263,9 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         scale,
         sampler,
         seed: seed !== '' ? parseInt(seed, 10) : null,
-        save_meta: { character: currentCharacter, outfit: currentOutfit },
       });
-
       setResults(prev => {
-        const next = [{ ...result.image, character: currentCharacter, outfit: currentOutfit, saved: false }, ...prev];
+        const next = [{ ...result.image, folderSegments, filenameSegments, saved: false }, ...prev];
         return next.length > maxResults ? next.slice(0, maxResults) : next;
       });
     } catch (e) {
@@ -281,8 +280,9 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     try {
       await api.saveImage({
         filename: item.filename,
-        character: item.character,
-        outfit: item.outfit,
+        seed: item.seed,
+        folderSegments: item.folderSegments || [],
+        filenameSegments: item.filenameSegments || [],
       });
       setResults(prev => prev.map((r, i) => i === idx ? { ...r, saved: true } : r));
     } catch (e) {
@@ -292,8 +292,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100dvh - 48px - 54px)', color: 'var(--text-secondary)', fontSize: 'var(--fs-body)' }}>
-        読み込み中...
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100dvh - 48px - 54px)', color: 'var(--text-secondary)' }}>
+        読み込み中…
       </div>
     );
   }
@@ -302,143 +302,175 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     <div style={{ overflowY: 'auto', height: 'calc(100dvh - 48px - 54px)', padding: '12px 16px 24px' }}>
 
       {!vaultReady && (
-        <div style={{
-          background: 'var(--surface)',
-          borderRadius: 'var(--radius-m)',
-          padding: '16px',
-          marginBottom: '10px',
-          color: 'var(--text-secondary)',
-          fontSize: 'var(--fs-body)',
-          textAlign: 'center',
-        }}>
+        <div style={{ ...sectionStyle, color: 'var(--text-secondary)', textAlign: 'center' }}>
           設定画面でVAULT_ROOTを確認してください
         </div>
       )}
 
-      {/* 1. プリセット選択 */}
-      <div style={sectionStyle}>
-        <label style={labelStyle}>プリセット</label>
-        <select
-          value={presetIdx}
-          onChange={e => setPresetIdx(Number(e.target.value))}
-          style={selectStyle}
-          disabled={!presetData}
-        >
-          {presetData ? presetData.presets.map((p, i) => (
-            <option key={i} value={i}>{p.name}</option>
-          )) : <option>読み込み中...</option>}
-        </select>
-      </div>
-
-      {/* 2. 個別プルダウン群 */}
-      {presetData && (
-        <div style={{ ...sectionStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          <SelectField
-            label="キャラ"
-            value={character}
-            options={[NONE, ...presetData.characters]}
-            onChange={setCharacter}
-          />
-          <SelectField
-            label="シチュ"
-            value={situation}
-            options={[NONE, ...presetData.situations]}
-            onChange={setSituation}
-          />
-          <SelectField
-            label="衣装"
-            value={outfit}
-            options={[NONE, ...presetData.outfits]}
-            onChange={setOutfit}
-          />
-          <SelectField
-            label="その他"
-            value={extra}
-            options={[NONE, ...presetData.extras]}
-            onChange={setExtra}
-          />
+      {/* プリセット選択 */}
+      {presetsData && presetsData.presets.length > 0 && (
+        <div style={sectionStyle}>
+          <label style={labelStyle}>プリセット</label>
+          <select
+            value={selectedPresetId || ''}
+            onChange={e => handlePresetSelect(e.target.value || null)}
+            style={fieldStyle}
+          >
+            <option value="">（プリセットなし）</option>
+            {presetsData.presets.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
         </div>
       )}
 
-      {/* 3. プロンプト確認・編集 */}
+      {/* スロット別カード選択 */}
+      {cardsData && (
+        <div style={sectionStyle}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            {sortedSlots.map(slot => {
+              const slotCards = cardsData.cards.filter(c => c.slotId === slot.id);
+              const selectedCardId = selectedCardMap[slot.id];
+              return (
+                <div key={slot.id}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>{slot.name}</label>
+                    <button
+                      onClick={() => openInlineEdit(slot)}
+                      title="インライン編集"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: inlineSlotId === slot.id ? 'var(--accent)' : 'var(--text-secondary)', fontSize: '14px', padding: '0 2px' }}
+                    >✏️</button>
+                  </div>
+                  <select
+                    value={selectedCardId || ''}
+                    onChange={e => handleSlotChange(slot.id, e.target.value || null)}
+                    style={fieldStyle}
+                  >
+                    <option value="">（なし）</option>
+                    {slotCards.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* インラインカード編集 */}
+          {inlineSlotId && (
+            <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg)', borderRadius: 'var(--radius-s)', border: '1px solid var(--accent)' }}>
+              <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
+                {sortedSlots.find(s => s.id === inlineSlotId)?.name} — インライン編集
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <label style={labelStyle}>ポジティブ</label>
+                <TagSuggest
+                  value={inlinePos}
+                  onChange={setInlinePos}
+                  rows={3}
+                  style={{ ...fieldStyle, resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ marginBottom: '10px' }}>
+                <label style={labelStyle}>ネガティブ</label>
+                <TagSuggest
+                  value={inlineNeg}
+                  onChange={setInlineNeg}
+                  rows={2}
+                  style={{ ...fieldStyle, resize: 'vertical' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={handleInlineOverwrite}
+                  disabled={inlineSaving || !selectedCardMap[inlineSlotId]}
+                  style={{ padding: '7px 12px', border: 'none', borderRadius: 'var(--radius-s)', background: 'var(--accent)', color: 'var(--accent-contrast)', cursor: 'pointer', fontSize: 'var(--fs-label)', opacity: !selectedCardMap[inlineSlotId] ? 0.5 : 1 }}
+                >上書き保存</button>
+                <button
+                  onClick={handleInlineSaveAsNew}
+                  disabled={inlineSaving}
+                  style={{ padding: '7px 12px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-s)', background: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
+                >新規カードとして保存</button>
+                <button
+                  onClick={() => setInlineSlotId(null)}
+                  style={{ padding: '7px 12px', border: '1px solid var(--line)', borderRadius: 'var(--radius-s)', background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
+                >キャンセル</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* プロンプト確認・編集 */}
       <div style={sectionStyle}>
-        <button onClick={() => setShowPromptEdit(!showPromptEdit)} style={collapseHeaderStyle}>
+        <button onClick={() => setShowPromptEdit(!showPromptEdit)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', fontSize: 'var(--fs-body)', padding: 0, width: '100%', textAlign: 'left' }}>
           {showPromptEdit ? '▼' : '▶'} プロンプト確認・編集
         </button>
         {showPromptEdit && (
           <div style={{ marginTop: '12px' }}>
-            <label style={labelStyle}>正プロンプト</label>
+            <label style={labelStyle}>正プロンプト（一時編集・カードに反映しない）</label>
             <textarea
-              value={editedPrompt}
-              onChange={e => setEditedPrompt(e.target.value)}
+              value={editedPositive}
+              onChange={e => setEditedPositive(e.target.value)}
               rows={3}
-              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
+              style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }}
             />
-            <label style={{ ...labelStyle, marginTop: '10px' }}>ネガティブ</label>
+            <label style={{ ...labelStyle, marginTop: '10px' }}>ネガティブ（一時編集）</label>
             <textarea
               value={editedNegative}
               onChange={e => setEditedNegative(e.target.value)}
               rows={2}
-              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5 }}
+              style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }}
             />
           </div>
         )}
       </div>
 
-      {/* 4. パラメータ */}
+      {/* パラメータ */}
       <div style={sectionStyle}>
-        <button onClick={() => setShowParams(!showParams)} style={collapseHeaderStyle}>
+        <button onClick={() => setShowParams(!showParams)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', fontSize: 'var(--fs-body)', padding: 0, width: '100%', textAlign: 'left' }}>
           {showParams ? '▼' : '▶'} パラメータ
         </button>
         {showParams && (
           <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <ParamSelect
-              label="モデル"
-              value={model}
-              options={MODELS}
-              onChange={setModel}
-            />
-            <ParamSelect
-              label="解像度"
-              value={resolution}
-              options={RESOLUTIONS.map(r => ({ value: r.value, label: r.label }))}
-              onChange={setResolution}
-            />
-            <ParamNumber
-              label="ステップ"
-              value={steps}
-              min={1}
-              max={50}
-              onChange={setSteps}
-            />
-            <ParamNumber
-              label="ガイダンス"
-              value={scale}
-              min={1}
-              max={10}
-              step={0.1}
-              onChange={setScale}
-            />
-            <ParamSelect
-              label="サンプラー"
-              value={sampler}
-              options={SAMPLERS.map(s => ({ value: s, label: s }))}
-              onChange={setSampler}
-            />
-            <ParamText
-              label="シード（空=ランダム）"
-              value={seed}
-              placeholder="空=ランダム"
-              onChange={setSeed}
-            />
+            <div>
+              <label style={labelStyle}>モデル</label>
+              <select value={model} onChange={e => setModel(e.target.value)} style={fieldStyle}>
+                {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>解像度</label>
+              <select value={resolution} onChange={e => setResolution(e.target.value)} style={fieldStyle}>
+                {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>ステップ</label>
+              <input type="number" value={steps} min={1} max={50} onChange={e => setSteps(Number(e.target.value))} style={fieldStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>ガイダンス</label>
+              <input type="number" value={scale} min={1} max={10} step={0.1} onChange={e => setScale(Number(e.target.value))} style={fieldStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>サンプラー</label>
+              <select value={sampler} onChange={e => setSampler(e.target.value)} style={fieldStyle}>
+                {SAMPLERS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>シード（空=ランダム）</label>
+              <input type="number" value={seed} min={0} placeholder="空=ランダム" onChange={e => setSeed(e.target.value)} style={fieldStyle} />
+            </div>
           </div>
         )}
       </div>
 
-      {/* 5. 生成ボタン */}
+      {/* 生成ボタン */}
       <button
         onClick={handleGenerate}
-        disabled={!vaultReady || generating || !presetData}
+        disabled={!vaultReady || generating}
         style={{
           width: '100%',
           padding: '14px',
@@ -448,22 +480,16 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           borderRadius: 'var(--radius-m)',
           fontSize: 'var(--fs-body)',
           fontWeight: 600,
-          cursor: (!vaultReady || generating || !presetData) ? 'not-allowed' : 'pointer',
+          cursor: (!vaultReady || generating) ? 'not-allowed' : 'pointer',
           marginBottom: '16px',
           minHeight: '48px',
-          opacity: (!vaultReady || generating || !presetData) ? 0.5 : 1,
+          opacity: (!vaultReady || generating) ? 0.5 : 1,
         }}
-      >
-        {generating ? '生成中…' : '生成'}
-      </button>
+      >{generating ? '生成中…' : '生成'}</button>
 
-      {/* 6. 生成結果一覧 */}
+      {/* 結果一覧 */}
       {results.map((item, idx) => (
-        <ResultCard
-          key={`${item.filename}-${idx}`}
-          item={item}
-          onSave={() => handleSave(idx)}
-        />
+        <ResultCard key={`${item.filename}-${idx}`} item={item} onSave={() => handleSave(idx)} />
       ))}
     </div>
   );

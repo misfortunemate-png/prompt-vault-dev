@@ -108,7 +108,25 @@ check('_STATUS.md 行数', () => {
   return true;
 });
 
-// 5. ビルド確認
+// 5. danbooru-filtered.csv SHA-256
+check('danbooru-filtered.csv SHA-256', () => {
+  const csvPath = join(ROOT, 'docs', 'supplied', 'danbooru-filtered.csv');
+  if (!existsSync(csvPath)) {
+    console.log('  ❌ docs/supplied/danbooru-filtered.csv not found');
+    return false;
+  }
+  const content = readFileSync(csvPath);
+  const lfContent = Buffer.from(content.toString().replace(/\r\n/g, '\n'));
+  const hash = createHash('sha256').update(lfContent).digest('hex');
+  const expected = 'fd9f677d2f0bdab7e1bf644a9ea76a1e5d861b7698e3b0d06a6158df465e13f7';
+  if (hash !== expected) {
+    console.log(`  ❌ Hash mismatch: ${hash}`);
+    return false;
+  }
+  return true;
+});
+
+// 6. ビルド確認
 check('ビルド確認', () => {
   try {
     const output = execSync('npm run build 2>&1', { cwd: ROOT, timeout: 60000 }).toString();
