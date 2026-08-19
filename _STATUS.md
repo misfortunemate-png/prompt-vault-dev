@@ -21,3 +21,9 @@ updated: 2026-08-19
 
 - [x] AlbumScreen.jsx（新着・フォルダ一覧・フォルダ内・4象限ナビ）
 - [x] App.jsx接続（albumタブ）
+
+## 残課題（次マイルストーン以降）
+
+- [ ] トーストの自動消去（10秒程度でフェードアウト）
+- [ ] 連続生成（生成ボタン連打 or 枚数指定での連続実行）
+- [ ] danbooruタグ予測変換（支給物: docs/supplied/danbooru-filtered.csv）
