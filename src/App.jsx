@@ -4,6 +4,7 @@ import Footer from './components/Footer';
 import Toast from './components/Toast';
 import GenerateScreen from './screens/GenerateScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import { api } from './lib/api';
 
 const DISPLAY_KEY = 'pv-display-settings';
 
@@ -89,10 +90,18 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [displaySettings, setDisplaySettings] = useState(loadDisplaySettings);
+  const [results, setResults] = useState([]);
+  const [maxResults, setMaxResults] = useState(5);
 
   useEffect(() => {
     applyDisplaySettings(displaySettings);
   }, [displaySettings]);
+
+  useEffect(() => {
+    api.getSettings().then(s => {
+      if (s.generation?.maxResults) setMaxResults(s.generation.maxResults);
+    }).catch(() => {});
+  }, []);
 
   const addToast = useCallback((type, message) => {
     const id = ++toastId;
@@ -117,7 +126,7 @@ export default function App() {
 
   let mainContent;
   if (activeTab === 'generate') {
-    mainContent = <GenerateScreen addToast={addToast} />;
+    mainContent = <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} />;
   } else if (activeTab === 'album') {
     mainContent = <PlaceholderView message="M2-B以降で実装します" />;
   } else {

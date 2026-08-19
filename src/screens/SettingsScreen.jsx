@@ -351,6 +351,18 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
                 style={inputStyle}
               />
             </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={labelStyle}>結果保持件数（1〜100）</label>
+              <input
+                type="number"
+                value={gen.maxResults ?? 5}
+                min={1}
+                max={100}
+                onChange={e => setGen({ ...gen, maxResults: Math.max(1, Math.min(100, Number(e.target.value))) })}
+                style={inputStyle}
+              />
+            </div>
           </div>
         )}
 

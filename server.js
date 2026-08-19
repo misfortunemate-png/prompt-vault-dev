@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS = {
     sampler: 'k_euler_ancestral',
     scale: 5.0,
     seed: -1,
+    maxResults: 5,
   },
   guard: {
     intervalMin: 2,

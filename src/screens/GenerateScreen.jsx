@@ -167,7 +167,7 @@ function ResultCard({ item, onSave }) {
   );
 }
 
-export default function GenerateScreen({ addToast }) {
+export default function GenerateScreen({ addToast, results, setResults, maxResults }) {
   const [presetData, setPresetData] = useState(null);
   const [vaultReady, setVaultReady] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -191,7 +191,6 @@ export default function GenerateScreen({ addToast }) {
   const [seed, setSeed] = useState('');
 
   const [generating, setGenerating] = useState(false);
-  const [results, setResults] = useState([]);
 
   const computePrompt = useCallback(() => {
     if (!presetData || !presetData.presets.length) return '';
@@ -266,12 +265,10 @@ export default function GenerateScreen({ addToast }) {
         save_meta: { character: currentCharacter, outfit: currentOutfit },
       });
 
-      setResults(prev => [{
-        ...result.image,
-        character: currentCharacter,
-        outfit: currentOutfit,
-        saved: false,
-      }, ...prev]);
+      setResults(prev => {
+        const next = [{ ...result.image, character: currentCharacter, outfit: currentOutfit, saved: false }, ...prev];
+        return next.length > maxResults ? next.slice(0, maxResults) : next;
+      });
     } catch (e) {
       addToast('error', '生成に失敗しました: ' + (e.message || ''));
     } finally {
