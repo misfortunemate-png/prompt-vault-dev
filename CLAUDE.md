@@ -49,6 +49,14 @@
 - 起動時に `VAULT_ROOT/.tmp/` と `VAULT_ROOT/presets.json`（初回のみ）を自動生成
 - フォルダ構成: `VAULT_ROOT/{character}/` に画像保存。`.tmp/` に一時画像
 
+## アルバム画面（M2-B）
+
+- `src/screens/AlbumScreen.jsx` — フッター「アルバム」タブ
+- ルート表示: 新着（recent）+ フォルダ一覧（folders）を4列グリッド
+- フォルダ内表示: 画像を4列グリッド・名前順（サーバーソート済み）
+- 4象限ビューア: 全画面オーバーレイ。左上=閉じる、右上=次フォルダ、右下=次画像、左下=前画像
+- 画像配信: `/api/images/{folder}/{filename}`（folder/filenameはencodeURIComponent済み）
+
 ## 認証環境変数
 
 - `NOVELAI_TOKEN` — NovelAI Persistent API Token（生成APIで使用）

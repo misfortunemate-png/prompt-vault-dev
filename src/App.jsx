@@ -3,6 +3,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
 import GenerateScreen from './screens/GenerateScreen';
+import AlbumScreen from './screens/AlbumScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { api } from './lib/api';
 
@@ -128,7 +129,7 @@ export default function App() {
   if (activeTab === 'generate') {
     mainContent = <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} />;
   } else if (activeTab === 'album') {
-    mainContent = <PlaceholderView message="M2-B以降で実装します" />;
+    mainContent = <AlbumScreen addToast={addToast} />;
   } else {
     mainContent = <PlaceholderView message="M3以降で実装します" />;
   }

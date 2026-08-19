@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.1.0
-milestone: M2-A
+version: 3.2.0
+milestone: M2-B
 status: done
 updated: 2026-08-19
 ---
@@ -13,8 +13,11 @@ updated: 2026-08-19
 ## M2-A: サーバーAPI＋生成画面（完了）
 
 - [x] server/providers/novelai.js（ZIPパーサー・V4.5対応）
-- [x] GET /api/presets（presets.json管理）
-- [x] POST /api/generate / POST /api/save
-- [x] GET /api/images（フォルダ一覧＋新着・配信API）
+- [x] generate/save/images API群
 - [x] 生成画面UI（プリセット・個別・パラメータ・結果カード）
-- [x] 設定画面拡張（NOVELAI_TOKEN・モデルセレクト）
+- [x] 結果state持ち上げ（タブ切り替え保持・maxResults上限）
+
+## M2-B: アルバム画面（完了）
+
+- [x] AlbumScreen.jsx（新着・フォルダ一覧・フォルダ内・4象限ナビ）
+- [x] App.jsx接続（albumタブ）
