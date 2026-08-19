@@ -68,9 +68,6 @@ export default function TemplateCardList({ addToast }) {
   const [renameValue, setRenameValue] = useState('');
   const [addSlotMode, setAddSlotMode] = useState(false);
   const [newSlotName, setNewSlotName] = useState('');
-  const [addCardMode, setAddCardMode] = useState(false);
-  const [dragIdx, setDragIdx] = useState(null);
-  const dragOverIdx = useRef(null);
 
   const refresh = async () => {
     try {
@@ -111,34 +108,6 @@ export default function TemplateCardList({ addToast }) {
     setRenameTarget(null);
   };
 
-  // ──────── SLOT PATH SETTINGS ────────
-
-  const toggleSlotProp = async (slot, prop) => {
-    try {
-      await api.updateSlot(slot.id, { [prop]: !slot[prop] });
-      await refresh();
-    } catch (e) {
-      addToast('error', e.message);
-    }
-  };
-
-  // ──────── SLOT DELETE ────────
-
-  const deleteSlot = async (slot) => {
-    const cardCount = cards.filter(c => c.slotId === slot.id).length;
-    const msg = cardCount > 0
-      ? `「${slot.name}」とその ${cardCount} 枚のカードを削除しますか？`
-      : `「${slot.name}」を削除しますか？`;
-    if (!window.confirm(msg)) return;
-    try {
-      await api.deleteSlot(slot.id);
-      addToast('success', 'スロットを削除しました');
-      await refresh();
-    } catch (e) {
-      addToast('error', e.message);
-    }
-  };
-
   // ──────── SLOT ADD ────────
 
   const commitAddSlot = async () => {
@@ -152,35 +121,6 @@ export default function TemplateCardList({ addToast }) {
     } catch (e) {
       addToast('error', e.message);
     }
-  };
-
-  // ──────── SLOT DRAG ────────
-
-  const handleDragStart = (e, idx) => {
-    setDragIdx(idx);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e, idx) => {
-    e.preventDefault();
-    dragOverIdx.current = idx;
-  };
-
-  const handleDrop = async (e, idx) => {
-    e.preventDefault();
-    if (dragIdx === null || dragIdx === idx) { setDragIdx(null); return; }
-    const reordered = [...slots];
-    const [moved] = reordered.splice(dragIdx, 1);
-    reordered.splice(idx, 0, moved);
-    reordered.forEach((s, i) => { s.order = i; });
-    const updated = { ...cardsData, slots: reordered };
-    try {
-      await api.putCards(updated);
-      await refresh();
-    } catch (e) {
-      addToast('error', e.message);
-    }
-    setDragIdx(null);
   };
 
   // ──────── CARD OPERATIONS ────────
@@ -270,22 +210,12 @@ export default function TemplateCardList({ addToast }) {
     );
   }
 
-  // ──────── RENDER: SLOT LIST ────────
+  // ──────── RENDER: SLOT LIST（シンプル版） ────────
 
   return (
     <div>
-      {slots.map((slot, idx) => (
-        <div
-          key={slot.id}
-          draggable
-          onDragStart={e => handleDragStart(e, idx)}
-          onDragOver={e => handleDragOver(e, idx)}
-          onDrop={e => handleDrop(e, idx)}
-          onDragEnd={() => setDragIdx(null)}
-          style={{ ...rowStyle, position: 'relative', opacity: dragIdx === idx ? 0.4 : 1 }}
-        >
-          <span style={{ color: 'var(--text-secondary)', cursor: 'grab', fontSize: '18px', touchAction: 'none' }}>☰</span>
-
+      {slots.map(slot => (
+        <div key={slot.id} style={{ ...rowStyle }}>
           {renameTarget === slot.id ? (
             <input
               autoFocus
@@ -301,31 +231,17 @@ export default function TemplateCardList({ addToast }) {
               style={{ flex: 1, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 'var(--fs-body)', fontWeight: 600, color: 'var(--text-primary)', padding: 0 }}
             >
               {slot.name}
-              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', fontWeight: 400, marginLeft: '6px' }}>{cards.filter(c => c.slotId === slot.id).length}枚</span>
+              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', fontWeight: 400, marginLeft: '6px' }}>
+                {cards.filter(c => c.slotId === slot.id).length}枚
+              </span>
             </button>
           )}
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-            <input type="checkbox" checked={slot.useAsFolder} onChange={() => toggleSlotProp(slot, 'useAsFolder')} style={{ cursor: 'pointer' }} />
-            F
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-            <input type="checkbox" checked={slot.useInFilename} onChange={() => toggleSlotProp(slot, 'useInFilename')} style={{ cursor: 'pointer' }} />
-            N
-          </label>
-
-          <div style={{ position: 'relative' }}>
-            <button style={menuBtnStyle} onClick={() => setMenuTarget(menuTarget === slot.id ? null : slot.id)}>⋯</button>
-            {menuTarget === slot.id && (
-              <ContextMenu
-                items={[
-                  { label: '改名', action: () => startRename(slot) },
-                  { label: '削除', action: () => deleteSlot(slot), danger: true },
-                ]}
-                onClose={() => setMenuTarget(null)}
-              />
-            )}
-          </div>
+          <button
+            onClick={() => startRename(slot)}
+            title="改名"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '16px', padding: '0 4px' }}
+          >✎</button>
         </div>
       ))}
 
@@ -350,10 +266,6 @@ export default function TemplateCardList({ addToast }) {
           >＋ スロット追加</button>
         </div>
       )}
-
-      <div style={{ padding: '8px 16px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
-        F=フォルダ分け、N=ファイル名使用
-      </div>
     </div>
   );
 }

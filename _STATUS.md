@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.3.0
-milestone: M3
+version: 3.3.1
+milestone: M3-fix
 status: done
 updated: 2026-08-19
 ---

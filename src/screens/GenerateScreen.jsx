@@ -3,10 +3,10 @@ import TagSuggest from '../components/TagSuggest';
 import { api } from '../lib/api';
 
 const MODELS = [
-  { value: 'nai-diffusion-4-5-full', label: 'V4.5 Full' },
-  { value: 'nai-diffusion-4-5-curated', label: 'V4.5 Curated' },
-  { value: 'nai-diffusion-4-full', label: 'V4 Full' },
-  { value: 'nai-diffusion-3', label: 'V3' },
+  { value: 'nai-diffusion-4-5-full',     label: 'V4.5 Full' },
+  { value: 'nai-diffusion-4-5-curated',  label: 'V4.5 Curated' },
+  { value: 'nai-diffusion-4-full',       label: 'V4 Full' },
+  { value: 'nai-diffusion-3',            label: 'V3' },
 ];
 
 const RESOLUTIONS = [
@@ -16,8 +16,6 @@ const RESOLUTIONS = [
 ];
 
 const SAMPLERS = ['k_euler_ancestral', 'k_euler', 'k_dpmpp_2m_sde'];
-
-const NONE = null;
 
 const fieldStyle = {
   width: '100%',
@@ -42,6 +40,18 @@ const sectionStyle = {
   borderRadius: 'var(--radius-m)',
   padding: '12px 14px',
   marginBottom: '10px',
+};
+
+const arrowBtnStyle = {
+  background: 'none',
+  border: '1px solid var(--line)',
+  borderRadius: '3px',
+  cursor: 'pointer',
+  color: 'var(--text-secondary)',
+  fontSize: '10px',
+  padding: '0 4px',
+  lineHeight: '14px',
+  flexShrink: 0,
 };
 
 function ResultCard({ item, onSave }) {
@@ -110,7 +120,6 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const [generating, setGenerating] = useState(false);
 
-  // Inline edit state
   const [inlineSlotId, setInlineSlotId] = useState(null);
   const [inlinePos, setInlinePos] = useState('');
   const [inlineNeg, setInlineNeg] = useState('');
@@ -118,40 +127,39 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const sortedSlots = cardsData ? [...cardsData.slots].sort((a, b) => a.order - b.order) : [];
 
+  // ── Prompt computation ──
+
   const computePositive = useCallback((cardMap, data) => {
     if (!data) return '';
-    const slots = [...data.slots].sort((a, b) => a.order - b.order);
-    return slots
-      .map(s => {
-        const cardId = cardMap[s.id];
-        if (!cardId) return '';
-        return data.cards.find(c => c.id === cardId)?.positive || '';
-      })
-      .filter(Boolean)
-      .join(', ');
+    return [...data.slots].sort((a, b) => a.order - b.order)
+      .map(s => { const id = cardMap[s.id]; return id ? data.cards.find(c => c.id === id)?.positive || '' : ''; })
+      .filter(Boolean).join(', ');
   }, []);
 
   const computeNegative = useCallback((cardMap, data) => {
     if (!data) return '';
-    const slots = [...data.slots].sort((a, b) => a.order - b.order);
-    return slots
-      .map(s => {
-        const cardId = cardMap[s.id];
-        if (!cardId) return '';
-        return data.cards.find(c => c.id === cardId)?.negative || '';
-      })
-      .filter(Boolean)
-      .join(', ');
+    return [...data.slots].sort((a, b) => a.order - b.order)
+      .map(s => { const id = cardMap[s.id]; return id ? data.cards.find(c => c.id === id)?.negative || '' : ''; })
+      .filter(Boolean).join(', ');
   }, []);
 
-  const refreshPrompts = useCallback((cardMap, data) => {
-    setEditedPositive(computePositive(cardMap, data));
-    setEditedNegative(computeNegative(cardMap, data));
-  }, [computePositive, computeNegative]);
-
   useEffect(() => {
-    if (cardsData) refreshPrompts(selectedCardMap, cardsData);
-  }, [selectedCardMap, cardsData, refreshPrompts]);
+    if (cardsData) {
+      setEditedPositive(computePositive(selectedCardMap, cardsData));
+      setEditedNegative(computeNegative(selectedCardMap, cardsData));
+    }
+  }, [selectedCardMap, cardsData, computePositive, computeNegative]);
+
+  // ── Data loading ──
+
+  const refreshCardsData = useCallback(async () => {
+    try {
+      const cd = await api.getCards();
+      setCardsData(cd);
+    } catch (e) {
+      addToast('error', e.message);
+    }
+  }, [addToast]);
 
   useEffect(() => {
     async function loadData() {
@@ -164,6 +172,9 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           const [cd, pd] = await Promise.all([api.getCards(), api.getPresets()]);
           setCardsData(cd);
           setPresetsData(pd);
+        } else {
+          const cd = await api.getCards();
+          setCardsData(cd);
         }
       } catch {
         addToast('error', 'データの読み込みに失敗しました');
@@ -173,6 +184,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     }
     loadData();
   }, [addToast]);
+
+  // ── Preset selection ──
 
   const handlePresetSelect = (presetId) => {
     setSelectedPresetId(presetId);
@@ -186,6 +199,65 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     setSelectedCardMap(prev => ({ ...prev, [slotId]: cardId || null }));
     if (inlineSlotId === slotId) setInlineSlotId(null);
   };
+
+  // ── Slot management ──
+
+  const handleMoveSlot = async (idx, direction) => {
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= sortedSlots.length) return;
+    const updatedData = JSON.parse(JSON.stringify(cardsData));
+    const slotA = updatedData.slots.find(s => s.id === sortedSlots[idx].id);
+    const slotB = updatedData.slots.find(s => s.id === sortedSlots[targetIdx].id);
+    const tmp = slotA.order;
+    slotA.order = slotB.order;
+    slotB.order = tmp;
+    try {
+      await api.putCards(updatedData);
+      await refreshCardsData();
+    } catch (e) {
+      addToast('error', e.message);
+    }
+  };
+
+  const handleToggleSlotProp = async (slot, prop) => {
+    try {
+      await api.updateSlot(slot.id, { [prop]: !slot[prop] });
+      await refreshCardsData();
+    } catch (e) {
+      addToast('error', e.message);
+    }
+  };
+
+  const handleDeleteSlot = async (slot) => {
+    const cardCount = (cardsData?.cards || []).filter(c => c.slotId === slot.id).length;
+    const msg = cardCount > 0
+      ? `「${slot.name}」とその ${cardCount} 枚のカードを削除しますか？`
+      : `「${slot.name}」を削除しますか？`;
+    if (!window.confirm(msg)) return;
+    try {
+      await api.deleteSlot(slot.id);
+      setSelectedCardMap(prev => { const next = { ...prev }; delete next[slot.id]; return next; });
+      if (inlineSlotId === slot.id) setInlineSlotId(null);
+      addToast('success', 'スロットを削除しました');
+      await refreshCardsData();
+    } catch (e) {
+      addToast('error', e.message);
+    }
+  };
+
+  const handleAddSlot = async () => {
+    const nameVal = window.prompt('スロット名を入力してください:');
+    if (!nameVal?.trim()) return;
+    try {
+      await api.addSlot({ name: nameVal.trim() });
+      addToast('success', 'スロットを追加しました');
+      await refreshCardsData();
+    } catch (e) {
+      addToast('error', e.message);
+    }
+  };
+
+  // ── Inline card editing ──
 
   const openInlineEdit = (slot) => {
     if (inlineSlotId === slot.id) { setInlineSlotId(null); return; }
@@ -202,8 +274,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     setInlineSaving(true);
     try {
       await api.updateCard(cardId, { positive: inlinePos, negative: inlineNeg });
-      const cd = await api.getCards();
-      setCardsData(cd);
+      await refreshCardsData();
       addToast('success', 'カードを上書き保存しました');
       setInlineSlotId(null);
     } catch (e) {
@@ -219,8 +290,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     setInlineSaving(true);
     try {
       const newCard = await api.addCard({ slotId: inlineSlotId, name: nameVal.trim(), positive: inlinePos, negative: inlineNeg });
-      const cd = await api.getCards();
-      setCardsData(cd);
+      await refreshCardsData();
       setSelectedCardMap(prev => ({ ...prev, [inlineSlotId]: newCard.id }));
       addToast('success', '新しいカードを作成しました');
       setInlineSlotId(null);
@@ -231,6 +301,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     }
   };
 
+  // ── Generation / Save ──
+
   const handleGenerate = async () => {
     if (steps > 28 && !window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
     setGenerating(true);
@@ -238,30 +310,19 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
     const folderSegments = sortedSlots
       .filter(s => s.useAsFolder)
-      .map(s => {
-        const cardId = selectedCardMap[s.id];
-        return cardId ? cardsData.cards.find(c => c.id === cardId)?.name : null;
-      })
+      .map(s => { const id = selectedCardMap[s.id]; return id ? cardsData.cards.find(c => c.id === id)?.name : null; })
       .filter(Boolean);
 
     const filenameSegments = sortedSlots
       .filter(s => s.useInFilename)
-      .map(s => {
-        const cardId = selectedCardMap[s.id];
-        return cardId ? cardsData.cards.find(c => c.id === cardId)?.name : null;
-      })
+      .map(s => { const id = selectedCardMap[s.id]; return id ? cardsData.cards.find(c => c.id === id)?.name : null; })
       .filter(Boolean);
 
     try {
       const result = await api.generate({
         prompt: editedPositive,
         negative_prompt: editedNegative,
-        model,
-        width: res.width,
-        height: res.height,
-        steps,
-        scale,
-        sampler,
+        model, width: res.width, height: res.height, steps, scale, sampler,
         seed: seed !== '' ? parseInt(seed, 10) : null,
       });
       setResults(prev => {
@@ -278,17 +339,14 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const handleSave = async (idx) => {
     const item = results[idx];
     try {
-      await api.saveImage({
-        filename: item.filename,
-        seed: item.seed,
-        folderSegments: item.folderSegments || [],
-        filenameSegments: item.filenameSegments || [],
-      });
+      await api.saveImage({ filename: item.filename, seed: item.seed, folderSegments: item.folderSegments || [], filenameSegments: item.filenameSegments || [] });
       setResults(prev => prev.map((r, i) => i === idx ? { ...r, saved: true } : r));
     } catch (e) {
       addToast('error', '保存に失敗しました: ' + (e.message || ''));
     }
   };
+
+  // ── Render ──
 
   if (loading) {
     return (
@@ -311,93 +369,129 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       {presetsData && presetsData.presets.length > 0 && (
         <div style={sectionStyle}>
           <label style={labelStyle}>プリセット</label>
-          <select
-            value={selectedPresetId || ''}
-            onChange={e => handlePresetSelect(e.target.value || null)}
-            style={fieldStyle}
-          >
+          <select value={selectedPresetId || ''} onChange={e => handlePresetSelect(e.target.value || null)} style={fieldStyle}>
             <option value="">（プリセットなし）</option>
-            {presetsData.presets.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {presetsData.presets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </div>
       )}
 
-      {/* スロット別カード選択 */}
+      {/* スロット別カード選択 + スロット管理 */}
       {cardsData && (
         <div style={sectionStyle}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            {sortedSlots.map(slot => {
-              const slotCards = cardsData.cards.filter(c => c.slotId === slot.id);
-              const selectedCardId = selectedCardMap[slot.id];
-              return (
-                <div key={slot.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <label style={{ ...labelStyle, marginBottom: 0 }}>{slot.name}</label>
+          {sortedSlots.map((slot, idx) => {
+            const slotCards = cardsData.cards.filter(c => c.slotId === slot.id);
+            const selectedCardId = selectedCardMap[slot.id];
+            const isFirst = idx === 0;
+            const isLast = idx === sortedSlots.length - 1;
+
+            return (
+              <div key={slot.id} style={{ marginBottom: idx < sortedSlots.length - 1 ? '12px' : 0 }}>
+                {/* 管理行: ▲▼ / スロット名 / F / N / × */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flexShrink: 0 }}>
                     <button
-                      onClick={() => openInlineEdit(slot)}
-                      title="インライン編集"
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: inlineSlotId === slot.id ? 'var(--accent)' : 'var(--text-secondary)', fontSize: '14px', padding: '0 2px' }}
-                    >✏️</button>
+                      onClick={() => handleMoveSlot(idx, -1)}
+                      disabled={isFirst}
+                      style={{ ...arrowBtnStyle, opacity: isFirst ? 0.3 : 1 }}
+                    >▲</button>
+                    <button
+                      onClick={() => handleMoveSlot(idx, 1)}
+                      disabled={isLast}
+                      style={{ ...arrowBtnStyle, opacity: isLast ? 0.3 : 1 }}
+                    >▼</button>
                   </div>
+
+                  <span style={{ flex: 1, fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {slot.name}
+                  </span>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
+                    <input type="checkbox" checked={!!slot.useAsFolder} onChange={() => handleToggleSlotProp(slot, 'useAsFolder')} />
+                    F
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
+                    <input type="checkbox" checked={!!slot.useInFilename} onChange={() => handleToggleSlotProp(slot, 'useInFilename')} />
+                    N
+                  </label>
+
+                  <button
+                    onClick={() => handleDeleteSlot(slot)}
+                    title="スロット削除"
+                    style={{ background: 'none', border: '1px solid var(--line)', borderRadius: '3px', cursor: 'pointer', color: '#c0392b', fontSize: '14px', padding: '0 6px', lineHeight: '22px', flexShrink: 0 }}
+                  >×</button>
+                </div>
+
+                {/* カード選択行 */}
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                   <select
                     value={selectedCardId || ''}
                     onChange={e => handleSlotChange(slot.id, e.target.value || null)}
-                    style={fieldStyle}
+                    style={{ ...fieldStyle, flex: 1 }}
                   >
                     <option value="">（なし）</option>
-                    {slotCards.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
+                    {slotCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
+                  <button
+                    onClick={() => openInlineEdit(slot)}
+                    title="インライン編集"
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--line)',
+                      borderRadius: 'var(--radius-s)',
+                      cursor: 'pointer',
+                      color: inlineSlotId === slot.id ? 'var(--accent)' : 'var(--text-secondary)',
+                      fontSize: '18px',
+                      padding: '5px 8px',
+                      lineHeight: 1,
+                      flexShrink: 0,
+                    }}
+                  >✏️</button>
                 </div>
-              );
-            })}
-          </div>
 
-          {/* インラインカード編集 */}
-          {inlineSlotId && (
-            <div style={{ marginTop: '12px', padding: '12px', background: 'var(--bg)', borderRadius: 'var(--radius-s)', border: '1px solid var(--accent)' }}>
-              <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
-                {sortedSlots.find(s => s.id === inlineSlotId)?.name} — インライン編集
+                {/* インライン編集エリア */}
+                {inlineSlotId === slot.id && (
+                  <div style={{ marginTop: '8px', padding: '12px', background: 'var(--bg)', borderRadius: 'var(--radius-s)', border: '1px solid var(--accent)' }}>
+                    <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
+                      {slot.name} — インライン編集
+                    </div>
+                    <div style={{ marginBottom: '8px' }}>
+                      <label style={labelStyle}>ポジティブ</label>
+                      <TagSuggest value={inlinePos} onChange={setInlinePos} rows={3} style={{ ...fieldStyle, resize: 'vertical' }} />
+                    </div>
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={labelStyle}>ネガティブ</label>
+                      <TagSuggest value={inlineNeg} onChange={setInlineNeg} rows={2} style={{ ...fieldStyle, resize: 'vertical' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={handleInlineOverwrite}
+                        disabled={inlineSaving || !selectedCardMap[inlineSlotId]}
+                        style={{ padding: '7px 12px', border: 'none', borderRadius: 'var(--radius-s)', background: 'var(--accent)', color: 'var(--accent-contrast)', cursor: 'pointer', fontSize: 'var(--fs-label)', opacity: !selectedCardMap[inlineSlotId] ? 0.5 : 1 }}
+                      >上書き保存</button>
+                      <button
+                        onClick={handleInlineSaveAsNew}
+                        disabled={inlineSaving}
+                        style={{ padding: '7px 12px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-s)', background: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
+                      >新規カードとして保存</button>
+                      <button
+                        onClick={() => setInlineSlotId(null)}
+                        style={{ padding: '7px 12px', border: '1px solid var(--line)', borderRadius: 'var(--radius-s)', background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
+                      >キャンセル</button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div style={{ marginBottom: '8px' }}>
-                <label style={labelStyle}>ポジティブ</label>
-                <TagSuggest
-                  value={inlinePos}
-                  onChange={setInlinePos}
-                  rows={3}
-                  style={{ ...fieldStyle, resize: 'vertical' }}
-                />
-              </div>
-              <div style={{ marginBottom: '10px' }}>
-                <label style={labelStyle}>ネガティブ</label>
-                <TagSuggest
-                  value={inlineNeg}
-                  onChange={setInlineNeg}
-                  rows={2}
-                  style={{ ...fieldStyle, resize: 'vertical' }}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={handleInlineOverwrite}
-                  disabled={inlineSaving || !selectedCardMap[inlineSlotId]}
-                  style={{ padding: '7px 12px', border: 'none', borderRadius: 'var(--radius-s)', background: 'var(--accent)', color: 'var(--accent-contrast)', cursor: 'pointer', fontSize: 'var(--fs-label)', opacity: !selectedCardMap[inlineSlotId] ? 0.5 : 1 }}
-                >上書き保存</button>
-                <button
-                  onClick={handleInlineSaveAsNew}
-                  disabled={inlineSaving}
-                  style={{ padding: '7px 12px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-s)', background: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
-                >新規カードとして保存</button>
-                <button
-                  onClick={() => setInlineSlotId(null)}
-                  style={{ padding: '7px 12px', border: '1px solid var(--line)', borderRadius: 'var(--radius-s)', background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
-                >キャンセル</button>
-              </div>
-            </div>
-          )}
+            );
+          })}
+
+          {/* スロット追加 */}
+          <div style={{ marginTop: sortedSlots.length > 0 ? '12px' : 0 }}>
+            <button
+              onClick={handleAddSlot}
+              style={{ width: '100%', padding: '10px', border: '1px dashed var(--line)', borderRadius: 'var(--radius-s)', background: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
+            >＋ スロット追加</button>
+          </div>
         </div>
       )}
 
@@ -409,19 +503,9 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         {showPromptEdit && (
           <div style={{ marginTop: '12px' }}>
             <label style={labelStyle}>正プロンプト（一時編集・カードに反映しない）</label>
-            <textarea
-              value={editedPositive}
-              onChange={e => setEditedPositive(e.target.value)}
-              rows={3}
-              style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }}
-            />
+            <textarea value={editedPositive} onChange={e => setEditedPositive(e.target.value)} rows={3} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} />
             <label style={{ ...labelStyle, marginTop: '10px' }}>ネガティブ（一時編集）</label>
-            <textarea
-              value={editedNegative}
-              onChange={e => setEditedNegative(e.target.value)}
-              rows={2}
-              style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }}
-            />
+            <textarea value={editedNegative} onChange={e => setEditedNegative(e.target.value)} rows={2} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} />
           </div>
         )}
       </div>
@@ -472,17 +556,12 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         onClick={handleGenerate}
         disabled={!vaultReady || generating}
         style={{
-          width: '100%',
-          padding: '14px',
-          background: 'var(--accent)',
-          color: 'var(--accent-contrast)',
-          border: 'none',
-          borderRadius: 'var(--radius-m)',
-          fontSize: 'var(--fs-body)',
-          fontWeight: 600,
+          width: '100%', padding: '14px',
+          background: 'var(--accent)', color: 'var(--accent-contrast)',
+          border: 'none', borderRadius: 'var(--radius-m)',
+          fontSize: 'var(--fs-body)', fontWeight: 600,
           cursor: (!vaultReady || generating) ? 'not-allowed' : 'pointer',
-          marginBottom: '16px',
-          minHeight: '48px',
+          marginBottom: '16px', minHeight: '48px',
           opacity: (!vaultReady || generating) ? 0.5 : 1,
         }}
       >{generating ? '生成中…' : '生成'}</button>
