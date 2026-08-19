@@ -4,6 +4,13 @@ import { FONT_REGISTRY, DISPLAY_DEFAULTS } from '../App';
 
 const SAMPLER_OPTIONS = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2m_sde'];
 
+const MODEL_OPTIONS = [
+  { value: 'nai-diffusion-4-5-full', label: 'V4.5 Full' },
+  { value: 'nai-diffusion-4-5-curated', label: 'V4.5 Curated' },
+  { value: 'nai-diffusion-4-full', label: 'V4 Full' },
+  { value: 'nai-diffusion-3', label: 'V3' },
+];
+
 const sectionStyle = {
   background: 'var(--surface)',
   borderRadius: 'var(--radius-m)',
@@ -278,13 +285,16 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
             )}
 
             <div style={{ marginBottom: '12px' }}>
-              <label style={labelStyle}>モデル</label>
-              <input
-                type="text"
+              <label style={labelStyle}>既定モデル</label>
+              <select
                 value={gen.model}
                 onChange={e => setGen({ ...gen, model: e.target.value })}
                 style={inputStyle}
-              />
+              >
+                {MODEL_OPTIONS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
@@ -389,12 +399,18 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
             <>
               <div style={{ marginBottom: '8px' }}>
                 <span style={labelStyle}>VAULT_ROOT</span>
-                <div style={{ fontSize: 'var(--fs-body)' }}>
+                <div style={{ fontSize: 'var(--fs-body)', wordBreak: 'break-all' }}>
                   {systemInfo.vaultRoot || '未設定（.envにVAULT_ROOTを設定してください）'}
                 </div>
               </div>
+              <div style={{ marginBottom: '8px' }}>
+                <span style={labelStyle}>NOVELAI_TOKEN</span>
+                <div style={{ fontSize: 'var(--fs-body)' }}>
+                  {systemInfo.novelaiToken || '未設定'}
+                </div>
+              </div>
               <div>
-                <span style={labelStyle}>APIキー状態</span>
+                <span style={labelStyle}>APIキー（NOVELAI_API_KEY）</span>
                 <div style={{ fontSize: 'var(--fs-body)' }}>
                   {systemInfo.apiKey ? `設定済み（${systemInfo.apiKey}）` : '未設定'}
                 </div>

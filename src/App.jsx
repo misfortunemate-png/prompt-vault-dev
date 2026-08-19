@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
-import MainView from './screens/MainView';
+import GenerateScreen from './screens/GenerateScreen';
 import SettingsScreen from './screens/SettingsScreen';
 
 const DISPLAY_KEY = 'pv-display-settings';
@@ -69,6 +69,21 @@ export { FONT_REGISTRY, DISPLAY_DEFAULTS, DISPLAY_KEY, applyDisplaySettings, loa
 
 let toastId = 0;
 
+function PlaceholderView({ message }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 'calc(100dvh - 48px - 54px)',
+      color: 'var(--text-secondary)',
+      fontSize: 'var(--fs-body)',
+    }}>
+      {message}
+    </div>
+  );
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('generate');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -100,10 +115,19 @@ export default function App() {
     });
   }, []);
 
+  let mainContent;
+  if (activeTab === 'generate') {
+    mainContent = <GenerateScreen addToast={addToast} />;
+  } else if (activeTab === 'album') {
+    mainContent = <PlaceholderView message="M2-B以降で実装します" />;
+  } else {
+    mainContent = <PlaceholderView message="M3以降で実装します" />;
+  }
+
   return (
     <>
       <Header activeTab={activeTab} onOpenSettings={() => setSettingsOpen(true)} />
-      <MainView />
+      {mainContent}
       <Footer activeTab={activeTab} onTabChange={setActiveTab} />
       <Toast toasts={toasts} removeToast={removeToast} />
       {settingsOpen && (

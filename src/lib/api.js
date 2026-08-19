@@ -18,4 +18,9 @@ export const api = {
   testApi: () => request('/debug/test-api', { method: 'POST' }),
   testFs: () => request('/debug/test-fs', { method: 'POST' }),
   reset: () => request('/debug/reset', { method: 'POST' }),
+  getPresets: () => request('/presets'),
+  generate: (data) => request('/generate', { method: 'POST', body: JSON.stringify(data) }),
+  saveImage: (data) => request('/save', { method: 'POST', body: JSON.stringify(data) }),
+  getImages: () => request('/images'),
+  getImageFolder: (folder) => request(`/images/${encodeURIComponent(folder)}`),
 };
