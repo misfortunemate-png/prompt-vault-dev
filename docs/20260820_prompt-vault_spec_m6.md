@@ -21,6 +21,8 @@ RAGシステムでの教訓: ツールが多いとLLMの挙動が分散し不安
 - `generate_image` — 生プロンプトで画像を1枚生成し、結果を返す
 - healthzはツールにしない。障害時の内部切り分けロジックとして使う
 
+**既存ツールとの関係:** chat-pwaには既に`generate_image`（ComfyUI）と`attach_image`（NovelAI直接）がある。prompt-vault経由のツールは`vault_generate`と命名し、既存と衝突しない。提示条件は環境変数（`PROMPT_VAULT_URL`）の有無で制御する。
+
 ### §2.2 呼び出し経路 — サーバーサイドプロキシ
 
 chat-pwaサーバー（Node.js）がprompt-vaultのAPIをサーバー間通信（`http://localhost:8789`）で呼ぶ。ブラウザからprompt-vaultへの直接アクセスは発生しない。
@@ -87,8 +89,8 @@ LLMに提示するツールは1つのみ:
 
 ```json
 {
-  "name": "generate_image",
-  "description": "NovelAIで画像を1枚生成する。生プロンプト（danbooru tag形式）を渡すと画像を生成し、結果を返す。生成には10〜30秒かかる。",
+  "name": "vault_generate",
+  "description": "prompt-vault経由でNovelAIの画像を1枚生成する。生プロンプト（danbooru tag形式）を渡すと画像を生成し、結果を返す。生成には10〜30秒かかる。",
   "input_schema": {
     "type": "object",
     "properties": {
