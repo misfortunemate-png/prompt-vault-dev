@@ -392,25 +392,51 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     }
   };
 
+  // ── Random child resolution helper ──
+
+  const resolveRandomChildren = (slotIdToCardId) => {
+    const childResolutions = {};
+    Object.entries(slotIdToCardId).forEach(([slotId, cardId]) => {
+      if (!cardId) return;
+      const children = (cardsData?.cards || []).filter(c => c.parentId === cardId);
+      if (children.length > 0) {
+        childResolutions[slotId] = children[Math.floor(Math.random() * children.length)];
+      }
+    });
+    return childResolutions;
+  };
+
   // ── Queue ──
 
   const buildSingleTask = () => {
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
-    const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => {
-      const id = selectedCardMap[s.id];
+
+    // Resolve random children
+    const childRes = resolveRandomChildren(selectedCardMap);
+
+    const getName = (slotId) => {
+      const child = childRes[slotId];
+      if (child) return child.name;
+      const id = selectedCardMap[slotId];
       return id ? cardsData?.cards.find(c => c.id === id)?.name : null;
-    }).filter(Boolean);
-    const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => {
-      const id = selectedCardMap[s.id];
-      return id ? cardsData?.cards.find(c => c.id === id)?.name : null;
-    }).filter(Boolean);
-    const label = sortedSlots.map(s => {
-      const id = selectedCardMap[s.id];
-      return id ? cardsData?.cards.find(c => c.id === id)?.name : null;
-    }).filter(Boolean).join(' × ') || '（選択なし）';
+    };
+
+    // Append child prompts to edited prompts
+    let pos = editedPositive;
+    let neg = editedNegative;
+    sortedSlots.forEach(slot => {
+      const child = childRes[slot.id];
+      if (!child) return;
+      if (child.positive) pos = pos ? pos + ', ' + child.positive : child.positive;
+      if (child.negative) neg = neg ? neg + ', ' + child.negative : child.negative;
+    });
+
+    const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => getName(s.id)).filter(Boolean);
+    const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => getName(s.id)).filter(Boolean);
+    const label = sortedSlots.map(s => getName(s.id)).filter(Boolean).join(' × ') || '（選択なし）';
     return {
-      positive: editedPositive,
-      negative: editedNegative,
+      positive: pos,
+      negative: neg,
       params: { model, width: res.width, height: res.height, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null },
       folderSegments,
       filenameSegments,
@@ -434,14 +460,16 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const buildCartesianTasks = () => {
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
     const params = { model, width: res.width, height: res.height, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null };
+    const allCards = cardsData?.cards || [];
     const slotOptions = sortedSlots.map(slot => {
       const mode = cartesianMode[slot.id] ?? 'fixed';
       if (mode === 'expand') {
-        const cards = (cardsData?.cards || []).filter(c => c.slotId === slot.id);
-        return { slot, options: cards.length > 0 ? cards : [null] };
+        // Expand only root cards (no parentId); children are resolved randomly per task
+        const rootCards = allCards.filter(c => c.slotId === slot.id && !c.parentId);
+        return { slot, options: rootCards.length > 0 ? rootCards : [null] };
       }
       const cardId = selectedCardMap[slot.id];
-      const card = cardId ? cardsData?.cards.find(c => c.id === cardId) : null;
+      const card = cardId ? allCards.find(c => c.id === cardId) : null;
       return { slot, options: [card] };
     });
     let combos = [{}];
@@ -449,11 +477,26 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       combos = combos.flatMap(combo => options.map(card => ({ ...combo, [slot.id]: card })));
     }
     return combos.map(combo => {
-      const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => combo[s.id]?.name).filter(Boolean);
-      const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => combo[s.id]?.name).filter(Boolean);
-      const label = sortedSlots.map(s => combo[s.id]?.name).filter(Boolean).join(' × ') || '（選択なし）';
-      const positive = sortedSlots.map(s => combo[s.id]?.positive || '').filter(Boolean).join(', ');
-      const negative = sortedSlots.map(s => combo[s.id]?.negative || '').filter(Boolean).join(', ');
+      // Resolve random children for each slot in this combo
+      const childRes = {};
+      sortedSlots.forEach(slot => {
+        const card = combo[slot.id];
+        if (!card) return;
+        const children = allCards.filter(c => c.parentId === card.id);
+        if (children.length > 0) childRes[slot.id] = children[Math.floor(Math.random() * children.length)];
+      });
+      const getName = (slotId) => (childRes[slotId]?.name || combo[slotId]?.name) || null;
+      let positive = sortedSlots.map(s => combo[s.id]?.positive || '').filter(Boolean).join(', ');
+      let negative = sortedSlots.map(s => combo[s.id]?.negative || '').filter(Boolean).join(', ');
+      sortedSlots.forEach(slot => {
+        const child = childRes[slot.id];
+        if (!child) return;
+        if (child.positive) positive = positive ? positive + ', ' + child.positive : child.positive;
+        if (child.negative) negative = negative ? negative + ', ' + child.negative : child.negative;
+      });
+      const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => getName(s.id)).filter(Boolean);
+      const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => getName(s.id)).filter(Boolean);
+      const label = sortedSlots.map(s => getName(s.id)).filter(Boolean).join(' × ') || '（選択なし）';
       return { positive, negative, params, folderSegments, filenameSegments, preset_id: selectedPresetId || null, label };
     });
   };
@@ -499,20 +542,26 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     setGenerating(true);
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
 
-    const folderSegments = sortedSlots
-      .filter(s => s.useAsFolder)
-      .map(s => { const id = selectedCardMap[s.id]; return id ? cardsData.cards.find(c => c.id === id)?.name : null; })
-      .filter(Boolean);
+    // Resolve random children
+    const childRes = resolveRandomChildren(selectedCardMap);
+    const getName = (slotId) => (childRes[slotId]?.name || (selectedCardMap[slotId] ? cardsData.cards.find(c => c.id === selectedCardMap[slotId])?.name : null));
 
-    const filenameSegments = sortedSlots
-      .filter(s => s.useInFilename)
-      .map(s => { const id = selectedCardMap[s.id]; return id ? cardsData.cards.find(c => c.id === id)?.name : null; })
-      .filter(Boolean);
+    let pos = editedPositive;
+    let neg = editedNegative;
+    sortedSlots.forEach(slot => {
+      const child = childRes[slot.id];
+      if (!child) return;
+      if (child.positive) pos = pos ? pos + ', ' + child.positive : child.positive;
+      if (child.negative) neg = neg ? neg + ', ' + child.negative : child.negative;
+    });
+
+    const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => getName(s.id)).filter(Boolean);
+    const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => getName(s.id)).filter(Boolean);
 
     try {
       const result = await api.generate({
-        prompt: editedPositive,
-        negative_prompt: editedNegative,
+        prompt: pos,
+        negative_prompt: neg,
         model, width: res.width, height: res.height, steps, scale, sampler,
         seed: seed !== '' ? parseInt(seed, 10) : null,
       });
@@ -571,8 +620,12 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       {cardsData && (
         <div style={sectionStyle}>
           {sortedSlots.map((slot, idx) => {
-            const slotCards = cardsData.cards.filter(c => c.slotId === slot.id);
+            // Show only root cards in dropdown; children are resolved randomly at generation time
+            const slotCards = cardsData.cards.filter(c => c.slotId === slot.id && !c.parentId);
             const selectedCardId = selectedCardMap[slot.id];
+            const selectedChildCount = selectedCardId
+              ? cardsData.cards.filter(c => c.parentId === selectedCardId).length
+              : 0;
             const isFirst = idx === 0;
             const isLast = idx === sortedSlots.length - 1;
 
@@ -615,14 +668,19 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
                 {/* カード選択行 */}
                 <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <select
-                    value={selectedCardId || ''}
-                    onChange={e => handleSlotChange(slot.id, e.target.value || null)}
-                    style={{ ...fieldStyle, flex: 1 }}
-                  >
-                    <option value="">（なし）</option>
-                    {slotCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <select
+                      value={selectedCardId || ''}
+                      onChange={e => handleSlotChange(slot.id, e.target.value || null)}
+                      style={{ ...fieldStyle, width: '100%' }}
+                    >
+                      <option value="">（なし）</option>
+                      {slotCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                    {selectedChildCount > 0 && (
+                      <div style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '3px' }}>⚄ 子カード {selectedChildCount}種からランダム選択</div>
+                    )}
+                  </div>
                   <button
                     onClick={() => openInlineEdit(slot)}
                     title="インライン編集"

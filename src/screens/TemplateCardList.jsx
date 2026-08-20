@@ -129,6 +129,8 @@ export default function TemplateCardList({ addToast }) {
       <TemplateCardEdit
         card={nav.editCard || null}
         slots={slots}
+        cards={slotCards}
+        defaultParentId={nav.editParentId || null}
         onSave={async () => { await refresh(); setNav({ view: 'cards', selectedSlot: nav.selectedSlot }); }}
         onCancel={() => setNav({ view: 'cards', selectedSlot: nav.selectedSlot })}
         addToast={addToast}
@@ -138,6 +140,9 @@ export default function TemplateCardList({ addToast }) {
 
   // ────── Card list view ──────
   if (nav.view === 'cards' && currentSlot) {
+    const rootCards = slotCards.filter(c => !c.parentId);
+    const childrenOf = (parentId) => slotCards.filter(c => c.parentId === parentId);
+
     return (
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderBottom: '1px solid var(--line)' }}>
@@ -145,38 +150,63 @@ export default function TemplateCardList({ addToast }) {
           <span style={{ fontSize: 'var(--fs-title)', fontWeight: 600 }}>{currentSlot.name}</span>
         </div>
 
-        {slotCards.length === 0 ? (
+        {rootCards.length === 0 ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>カードがありません</div>
         ) : (
-          slotCards.map(card => {
+          rootCards.map(card => {
             const ct = cardThumbs[card.id] || { images: [], total: 0 };
+            const children = childrenOf(card.id);
             return (
-              <div key={card.id} style={{ display: 'flex', gap: '10px', padding: '12px 14px', borderBottom: '1px solid var(--line)', alignItems: 'flex-start' }}>
-                {/* 2×2 サムネ */}
-                <ThumbGrid thumbs={ct.images} />
-
-                {/* テキスト情報 */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 'var(--fs-body)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.name}</div>
-                  {card.positive && (
-                    <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.positive}</div>
-                  )}
-                  {card.negative && (
-                    <div style={{ fontSize: 'var(--fs-label)', color: '#c0392b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.negative}</div>
-                  )}
+              <div key={card.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                {/* 親カード行 */}
+                <div style={{ display: 'flex', gap: '10px', padding: '12px 14px', alignItems: 'flex-start' }}>
+                  <ThumbGrid thumbs={ct.images} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 'var(--fs-body)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {card.name}
+                      {children.length > 0 && (
+                        <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--accent)', fontWeight: 400 }}>⚄ 子{children.length}種</span>
+                      )}
+                    </div>
+                    {card.positive && (
+                      <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.positive}</div>
+                    )}
+                    {card.negative && (
+                      <div style={{ fontSize: 'var(--fs-label)', color: '#c0392b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.negative}</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button style={btnStyle(false)} onClick={() => setNav({ view: 'edit', selectedSlot: currentSlot.id, editCard: card })}>編集</button>
+                      <button style={btnStyle(false)} onClick={() => duplicateCard(card)}>コピー</button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <button style={btnStyle(true)} onClick={() => deleteCard(card)}>削除</button>
+                      {ct.total > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ct.total}枚</span>}
+                    </div>
+                    <button
+                      style={{ ...btnStyle(false), fontSize: '11px', color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                      onClick={() => setNav({ view: 'edit', selectedSlot: currentSlot.id, editCard: null, editParentId: card.id })}
+                    >＋子</button>
+                  </div>
                 </div>
 
-                {/* ボタン列 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, alignItems: 'flex-end' }}>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button style={btnStyle(false)} onClick={() => setNav({ view: 'edit', selectedSlot: currentSlot.id, editCard: card })}>編集</button>
-                    <button style={btnStyle(false)} onClick={() => duplicateCard(card)}>コピー</button>
+                {/* 子カード行（インデント） */}
+                {children.map(child => (
+                  <div key={child.id} style={{ display: 'flex', gap: '10px', padding: '8px 14px 8px 30px', alignItems: 'center', background: 'var(--surface)', borderTop: '1px solid var(--line)' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flexShrink: 0 }}>∟</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 'var(--fs-label)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{child.name}</div>
+                      {child.positive && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{child.positive}</div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                      <button style={btnStyle(false)} onClick={() => setNav({ view: 'edit', selectedSlot: currentSlot.id, editCard: child })}>編集</button>
+                      <button style={btnStyle(true)} onClick={() => deleteCard(child)}>削除</button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                    <button style={btnStyle(true)} onClick={() => deleteCard(card)}>削除</button>
-                    {ct.total > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ct.total}枚</span>}
-                  </div>
-                </div>
+                ))}
               </div>
             );
           })

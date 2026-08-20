@@ -75,9 +75,18 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
     );
   };
 
+  const getChildCount = (cardId) => cardId ? cards.filter(c => c.parentId === cardId).length : 0;
+
   // Computed previews using orderedSlots + slotFolder/slotFilename
   const computedPositive = orderedSlots
-    .map(s => { const id = selectedCards[s.id]; return id ? (cards.find(c => c.id === id)?.positive || '') : ''; })
+    .map(s => {
+      const id = selectedCards[s.id];
+      if (!id) return '';
+      const card = cards.find(c => c.id === id);
+      if (!card) return '';
+      const cc = getChildCount(id);
+      return card.positive + (cc > 0 ? ` [＋子${cc}種ランダム]` : '');
+    })
     .filter(Boolean).join(', ');
 
   const computedNegative = orderedSlots
@@ -159,16 +168,21 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
                 <span style={{ fontSize: 'var(--fs-label)', fontWeight: 600, width: '56px', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{slot.name}</span>
 
                 {/* カード選択 */}
-                <select
-                  value={selectedCards[slot.id] || ''}
-                  onChange={e => setSelectedCards(prev => ({ ...prev, [slot.id]: e.target.value || null }))}
-                  style={{ ...fieldStyle, flex: 1, padding: '5px 6px', fontSize: '12px' }}
-                >
-                  <option value="">（なし）</option>
-                  {cards.filter(c => c.slotId === slot.id).map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <select
+                    value={selectedCards[slot.id] || ''}
+                    onChange={e => setSelectedCards(prev => ({ ...prev, [slot.id]: e.target.value || null }))}
+                    style={{ ...fieldStyle, width: '100%', padding: '5px 6px', fontSize: '12px' }}
+                  >
+                    <option value="">（なし）</option>
+                    {cards.filter(c => c.slotId === slot.id && !c.parentId).map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  {getChildCount(selectedCards[slot.id]) > 0 && (
+                    <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '2px' }}>⚄ 子{getChildCount(selectedCards[slot.id])}種ランダム</div>
+                  )}
+                </div>
 
                 {/* F (radio behavior) */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: 'var(--fs-label)', cursor: 'pointer', flexShrink: 0, userSelect: 'none', color: slotFolder === slot.id ? 'var(--accent)' : 'var(--text-secondary)' }}>

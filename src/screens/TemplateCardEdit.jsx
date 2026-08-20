@@ -20,25 +20,30 @@ const labelStyle = {
   marginBottom: '4px',
 };
 
-export default function TemplateCardEdit({ card, slots, onSave, onCancel, addToast }) {
+export default function TemplateCardEdit({ card, slots, cards = [], defaultParentId = null, onSave, onCancel, addToast }) {
   const [name, setName] = useState(card?.name || '');
   const [slotId, setSlotId] = useState(card?.slotId || slots[0]?.id || '');
   const [positive, setPositive] = useState(card?.positive || '');
   const [negative, setNegative] = useState(card?.negative || '');
+  const [parentId, setParentId] = useState(card?.parentId || defaultParentId || '');
   const [saving, setSaving] = useState(false);
 
   const isNew = !card?.id;
+
+  // Root cards in the same slot (excluding self) = valid parent options
+  const parentOptions = cards.filter(c => !c.parentId && c.id !== card?.id);
 
   const handleSave = async () => {
     if (!name.trim()) { addToast('error', 'カード名は必須です'); return; }
     if (!slotId) { addToast('error', 'スロットを選択してください'); return; }
     setSaving(true);
     try {
+      const payload = { name: name.trim(), slotId, positive, negative, parentId: parentId || null };
       let saved;
       if (isNew) {
-        saved = await api.addCard({ name: name.trim(), slotId, positive, negative });
+        saved = await api.addCard(payload);
       } else {
-        saved = await api.updateCard(card.id, { name: name.trim(), slotId, positive, negative });
+        saved = await api.updateCard(card.id, payload);
       }
       addToast('success', isNew ? 'カードを追加しました' : 'カードを更新しました');
       onSave(saved);
@@ -73,6 +78,16 @@ export default function TemplateCardEdit({ card, slots, onSave, onCancel, addToa
             {slots.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
+
+        {parentOptions.length > 0 && (
+          <div>
+            <label style={labelStyle}>親カード（省略可：設定すると生成時に親＋このカードを合成）</label>
+            <select value={parentId} onChange={e => setParentId(e.target.value)} style={fieldStyle}>
+              <option value="">（なし — 独立カード）</option>
+              {parentOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+        )}
 
         <div>
           <label style={labelStyle}>ポジティブプロンプト</label>

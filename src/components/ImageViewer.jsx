@@ -87,14 +87,14 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
   }, [detail?.hash, detail?.caption_config, defaultCaptionStyle]);
 
   useEffect(() => {
-    if (!overlayExpanded || !img) return;
+    if (!img) return;
     let cancelled = false;
     const seq = ++fetchSeqRef.current;
     api.getGalleryImage(img.hash)
       .then(d => { if (!cancelled && seq === fetchSeqRef.current) setDetail(d); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [overlayExpanded, img?.hash]);
+  }, [img?.hash]);
 
   const go = useCallback((delta) => {
     setIdx(prev => {

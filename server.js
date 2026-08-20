@@ -270,13 +270,14 @@ async function start() {
 
   api.post('/cards/card', (req, res) => {
     const data = readCardsData();
-    const { slotId, name, positive = '', negative = '' } = req.body;
+    const { slotId, name, positive = '', negative = '', parentId = null } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'カード名は必須です' });
     if (!data.slots.some(s => s.id === slotId)) return res.status(400).json({ error: 'スロットが見つかりません' });
     if (data.cards.some(c => c.slotId === slotId && c.name === name.trim())) {
       return res.status(400).json({ error: '同じスロット内に同名カードが存在します' });
     }
     const card = { id: generateId('c_'), slotId, name: name.trim(), positive, negative };
+    if (parentId) card.parentId = parentId;
     data.cards.push(card);
     writeCardsData(data);
     res.json(card);
@@ -300,9 +301,10 @@ async function start() {
 
   api.delete('/cards/card/:id', (req, res) => {
     const data = readCardsData();
-    const idx = data.cards.findIndex(c => c.id === req.params.id);
-    if (idx === -1) return res.status(404).json({ error: 'カードが見つかりません' });
-    data.cards.splice(idx, 1);
+    const cardId = req.params.id;
+    if (!data.cards.some(c => c.id === cardId)) return res.status(404).json({ error: 'カードが見つかりません' });
+    // Cascade: also delete children of this card
+    data.cards = data.cards.filter(c => c.id !== cardId && c.parentId !== cardId);
     writeCardsData(data);
     res.json({ ok: true });
   });
