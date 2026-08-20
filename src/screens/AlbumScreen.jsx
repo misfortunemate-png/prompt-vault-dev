@@ -68,6 +68,69 @@ function FolderRow({ node, depth, onNavigate }) {
   );
 }
 
+function FolderCard({ node, onNavigate }) {
+  return (
+    <button
+      onClick={() => onNavigate(node.path)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        width: '100%',
+        background: 'none',
+        border: '1px solid var(--line)',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        padding: '10px 12px',
+        color: 'var(--text)',
+        textAlign: 'left',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px', flexShrink: 0 }}>
+        {[0, 1, 2, 3].map(i => {
+          const hash = node.previewHashes?.[i];
+          return (
+            <div key={i} style={{ width: '60px', height: '60px', overflow: 'hidden', background: 'var(--line)', borderRadius: '2px' }}>
+              {hash ? (
+                <img
+                  src={`/api/thumbs/${hash}.webp`}
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  loading="lazy"
+                />
+              ) : (
+                <Placeholder />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 'var(--fs-body)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.name}</div>
+        <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginTop: '4px' }}>{node.imageCount}枚</div>
+      </div>
+    </button>
+  );
+}
+
+function FolderCardTree({ nodes, onNavigate, depth = 0 }) {
+  return (
+    <>
+      {nodes.map(node => (
+        <div key={node.path} style={depth > 0 ? { paddingLeft: `${depth * 16}px` } : {}}>
+          <FolderCard node={node} onNavigate={onNavigate} />
+          {node.children?.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px', marginTop: '8px' }}>
+              <FolderCardTree nodes={node.children} onNavigate={onNavigate} depth={depth + 1} />
+            </div>
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
 const GRID_3 = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px' };
 const SECTION_LABEL = { fontSize: 'var(--fs-title)', fontWeight: 600, margin: '0 0 8px' };
 
@@ -81,6 +144,7 @@ export default function AlbumScreen({ addToast }) {
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState({ total: 0, processed: 0, newCount: 0, movedCount: 0, deletedCount: 0 });
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('icon');
   const pollRef = useRef(null);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
@@ -258,16 +322,34 @@ export default function AlbumScreen({ addToast }) {
             )}
 
             <section>
-              <h2 style={SECTION_LABEL}>フォルダ</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <h2 style={{ ...SECTION_LABEL, margin: 0 }}>フォルダ</h2>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    style={{ background: viewMode === 'list' ? 'var(--accent)' : 'none', color: viewMode === 'list' ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--line)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '16px', minHeight: '32px' }}
+                    title="一覧モード"
+                  >☰</button>
+                  <button
+                    onClick={() => setViewMode('icon')}
+                    style={{ background: viewMode === 'icon' ? 'var(--accent)' : 'none', color: viewMode === 'icon' ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--line)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '16px', minHeight: '32px' }}
+                    title="アイコンモード"
+                  >▦</button>
+                </div>
+              </div>
               {!galleryData?.tree?.length ? (
                 <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-body)', textAlign: 'center', padding: '32px 0' }}>
                   保存済み画像はありません
                 </div>
-              ) : (
+              ) : viewMode === 'list' ? (
                 <div style={{ border: '1px solid var(--line)', borderRadius: '6px', overflow: 'hidden' }}>
                   {galleryData.tree.map(node => (
                     <FolderRow key={node.path} node={node} depth={0} onNavigate={navigateTo} />
                   ))}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
+                  <FolderCardTree nodes={galleryData.tree} onNavigate={navigateTo} />
                 </div>
               )}
             </section>

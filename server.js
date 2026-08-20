@@ -5,7 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes, createHash } from 'crypto';
 import { generate as novelaiGenerate } from './server/providers/novelai.js';
-import { upsertImage, getByHash, listFolders, listByFolder, getRecent, getStats } from './server/db.js';
+import { upsertImage, getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes } from './server/db.js';
 import { startScan, getScanStatus, generateThumb } from './server/scanner.js';
 import { parsePngMeta } from './server/png-meta.js';
 
@@ -373,7 +373,7 @@ async function start() {
 
   // ── ギャラリー ──
 
-  function buildFolderTree(rows) {
+  function buildFolderTree(rows, previewMap) {
     const folderCounts = {};
     for (const { folder, count } of rows) {
       if (!folder) continue;
@@ -388,7 +388,13 @@ async function start() {
     const root = [];
     for (const path of Object.keys(folderCounts).sort()) {
       const parts = path.split('/');
-      const node = { name: parts[parts.length - 1], path, imageCount: folderCounts[path], children: [] };
+      const node = {
+        name: parts[parts.length - 1],
+        path,
+        imageCount: folderCounts[path],
+        children: [],
+        previewHashes: previewMap?.[path] ?? [],
+      };
       nodeMap[path] = node;
       if (parts.length === 1) {
         root.push(node);
@@ -403,7 +409,8 @@ async function start() {
   api.get('/gallery', (_req, res) => {
     try {
       const rows = listFolders();
-      const tree = buildFolderTree(rows);
+      const previewMap = getAllPreviewHashes(4);
+      const tree = buildFolderTree(rows, previewMap);
       const totalImages = rows.reduce((s, r) => s + r.count, 0);
       const totalFolders = rows.filter(r => r.folder).length;
       res.json({ tree, totalImages, totalFolders });

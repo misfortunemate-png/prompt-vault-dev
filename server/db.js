@@ -114,3 +114,19 @@ export function setThumbOk(hash, val) {
 export function getAllHashes() {
   return getDb().prepare('SELECT hash, rel_path FROM images').all();
 }
+
+export function getAllPreviewHashes(limit = 4) {
+  const rows = getDb().prepare(`
+    SELECT folder, hash FROM (
+      SELECT folder, hash,
+        ROW_NUMBER() OVER (PARTITION BY folder ORDER BY created_at DESC) AS rn
+      FROM images
+    ) WHERE rn <= ?
+  `).all(limit);
+  const map = {};
+  for (const { folder, hash } of rows) {
+    if (!map[folder]) map[folder] = [];
+    map[folder].push(hash);
+  }
+  return map;
+}
