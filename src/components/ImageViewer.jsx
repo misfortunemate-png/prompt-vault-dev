@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { api } from '../lib/api';
 
+const FONT_SIZE_MAP = { small: '14px', medium: '20px', large: '28px' };
+const DEFAULT_CAPTION_CFG = { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true, x: 50, y: 20 };
+
 export default function ImageViewer({ images, initialIndex, onClose, onFavoriteToggle, onCaptionSave, addToast, onDelete }) {
   const [idx, setIdx] = useState(initialIndex ?? 0);
   const [detail, setDetail] = useState(null);
@@ -10,6 +13,8 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
   const [negExpanded, setNegExpanded] = useState(false);
   const [captionEdit, setCaptionEdit] = useState(null);
   const [captionSaving, setCaptionSaving] = useState(false);
+  const [captionCfg, setCaptionCfg] = useState(DEFAULT_CAPTION_CFG);
+  const [defaultCaptionStyle, setDefaultCaptionStyle] = useState(null);
   const [favoriteMap, setFavoriteMap] = useState(() => {
     const m = {};
     images.forEach(img => { m[img.hash] = img.favorite === 1; });
@@ -27,15 +32,17 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // #1: thumbnail-first display
+  const [displaySrc, setDisplaySrc] = useState('');
+  const [imgLoading, setImgLoading] = useState(true);
+
   const fetchSeqRef = useRef(0);
   const touchRef = useRef({ startX: 0, startY: 0, startDist: 0, isPinch: false, lastTap: 0 });
+  const dragRef = useRef({ active: false, startX: 0, startY: 0, startCX: 50, startCY: 20 });
   const img = images[idx];
 
-  // images が縮小して idx が範囲外になった場合に clamp
   useEffect(() => {
-    if (images.length > 0 && idx >= images.length) {
-      setIdx(images.length - 1);
-    }
+    if (images.length > 0 && idx >= images.length) setIdx(images.length - 1);
   }, [idx, images.length]);
 
   useEffect(() => {
@@ -46,6 +53,38 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     setShowCardDialog(false);
     setShowDeleteConfirm(false);
   }, [idx]);
+
+  // #1: thumbnail-first + preload
+  useEffect(() => {
+    if (!img) return;
+    setDisplaySrc(`/api/thumbs/${img.hash}.webp`);
+    setImgLoading(true);
+    const fullUrl = `/api/images/full/${img.hash}`;
+    const loader = new Image();
+    loader.onload = () => { setDisplaySrc(fullUrl); setImgLoading(false); };
+    loader.src = fullUrl;
+    return () => { loader.onload = null; };
+  }, [img?.hash]);
+
+  // #1: adjacent preload
+  useEffect(() => {
+    [images[idx - 1], images[idx + 1]].forEach(adj => {
+      if (adj) { const i = new Image(); i.src = `/api/images/full/${adj.hash}`; }
+    });
+  }, [idx, images]);
+
+  // Load default caption style from settings
+  useEffect(() => {
+    api.getSettings().then(s => { if (s.captionStyle) setDefaultCaptionStyle(s.captionStyle); }).catch(() => {});
+  }, []);
+
+  // Load captionCfg from detail when it arrives
+  useEffect(() => {
+    if (!detail) return;
+    let cfg;
+    try { if (detail.caption_config) cfg = JSON.parse(detail.caption_config); } catch {}
+    setCaptionCfg(cfg || defaultCaptionStyle || DEFAULT_CAPTION_CFG);
+  }, [detail?.hash, detail?.caption_config, defaultCaptionStyle]);
 
   useEffect(() => {
     if (!overlayExpanded || !img) return;
@@ -87,8 +126,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.hypot(dx, dy);
-      const ratio = dist / t.startDist;
-      setScale(prev => Math.max(0.5, Math.min(5, prev * ratio)));
+      setScale(prev => Math.max(0.5, Math.min(5, prev * (dist / t.startDist))));
       t.startDist = dist;
     }
   }, []);
@@ -101,31 +139,43 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     const endY = e.changedTouches[0].clientY;
     const dx = endX - t.startX;
     const dy = endY - t.startY;
-    if (Math.abs(dy) > 80 && dy < 0 && Math.abs(dx) < Math.abs(dy)) {
-      onClose();
+    // #2: tap to set caption position in overlay mode
+    if (captionEdit !== null && captionCfg.mode === 'overlay' && Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+      const area = document.querySelector('.iv-image-area');
+      if (area) {
+        const rect = area.getBoundingClientRect();
+        setCaptionCfg(prev => ({
+          ...prev,
+          x: Math.round(((endX - rect.left) / rect.width) * 100),
+          y: Math.round(((endY - rect.top) / rect.height) * 100),
+        }));
+      }
       return;
     }
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-      go(dx < 0 ? 1 : -1);
-      return;
-    }
+    if (Math.abs(dy) > 80 && dy < 0 && Math.abs(dx) < Math.abs(dy)) { onClose(); return; }
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { go(dx < 0 ? 1 : -1); return; }
     const now = Date.now();
-    if (now - t.lastTap < 300) {
-      setScale(1);
-      t.lastTap = 0;
-    } else {
-      t.lastTap = now;
-    }
-  }, [go, onClose]);
+    if (now - t.lastTap < 300) { setScale(1); t.lastTap = 0; } else { t.lastTap = now; }
+  }, [go, onClose, captionEdit, captionCfg.mode]);
 
   const handleImageAreaClick = useCallback((e) => {
+    // #2: tap to set caption position in overlay edit mode
+    if (captionEdit !== null && captionCfg.mode === 'overlay') {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setCaptionCfg(prev => ({
+        ...prev,
+        x: Math.round(((e.clientX - rect.left) / rect.width) * 100),
+        y: Math.round(((e.clientY - rect.top) / rect.height) * 100),
+      }));
+      return;
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const w = rect.width;
     if (x < w * 0.25) go(-1);
     else if (x > w * 0.75) go(1);
     else setOverlayExpanded(v => !v);
-  }, [go]);
+  }, [go, captionEdit, captionCfg.mode]);
 
   const toggleFavorite = useCallback(async (e) => {
     e.stopPropagation();
@@ -144,16 +194,19 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     if (!img || captionEdit === null) return;
     setCaptionSaving(true);
     try {
-      await api.setCaption(img.hash, captionEdit);
+      await api.setCaption(img.hash, captionEdit, captionCfg);
       if (onCaptionSave) onCaptionSave(img.hash, captionEdit);
       const saved = captionEdit;
-      // 保存後に遅延完了した detail fetch が caption を上書きするのを防ぐ
+      const savedCfg = captionCfg;
       fetchSeqRef.current++;
-      setDetail(prev => prev ? { ...prev, caption: saved } : { caption: saved });
+      setDetail(prev => prev
+        ? { ...prev, caption: saved, caption_config: JSON.stringify(savedCfg) }
+        : { caption: saved, caption_config: JSON.stringify(savedCfg) }
+      );
       setCaptionEdit(null);
     } catch {}
     setCaptionSaving(false);
-  }, [img, captionEdit, onCaptionSave]);
+  }, [img, captionEdit, captionCfg, onCaptionSave]);
 
   const openCardDialog = useCallback(async () => {
     try {
@@ -214,10 +267,39 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     }
   }, [deleting, img, addToast, onDelete]);
 
+  // #2: caption overlay drag handlers
+  const handleCaptionDragStart = useCallback((e) => {
+    e.stopPropagation();
+    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, startCX: captionCfg.x ?? 50, startCY: captionCfg.y ?? 20 };
+  }, [captionCfg.x, captionCfg.y]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!dragRef.current.active) return;
+    const area = document.querySelector('.iv-image-area');
+    if (!area) return;
+    const rect = area.getBoundingClientRect();
+    const dx = ((e.clientX - dragRef.current.startX) / rect.width) * 100;
+    const dy = ((e.clientY - dragRef.current.startY) / rect.height) * 100;
+    setCaptionCfg(prev => ({
+      ...prev,
+      x: Math.max(0, Math.min(100, dragRef.current.startCX + dx)),
+      y: Math.max(0, Math.min(100, dragRef.current.startCY + dy)),
+    }));
+  }, []);
+
+  const handleMouseUp = useCallback(() => { dragRef.current.active = false; }, []);
+
   if (!img) return null;
 
   const isFav = favoriteMap[img.hash] ?? false;
   const d = detail;
+  const captionToShow = captionEdit !== null ? captionEdit : (d?.caption || null);
+  const isPortrait = img.width && img.height ? img.height >= img.width : true;
+  const captionFontSize = FONT_SIZE_MAP[captionCfg.fontSize || 'medium'];
+  const captionColor = captionCfg.color || '#fff';
+  const captionShadow = captionCfg.outline !== false
+    ? '0 0 4px #000, 1px 1px 3px rgba(0,0,0,0.8), -1px -1px 3px rgba(0,0,0,0.8)'
+    : 'none';
 
   const OVERLAY_BTN = {
     background: 'rgba(255,255,255,0.1)',
@@ -253,6 +335,8 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
       >
         {/* × ボタン */}
         <button
@@ -265,19 +349,106 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
           {idx + 1} / {images.length}
         </div>
 
-        {/* 画像エリア */}
-        <div
-          className="iv-image-area"
-          onClick={handleImageAreaClick}
-          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', minHeight: 0, cursor: 'pointer' }}
-        >
-          <img
-            src={`/api/images/full/${img.hash}`}
-            alt=""
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: `scale(${scale})`, transformOrigin: 'center', transition: 'transform 0.1s ease', display: 'block' }}
-            draggable={false}
-          />
-        </div>
+        {/* #2: 余白モード用ラッパー or 通常レイアウト */}
+        {captionToShow && captionCfg.mode === 'margin' ? (
+          <div
+            className="iv-image-area"
+            onClick={handleImageAreaClick}
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: isPortrait ? 'row' : 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              minHeight: 0,
+              cursor: 'pointer',
+            }}
+          >
+            <img
+              src={displaySrc}
+              alt=""
+              style={{
+                maxWidth: isPortrait ? '75%' : '100%',
+                maxHeight: isPortrait ? '100%' : '72%',
+                objectFit: 'contain',
+                transform: `scale(${scale})`,
+                transformOrigin: 'center',
+                transition: 'transform 0.1s ease, opacity 0.25s ease, filter 0.25s ease',
+                opacity: imgLoading ? 0.5 : 1,
+                filter: imgLoading ? 'blur(6px)' : 'none',
+                display: 'block',
+                flexShrink: 0,
+              }}
+              draggable={false}
+            />
+            <div style={{
+              writingMode: isPortrait ? 'vertical-rl' : 'horizontal-tb',
+              textOrientation: 'upright',
+              fontSize: captionFontSize,
+              color: captionColor,
+              textShadow: captionShadow,
+              padding: isPortrait ? '12px 6px' : '8px 12px',
+              flexShrink: 0,
+              maxWidth: isPortrait ? '25%' : '100%',
+              maxHeight: isPortrait ? '100%' : '28%',
+              overflow: 'hidden',
+              lineHeight: 2,
+              letterSpacing: isPortrait ? '0.1em' : 'normal',
+              pointerEvents: 'none',
+              whiteSpace: 'pre-wrap',
+            }}>
+              {captionToShow}
+            </div>
+          </div>
+        ) : (
+          <div
+            className="iv-image-area"
+            onClick={handleImageAreaClick}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', minHeight: 0, cursor: 'pointer', position: 'relative' }}
+          >
+            <img
+              src={displaySrc}
+              alt=""
+              style={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain',
+                transform: `scale(${scale})`,
+                transformOrigin: 'center',
+                transition: 'transform 0.1s ease, opacity 0.25s ease, filter 0.25s ease',
+                opacity: imgLoading ? 0.5 : 1,
+                filter: imgLoading ? 'blur(6px)' : 'none',
+                display: 'block',
+              }}
+              draggable={false}
+            />
+            {/* #2: 画像内モード オーバーレイ */}
+            {captionToShow && captionCfg.mode === 'overlay' && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${captionCfg.x ?? 50}%`,
+                  top: `${captionCfg.y ?? 20}%`,
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: captionFontSize,
+                  color: captionColor,
+                  textShadow: captionShadow,
+                  maxWidth: '80%',
+                  textAlign: 'center',
+                  lineHeight: 1.8,
+                  whiteSpace: 'pre-wrap',
+                  pointerEvents: captionEdit !== null ? 'auto' : 'none',
+                  cursor: captionEdit !== null ? 'move' : 'default',
+                  userSelect: 'none',
+                }}
+                onMouseDown={captionEdit !== null ? handleCaptionDragStart : undefined}
+              >
+                {captionToShow}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 情報オーバーレイ */}
         <div className="iv-overlay">
@@ -340,11 +511,11 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
                 <button onClick={() => setShowDeleteConfirm(true)} style={{ ...OVERLAY_BTN, color: '#ff6b6b', borderColor: 'rgba(255,100,100,0.3)' }}>🗑 削除</button>
               </div>
 
-              {/* セリフ */}
+              {/* #2: セリフ */}
               <div style={{ marginTop: '10px' }}>
                 <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '4px' }}>セリフ</div>
                 {captionEdit !== null ? (
-                  <div>
+                  <div onClick={e => e.stopPropagation()}>
                     <textarea
                       value={captionEdit}
                       onChange={e => setCaptionEdit(e.target.value)}
@@ -353,9 +524,42 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
                       autoFocus
                       onKeyDown={e => { if (e.key === 'Escape') setCaptionEdit(null); }}
                     />
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                    {/* #2: スタイル設定 */}
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* モード */}
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>モード</span>
+                        {[['margin', '余白'], ['overlay', '画像内']].map(([v, l]) => (
+                          <button key={v} onClick={() => setCaptionCfg(prev => ({ ...prev, mode: v }))} style={{ padding: '4px 10px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', background: captionCfg.mode === v ? 'rgba(255,255,255,0.2)' : 'transparent', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>{l}</button>
+                        ))}
+                      </div>
+                      {captionCfg.mode === 'overlay' && (
+                        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>画像をタップして位置を指定・ドラッグで調整</div>
+                      )}
+                      {/* フォントサイズ */}
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>サイズ</span>
+                        {[['small', '小'], ['medium', '中'], ['large', '大']].map(([v, l]) => (
+                          <button key={v} onClick={() => setCaptionCfg(prev => ({ ...prev, fontSize: v }))} style={{ padding: '4px 9px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', background: captionCfg.fontSize === v ? 'rgba(255,255,255,0.2)' : 'transparent', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>{l}</button>
+                        ))}
+                      </div>
+                      {/* 文字色 */}
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>色</span>
+                        {['#ffffff', '#000000', '#ff69b4'].map(c => (
+                          <button key={c} onClick={() => setCaptionCfg(prev => ({ ...prev, color: c }))} style={{ width: '22px', height: '22px', borderRadius: '50%', background: c, border: captionCfg.color === c ? '2px solid #7ec8e3' : '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+                        ))}
+                        <input type="color" value={captionCfg.color || '#ffffff'} onChange={e => setCaptionCfg(prev => ({ ...prev, color: e.target.value }))} style={{ width: '28px', height: '22px', padding: 0, border: '1px solid rgba(255,255,255,0.3)', borderRadius: '3px', cursor: 'pointer', background: 'none', flexShrink: 0 }} />
+                      </div>
+                      {/* 縁取り */}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={captionCfg.outline !== false} onChange={e => setCaptionCfg(prev => ({ ...prev, outline: e.target.checked }))} />
+                        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>縁取り</span>
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                       <button onClick={saveCaption} disabled={captionSaving} style={{ flex: 1, background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>保存</button>
-                      <button onClick={() => setCaptionEdit(null)} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>キャンセル</button>
+                      <button onClick={() => { setCaptionEdit(null); if (d?.caption_config) { try { setCaptionCfg(JSON.parse(d.caption_config)); } catch {} } else { setCaptionCfg(defaultCaptionStyle || DEFAULT_CAPTION_CFG); } }} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>キャンセル</button>
                     </div>
                   </div>
                 ) : (
@@ -389,9 +593,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
                 }}
                 style={{ ...DIALOG_INPUT }}
               >
-                {cardSlots.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+                {cardSlots.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 <option value="__new__">＋ 新規スロット</option>
               </select>
             </div>
@@ -399,46 +601,23 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
             {cardNewSlotMode && (
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>新規スロット名</label>
-                <input
-                  type="text"
-                  value={cardNewSlotName}
-                  onChange={e => setCardNewSlotName(e.target.value)}
-                  placeholder="スロット名を入力"
-                  autoFocus
-                  style={{ ...DIALOG_INPUT }}
-                />
+                <input type="text" value={cardNewSlotName} onChange={e => setCardNewSlotName(e.target.value)} placeholder="スロット名を入力" autoFocus style={{ ...DIALOG_INPUT }} />
               </div>
             )}
 
             <div style={{ marginBottom: '10px' }}>
               <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>カード名</label>
-              <input
-                type="text"
-                value={cardName}
-                onChange={e => setCardName(e.target.value)}
-                placeholder="カード名（省略時: 無題）"
-                style={{ ...DIALOG_INPUT }}
-              />
+              <input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="カード名（省略時: 無題）" style={{ ...DIALOG_INPUT }} />
             </div>
 
             <div style={{ marginBottom: '10px' }}>
               <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>正プロンプト</label>
-              <textarea
-                value={cardPos}
-                onChange={e => setCardPos(e.target.value)}
-                rows={4}
-                style={{ ...DIALOG_INPUT, resize: 'vertical' }}
-              />
+              <textarea value={cardPos} onChange={e => setCardPos(e.target.value)} rows={4} style={{ ...DIALOG_INPUT, resize: 'vertical' }} />
             </div>
 
             <div style={{ marginBottom: '14px' }}>
               <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>負プロンプト</label>
-              <textarea
-                value={cardNeg}
-                onChange={e => setCardNeg(e.target.value)}
-                rows={3}
-                style={{ ...DIALOG_INPUT, resize: 'vertical' }}
-              />
+              <textarea value={cardNeg} onChange={e => setCardNeg(e.target.value)} rows={3} style={{ ...DIALOG_INPUT, resize: 'vertical' }} />
             </div>
 
             <button
@@ -456,15 +635,8 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
           <div style={{ background: 'var(--bg)', borderRadius: '12px', padding: '20px', maxWidth: '320px', width: '100%' }}>
             <p style={{ margin: '0 0 16px', fontSize: 'var(--fs-body)', lineHeight: 1.6 }}>この画像を削除しますか？（元に戻せません）</p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                style={{ flex: 1, padding: '10px', background: 'var(--line)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: 'var(--fs-body)', color: 'var(--text)' }}
-              >キャンセル</button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                style={{ flex: 1, padding: '10px', background: '#e53e3e', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: 'var(--fs-body)', color: '#fff', opacity: deleting ? 0.6 : 1 }}
-              >{deleting ? '削除中...' : '削除'}</button>
+              <button onClick={() => setShowDeleteConfirm(false)} style={{ flex: 1, padding: '10px', background: 'var(--line)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: 'var(--fs-body)', color: 'var(--text)' }}>キャンセル</button>
+              <button onClick={handleDelete} disabled={deleting} style={{ flex: 1, padding: '10px', background: '#e53e3e', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: 'var(--fs-body)', color: '#fff', opacity: deleting ? 0.6 : 1 }}>{deleting ? '削除中...' : '削除'}</button>
             </div>
           </div>
         </div>

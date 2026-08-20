@@ -1,59 +1,27 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import TemplateCardEdit from './TemplateCardEdit';
 import { api } from '../lib/api';
 
-const rowStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  padding: '12px 16px',
-  borderBottom: '1px solid var(--line)',
-  gap: '8px',
-};
-
-const menuBtnStyle = {
+const btnStyle = (danger) => ({
   background: 'none',
-  border: 'none',
+  border: `1px solid ${danger ? 'rgba(192,57,43,0.3)' : 'var(--line)'}`,
+  borderRadius: 'var(--radius-s)',
+  color: danger ? '#c0392b' : 'var(--text-secondary)',
   cursor: 'pointer',
-  color: 'var(--text-secondary)',
-  fontSize: '20px',
-  padding: '0 4px',
-  lineHeight: 1,
-};
+  fontSize: '12px',
+  padding: '5px 8px',
+  flexShrink: 0,
+  lineHeight: 1.2,
+  whiteSpace: 'nowrap',
+});
 
-function ContextMenu({ items, onClose }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
-
+function ThumbGrid({ thumbs }) {
   return (
-    <div ref={ref} style={{
-      position: 'absolute',
-      right: 0,
-      top: '100%',
-      background: 'var(--surface)',
-      border: '1px solid var(--line)',
-      borderRadius: 'var(--radius-s)',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      zIndex: 300,
-      minWidth: '140px',
-    }}>
-      {items.map((item, i) => (
-        <div
-          key={i}
-          onMouseDown={(e) => { e.preventDefault(); item.action(); onClose(); }}
-          style={{
-            padding: '10px 14px',
-            fontSize: 'var(--fs-label)',
-            cursor: 'pointer',
-            color: item.danger ? '#c0392b' : 'var(--text-primary)',
-            borderBottom: i < items.length - 1 ? '1px solid var(--line)' : 'none',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >{item.label}</div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', width: '86px', flexShrink: 0 }}>
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} style={{ width: '42px', height: '42px', background: 'var(--line)', borderRadius: '2px', overflow: 'hidden' }}>
+          {thumbs[i] && <img src={thumbs[i].thumbUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+        </div>
       ))}
     </div>
   );
@@ -63,11 +31,11 @@ export default function TemplateCardList({ addToast }) {
   const [cardsData, setCardsData] = useState(null);
   const [presetsData, setPresetsData] = useState(null);
   const [nav, setNav] = useState({ view: 'slots' });
-  const [menuTarget, setMenuTarget] = useState(null);
-  const [renameTarget, setRenameTarget] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
   const [addSlotMode, setAddSlotMode] = useState(false);
   const [newSlotName, setNewSlotName] = useState('');
+  const [renameTarget, setRenameTarget] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [cardThumbs, setCardThumbs] = useState({});
 
   const refresh = async () => {
     try {
@@ -85,46 +53,33 @@ export default function TemplateCardList({ addToast }) {
 
   const slots = [...cardsData.slots].sort((a, b) => a.order - b.order);
   const cards = cardsData.cards;
-
   const currentSlot = nav.selectedSlot ? slots.find(s => s.id === nav.selectedSlot) : null;
   const slotCards = currentSlot ? cards.filter(c => c.slotId === currentSlot.id) : [];
 
-  // ──────── SLOT RENAME ────────
-
-  const startRename = (slot) => {
-    setRenameTarget(slot.id);
-    setRenameValue(slot.name);
-  };
-
+  // ────── Slot rename ──────
+  const startRename = (slot) => { setRenameTarget(slot.id); setRenameValue(slot.name); };
   const commitRename = async () => {
     if (!renameValue.trim()) { setRenameTarget(null); return; }
     try {
       await api.updateSlot(renameTarget, { name: renameValue.trim() });
       addToast('success', 'スロット名を更新しました');
       await refresh();
-    } catch (e) {
-      addToast('error', e.message);
-    }
+    } catch (e) { addToast('error', e.message); }
     setRenameTarget(null);
   };
 
-  // ──────── SLOT ADD ────────
-
+  // ────── Slot add ──────
   const commitAddSlot = async () => {
     if (!newSlotName.trim()) { setAddSlotMode(false); return; }
     try {
       await api.addSlot({ name: newSlotName.trim() });
       addToast('success', 'スロットを追加しました');
-      setNewSlotName('');
-      setAddSlotMode(false);
+      setNewSlotName(''); setAddSlotMode(false);
       await refresh();
-    } catch (e) {
-      addToast('error', e.message);
-    }
+    } catch (e) { addToast('error', e.message); }
   };
 
-  // ──────── CARD OPERATIONS ────────
-
+  // ────── Card operations ──────
   const deleteCard = async (card) => {
     const usedIn = (presetsData?.presets || []).filter(p => Object.values(p.cards || {}).includes(card.id));
     const msg = usedIn.length > 0
@@ -135,9 +90,7 @@ export default function TemplateCardList({ addToast }) {
       await api.deleteCard(card.id);
       addToast('success', 'カードを削除しました');
       await refresh();
-    } catch (e) {
-      addToast('error', e.message);
-    }
+    } catch (e) { addToast('error', e.message); }
   };
 
   const duplicateCard = async (card) => {
@@ -145,13 +98,29 @@ export default function TemplateCardList({ addToast }) {
       await api.duplicateCard(card.id);
       addToast('success', 'カードを複製しました');
       await refresh();
-    } catch (e) {
-      addToast('error', e.message);
-    }
+    } catch (e) { addToast('error', e.message); }
   };
 
-  // ──────── RENDER: CARD EDIT ────────
+  // ────── Load thumbnails for card list view ──────
+  useEffect(() => {
+    if (nav.view !== 'cards' || !slotCards.length) return;
+    let cancelled = false;
+    const loadThumbs = async () => {
+      const results = {};
+      await Promise.all(slotCards.map(async (card) => {
+        try {
+          if (!card.positive) { results[card.id] = { images: [], total: 0 }; return; }
+          const r = await api.getGalleryByCard(card.positive, 4);
+          results[card.id] = r;
+        } catch { results[card.id] = { images: [], total: 0 }; }
+      }));
+      if (!cancelled) setCardThumbs(results);
+    };
+    loadThumbs();
+    return () => { cancelled = true; };
+  }, [nav.view, nav.selectedSlot, slotCards.map(c => c.id).join(',')]);
 
+  // ────── Card edit view ──────
   if (nav.view === 'edit') {
     return (
       <TemplateCardEdit
@@ -164,8 +133,7 @@ export default function TemplateCardList({ addToast }) {
     );
   }
 
-  // ──────── RENDER: CARD LIST ────────
-
+  // ────── Card list view ──────
   if (nav.view === 'cards' && currentSlot) {
     return (
       <div>
@@ -177,27 +145,38 @@ export default function TemplateCardList({ addToast }) {
         {slotCards.length === 0 ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>カードがありません</div>
         ) : (
-          slotCards.map(card => (
-            <div key={card.id} style={{ ...rowStyle, position: 'relative' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 'var(--fs-body)', fontWeight: 600 }}>{card.name}</div>
-                {card.positive && <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.positive}</div>}
+          slotCards.map(card => {
+            const ct = cardThumbs[card.id] || { images: [], total: 0 };
+            return (
+              <div key={card.id} style={{ display: 'flex', gap: '10px', padding: '12px 14px', borderBottom: '1px solid var(--line)', alignItems: 'flex-start' }}>
+                {/* 2×2 サムネ */}
+                <ThumbGrid thumbs={ct.images} />
+
+                {/* テキスト情報 */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 'var(--fs-body)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.name}</div>
+                  {card.positive && (
+                    <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '2px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.positive}</div>
+                  )}
+                  {card.negative && (
+                    <div style={{ fontSize: 'var(--fs-label)', color: '#c0392b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{card.negative}</div>
+                  )}
+                </div>
+
+                {/* ボタン列 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0, alignItems: 'flex-end' }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button style={btnStyle(false)} onClick={() => setNav({ view: 'edit', selectedSlot: currentSlot.id, editCard: card })}>編集</button>
+                    <button style={btnStyle(false)} onClick={() => duplicateCard(card)}>コピー</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                    <button style={btnStyle(true)} onClick={() => deleteCard(card)}>削除</button>
+                    {ct.total > 0 && <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ct.total}枚</span>}
+                  </div>
+                </div>
               </div>
-              <div style={{ position: 'relative' }}>
-                <button style={menuBtnStyle} onClick={() => setMenuTarget(menuTarget === card.id ? null : card.id)}>⋯</button>
-                {menuTarget === card.id && (
-                  <ContextMenu
-                    items={[
-                      { label: '編集', action: () => setNav({ view: 'edit', selectedSlot: currentSlot.id, editCard: card }) },
-                      { label: '複製', action: () => duplicateCard(card) },
-                      { label: '削除', action: () => deleteCard(card), danger: true },
-                    ]}
-                    onClose={() => setMenuTarget(null)}
-                  />
-                )}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
 
         <div style={{ padding: '12px 16px' }}>
@@ -210,12 +189,11 @@ export default function TemplateCardList({ addToast }) {
     );
   }
 
-  // ──────── RENDER: SLOT LIST（シンプル版） ────────
-
+  // ────── Slot list view ──────
   return (
     <div>
       {slots.map(slot => (
-        <div key={slot.id} style={{ ...rowStyle }}>
+        <div key={slot.id} style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--line)', gap: '8px' }}>
           {renameTarget === slot.id ? (
             <input
               autoFocus
@@ -236,12 +214,7 @@ export default function TemplateCardList({ addToast }) {
               </span>
             </button>
           )}
-
-          <button
-            onClick={() => startRename(slot)}
-            title="改名"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '16px', padding: '0 4px' }}
-          >✎</button>
+          <button onClick={() => startRename(slot)} title="改名" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '16px', padding: '0 4px' }}>✎</button>
         </div>
       ))}
 

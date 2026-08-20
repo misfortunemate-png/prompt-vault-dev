@@ -41,6 +41,7 @@ function getDb() {
       CREATE INDEX IF NOT EXISTS idx_created ON images(created_at);
       CREATE INDEX IF NOT EXISTS idx_favorite ON images(favorite);
     `);
+    try { db.exec('ALTER TABLE images ADD COLUMN caption_config TEXT'); } catch {}
   }
   return db;
 }
@@ -149,6 +150,22 @@ export function getByPreset(presetId, limit = 50) {
 
 export function setCaption(hash, text) {
   getDb().prepare('UPDATE images SET caption = ? WHERE hash = ?').run(text, hash);
+}
+
+export function setCaptionConfig(hash, configJson) {
+  getDb().prepare('UPDATE images SET caption_config = ? WHERE hash = ?').run(configJson, hash);
+}
+
+export function getGalleryByCard(positive, limit = 4) {
+  const like = `%${positive.slice(0, 100)}%`;
+  return getDb().prepare(
+    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images WHERE prompt LIKE ? ORDER BY created_at DESC LIMIT ?'
+  ).all(like, limit);
+}
+
+export function getTotalByCard(positive) {
+  const like = `%${positive.slice(0, 100)}%`;
+  return (getDb().prepare('SELECT COUNT(*) as count FROM images WHERE prompt LIKE ?').get(like) || { count: 0 }).count;
 }
 
 export function getAllPreviewHashes(limit = 4) {

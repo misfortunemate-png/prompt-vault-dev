@@ -65,8 +65,12 @@ export const api = {
   getFavorites: (limit = 50) => request(`/gallery/favorites?limit=${limit}`),
   searchGallery: (q, limit = 50) => request(`/gallery/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   getByPreset: (presetId, limit = 50) => request(`/gallery/by-preset/${encodeURIComponent(presetId)}?limit=${limit}`),
-  setCaption: (hash, caption) => request(`/gallery/image/${encodeURIComponent(hash)}/caption`, { method: 'PUT', body: JSON.stringify({ caption }) }),
+  setCaption: (hash, caption, captionConfig) => request(`/gallery/image/${encodeURIComponent(hash)}/caption`, {
+    method: 'PUT',
+    body: JSON.stringify(captionConfig !== undefined ? { caption, captionConfig } : { caption }),
+  }),
   deleteGalleryImage: (hash) => request(`/gallery/image/${encodeURIComponent(hash)}`, { method: 'DELETE' }),
+  getGalleryByCard: (positive, limit = 4) => request(`/gallery/by-card?positive=${encodeURIComponent(positive)}&limit=${limit}`),
 
   // Queue M5
   getQueue: () => request('/queue'),

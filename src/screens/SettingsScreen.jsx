@@ -79,6 +79,7 @@ function SelectRow({ label, value, options, onChange }) {
 export default function SettingsScreen({ onClose, addToast, displaySettings, updateDisplay }) {
   const [gen, setGen] = useState(null);
   const [guard, setGuard] = useState(null);
+  const [captionStyle, setCaptionStyle] = useState(null);
   const [systemInfo, setSystemInfo] = useState(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const [version, setVersion] = useState('');
@@ -88,6 +89,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     api.getSettings().then(s => {
       setGen(s.generation);
       setGuard(s.guard);
+      setCaptionStyle(s.captionStyle || { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true });
     }).catch(() => addToast('error', '設定の読み込みに失敗しました'));
     api.getSystemInfo().then(setSystemInfo).catch(() => {});
   }, [addToast]);
@@ -106,7 +108,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
       return;
     }
     try {
-      await api.putSettings({ generation: gen, guard });
+      await api.putSettings({ generation: gen, guard, captionStyle });
       addToast('success', '設定を保存しました');
     } catch {
       addToast('error', '設定の保存に失敗しました');
@@ -432,6 +434,61 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
             <div style={{ color: 'var(--text-secondary)' }}>読み込み中...</div>
           )}
         </div>
+
+        {/* §4.4 台詞表示 */}
+        {captionStyle && (
+          <div style={sectionStyle}>
+            <h3 style={{ fontSize: 'var(--fs-title)', marginBottom: '12px' }}>台詞表示</h3>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={labelStyle}>既定表示モード</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[['margin', '余白'], ['overlay', '画像内']].map(([v, l]) => (
+                  <button key={v} onClick={() => setCaptionStyle(prev => ({ ...prev, mode: v }))} style={{
+                    padding: '6px 14px', borderRadius: 'var(--radius-s)', border: '1px solid var(--line)',
+                    background: captionStyle.mode === v ? 'var(--accent)' : 'var(--surface)',
+                    color: captionStyle.mode === v ? 'var(--accent-contrast)' : 'var(--text-primary)',
+                    cursor: 'pointer', fontSize: 'var(--fs-label)',
+                  }}>{l}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={labelStyle}>既定フォントサイズ</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[['small', '小 (14px)'], ['medium', '中 (20px)'], ['large', '大 (28px)']].map(([v, l]) => (
+                  <button key={v} onClick={() => setCaptionStyle(prev => ({ ...prev, fontSize: v }))} style={{
+                    padding: '6px 10px', borderRadius: 'var(--radius-s)', border: '1px solid var(--line)',
+                    background: captionStyle.fontSize === v ? 'var(--accent)' : 'var(--surface)',
+                    color: captionStyle.fontSize === v ? 'var(--accent-contrast)' : 'var(--text-primary)',
+                    cursor: 'pointer', fontSize: 'var(--fs-label)',
+                  }}>{l}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '12px' }}>
+              <label style={labelStyle}>既定文字色</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {['#ffffff', '#000000', '#ff69b4'].map(c => (
+                  <button key={c} onClick={() => setCaptionStyle(prev => ({ ...prev, color: c }))} style={{
+                    width: '28px', height: '28px', borderRadius: '50%', background: c, cursor: 'pointer',
+                    border: captionStyle.color === c ? '3px solid var(--accent)' : '1px solid var(--line)',
+                    padding: 0, flexShrink: 0,
+                  }} />
+                ))}
+                <input type="color" value={captionStyle.color || '#ffffff'} onChange={e => setCaptionStyle(prev => ({ ...prev, color: e.target.value }))} style={{ width: '36px', height: '28px', padding: '1px', borderRadius: 'var(--radius-s)', border: '1px solid var(--line)', cursor: 'pointer', background: 'none', flexShrink: 0 }} />
+                <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>{captionStyle.color}</span>
+              </div>
+            </div>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={captionStyle.outline !== false} onChange={e => setCaptionStyle(prev => ({ ...prev, outline: e.target.checked }))} />
+              <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-primary)' }}>縁取りあり（既定）</span>
+            </label>
+          </div>
+        )}
 
         {/* §4.5 保存ボタン */}
         <button

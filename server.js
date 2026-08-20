@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, unl
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
-import { getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, deleteImage } from './server/db.js';
+import { getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, deleteImage, getGalleryByCard, getTotalByCard } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
     scale: 5.0, seed: -1, maxResults: 5,
   },
   guard: { intervalMin: 2, intervalMax: 5, maxPerJob: 100 },
+  captionStyle: { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true },
 };
 
 // danbooru tags cache
@@ -497,10 +498,22 @@ async function start() {
 
   api.put('/gallery/image/:hash/caption', (req, res) => {
     try {
-      const { caption } = req.body;
+      const { caption, captionConfig } = req.body;
       if (typeof caption !== 'string') return res.status(400).json({ error: 'caption は文字列' });
       setCaption(req.params.hash, caption);
+      if (captionConfig !== undefined) setCaptionConfig(req.params.hash, JSON.stringify(captionConfig));
       res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  api.get('/gallery/by-card', (req, res) => {
+    try {
+      const { positive, limit = 4 } = req.query;
+      if (!positive) return res.json({ images: [], total: 0 });
+      const images = getGalleryByCard(positive, parseInt(limit) || 4)
+        .map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
+      const total = getTotalByCard(positive);
+      res.json({ images, total });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 

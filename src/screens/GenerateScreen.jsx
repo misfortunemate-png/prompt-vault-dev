@@ -108,6 +108,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const [selectedPresetId, setSelectedPresetId] = useState(null);
   const [selectedCardMap, setSelectedCardMap] = useState({});
+  const [localSlotOrder, setLocalSlotOrder] = useState(null);
+  const [localSlotProps, setLocalSlotProps] = useState({});
 
   const [editedPositive, setEditedPositive] = useState('');
   const [editedNegative, setEditedNegative] = useState('');
@@ -135,7 +137,21 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [inlineSaving, setInlineSaving] = useState(false);
   const [previewItem, setPreviewItem] = useState(null);
 
-  const sortedSlots = cardsData ? [...cardsData.slots].sort((a, b) => a.order - b.order) : [];
+  const sortedSlots = cardsData ? (() => {
+    let slotsArr = [...cardsData.slots];
+    if (localSlotOrder) {
+      const idxMap = {};
+      localSlotOrder.forEach((id, i) => { idxMap[id] = i; });
+      slotsArr.sort((a, b) => (idxMap[a.id] ?? 9999) - (idxMap[b.id] ?? 9999));
+    } else {
+      slotsArr.sort((a, b) => a.order - b.order);
+    }
+    return slotsArr.map(s => ({
+      ...s,
+      useAsFolder: s.id in localSlotProps ? localSlotProps[s.id].useAsFolder : s.useAsFolder,
+      useInFilename: s.id in localSlotProps ? localSlotProps[s.id].useInFilename : s.useInFilename,
+    }));
+  })() : [];
 
   // ── Prompt computation ──
 
@@ -213,9 +229,30 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const handlePresetSelect = (presetId) => {
     setSelectedPresetId(presetId);
-    if (!presetId) { setSelectedCardMap({}); return; }
+    if (!presetId) {
+      setSelectedCardMap({});
+      setLocalSlotOrder(null);
+      setLocalSlotProps({});
+      return;
+    }
     const preset = presetsData?.presets.find(p => p.id === presetId);
-    if (preset) setSelectedCardMap({ ...preset.cards });
+    if (!preset) return;
+    setSelectedCardMap({ ...preset.cards });
+    // #6: apply slotOrder
+    setLocalSlotOrder(preset.slotOrder || null);
+    // #6: apply folder/filename as F/N slot overrides
+    if (preset.folder !== undefined || preset.filename !== undefined) {
+      const props = {};
+      (cardsData?.slots || []).forEach(s => {
+        props[s.id] = {
+          useAsFolder: preset.folder === s.id,
+          useInFilename: (preset.filename || []).includes(s.id),
+        };
+      });
+      setLocalSlotProps(props);
+    } else {
+      setLocalSlotProps({});
+    }
   };
 
   const handleSlotChange = (slotId, cardId) => {
@@ -237,6 +274,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     slotB.order = tmp;
     try {
       await api.putCards(updatedData);
+      setLocalSlotOrder(null);
       await refreshCardsData();
     } catch (e) {
       addToast('error', e.message);
@@ -245,7 +283,34 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const handleToggleSlotProp = async (slot, prop) => {
     try {
-      await api.updateSlot(slot.id, { [prop]: !slot[prop] });
+      if (prop === 'useAsFolder') {
+        // #7: F is radio — clear all other slots' useAsFolder
+        const updatedData = JSON.parse(JSON.stringify(cardsData));
+        // Apply current localSlotProps to base data
+        updatedData.slots.forEach(s => {
+          if (s.id in localSlotProps) {
+            if ('useAsFolder' in localSlotProps[s.id]) s.useAsFolder = localSlotProps[s.id].useAsFolder;
+            if ('useInFilename' in localSlotProps[s.id]) s.useInFilename = localSlotProps[s.id].useInFilename;
+          }
+        });
+        const newVal = !slot.useAsFolder;
+        updatedData.slots.forEach(s => {
+          if (newVal) s.useAsFolder = s.id === slot.id;
+          else if (s.id === slot.id) s.useAsFolder = false;
+        });
+        await api.putCards(updatedData);
+        setLocalSlotProps({});
+      } else {
+        await api.updateSlot(slot.id, { [prop]: !slot[prop] });
+        // Update localSlotProps if overrides are active
+        if (Object.keys(localSlotProps).length > 0) {
+          setLocalSlotProps(prev => {
+            const next = { ...prev };
+            next[slot.id] = { ...(next[slot.id] || {}), [prop]: !slot[prop] };
+            return next;
+          });
+        }
+      }
       await refreshCardsData();
     } catch (e) {
       addToast('error', e.message);
