@@ -2,6 +2,23 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 import ImageViewer from '../components/ImageViewer';
 
+function findNextSibling(tree, targetPath) {
+  function search(nodes) {
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].path === targetPath) {
+        if (i + 1 < nodes.length) return nodes[i + 1].path;
+        return null;
+      }
+      if (nodes[i].children?.length) {
+        const found = search(nodes[i].children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return search(tree);
+}
+
 function FolderIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -274,6 +291,16 @@ export default function AlbumScreen({ addToast }) {
       addToast('error', 'プリセットアルバムの読み込みに失敗しました');
     }
   }, [addToast]);
+
+  const handleNextFolder = useCallback(() => {
+    if (folderData?.subfolders?.length > 0) {
+      navigateTo(folderData.subfolders[0].path);
+      return;
+    }
+    if (!galleryData?.tree || !path) return;
+    const nextSibling = findNextSibling(galleryData.tree, path);
+    if (nextSibling) navigateTo(nextSibling);
+  }, [folderData, galleryData, path, navigateTo]);
 
   const openViewer = useCallback((images, idx) => {
     setViewer({ images, idx });
@@ -552,6 +579,7 @@ export default function AlbumScreen({ addToast }) {
           images={viewer.images}
           initialIndex={viewer.idx}
           onClose={() => setViewer(null)}
+          onNextFolder={handleNextFolder}
           onFavoriteToggle={handleFavoriteToggle}
           onCaptionSave={handleCaptionSave}
           addToast={addToast}

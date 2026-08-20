@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 const FONT_SIZE_MAP = { small: '14px', medium: '20px', large: '28px' };
 const DEFAULT_CAPTION_CFG = { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true, x: 50, y: 20 };
 
-export default function ImageViewer({ images, initialIndex, onClose, onFavoriteToggle, onCaptionSave, addToast, onDelete }) {
+export default function ImageViewer({ images, initialIndex, onClose, onNextFolder, onFavoriteToggle, onCaptionSave, addToast, onDelete }) {
   const [idx, setIdx] = useState(initialIndex ?? 0);
   const [detail, setDetail] = useState(null);
   const [overlayExpanded, setOverlayExpanded] = useState(false);
@@ -154,14 +154,11 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
       }
       return;
     }
-    if (captionEdit === null && Math.abs(dy) > 80 && dy < 0 && Math.abs(dx) < Math.abs(dy)) { onClose(); return; }
-    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { go(dx < 0 ? 1 : -1); return; }
     const now = Date.now();
     if (now - t.lastTap < 300) { setScale(1); t.lastTap = 0; } else { t.lastTap = now; }
-  }, [go, onClose, captionEdit, captionCfg.mode]);
+  }, [captionEdit, captionCfg.mode]);
 
   const handleImageAreaClick = useCallback((e) => {
-    // #2: tap to set caption position in overlay edit mode
     if (captionEdit !== null && captionCfg.mode === 'overlay') {
       const rect = e.currentTarget.getBoundingClientRect();
       setCaptionCfg(prev => ({
@@ -176,15 +173,14 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     const y = e.clientY - rect.top;
     const w = rect.width;
     const h = rect.height;
-    // デッドゾーン: 端10%（誤タップ防止）
     if (x < w * 0.1 || x > w * 0.9 || y < h * 0.1 || y > h * 0.9) return;
-    // 中央帯: オーバーレイ切替（左右ナビより優先）
-    if (x > w * 0.35 && x < w * 0.65) { setOverlayExpanded(v => !v); return; }
-    // オーバーレイ展開中は左右タップでナビゲーションしない
-    if (overlayExpanded) { setOverlayExpanded(false); return; }
-    if (x < w * 0.35) go(-1);
-    else go(1);
-  }, [go, captionEdit, captionCfg.mode, overlayExpanded]);
+    const isLeft = x < w * 0.5;
+    const isTop = y < h * 0.5;
+    if (isTop && isLeft) { onClose(); }
+    else if (isTop && !isLeft) { if (onNextFolder) onNextFolder(); }
+    else if (!isTop && isLeft) { go(-1); }
+    else { go(1); }
+  }, [go, onClose, onNextFolder, captionEdit, captionCfg.mode]);
 
   const toggleFavorite = useCallback(async (e) => {
     e.stopPropagation();
