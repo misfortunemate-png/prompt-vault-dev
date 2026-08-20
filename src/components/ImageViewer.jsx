@@ -344,7 +344,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
       >
         {/* 画像エリア（タッチジェスチャー対象） */}
         <div
-          style={{ flex: 1, position: 'relative', touchAction: 'none', userSelect: 'none', minHeight: 0 }}
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', touchAction: 'none', userSelect: 'none', minHeight: 0 }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
