@@ -116,8 +116,8 @@ function FolderCardTree({ nodes, onNavigate, depth = 0 }) {
   );
 }
 
-const GRID_3 = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px' };
 const SECTION_LABEL = { fontSize: 'var(--fs-title)', fontWeight: 600, margin: '0 0 8px' };
+const SIZE_PRESETS = [{ label: '小', val: 80 }, { label: '中', val: 110 }, { label: '大', val: 160 }];
 
 export default function AlbumScreen({ addToast }) {
   const [galleryData, setGalleryData] = useState(null);
@@ -143,6 +143,9 @@ export default function AlbumScreen({ addToast }) {
   const [scanStatus, setScanStatus] = useState({ total: 0, processed: 0, newCount: 0, movedCount: 0, deletedCount: 0 });
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('icon');
+  const [thumbColMin, setThumbColMin] = useState(() => {
+    try { return parseInt(localStorage.getItem('pv_thumbColMin')) || 110; } catch { return 110; }
+  });
   const pollRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -282,6 +285,23 @@ export default function AlbumScreen({ addToast }) {
 
   const handleCaptionSave = useCallback(() => {}, []);
 
+  const handleDelete = useCallback((hash) => {
+    setViewer(prev => {
+      if (!prev) return null;
+      const newImages = prev.images.filter(img => img.hash !== hash);
+      if (newImages.length === 0) return null;
+      return { ...prev, images: newImages };
+    });
+    setRecentImages(prev => prev.filter(img => img.hash !== hash));
+    setFolderData(prev => prev ? { ...prev, images: prev.images.filter(img => img.hash !== hash) } : null);
+    setFlatMode(prev => prev ? { ...prev, images: prev.images.filter(img => img.hash !== hash) } : null);
+  }, []);
+
+  const setThumbSize = useCallback((val) => {
+    setThumbColMin(val);
+    try { localStorage.setItem('pv_thumbColMin', val); } catch {}
+  }, []);
+
   const isFavorite = useCallback((img) => {
     return hash => {
       if (hash in favUpdates) return favUpdates[hash];
@@ -373,6 +393,24 @@ export default function AlbumScreen({ addToast }) {
         </div>
       )}
 
+      {/* サイズコントロール */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+        {SIZE_PRESETS.map(({ label, val }) => (
+          <button
+            key={val}
+            onClick={() => setThumbSize(val)}
+            style={{ background: thumbColMin === val ? 'var(--accent)' : 'none', color: thumbColMin === val ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--line)', borderRadius: '4px', cursor: 'pointer', padding: '2px 8px', fontSize: 'var(--fs-label)', minHeight: '26px', flexShrink: 0 }}
+          >{label}</button>
+        ))}
+        <input
+          type="range"
+          min={60} max={200} step={5}
+          value={thumbColMin}
+          onChange={e => setThumbSize(parseInt(e.target.value))}
+          style={{ flex: 1, cursor: 'pointer', accentColor: 'var(--accent)' }}
+        />
+      </div>
+
       {/* コンテンツ */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 24px' }}>
 
@@ -385,7 +423,7 @@ export default function AlbumScreen({ addToast }) {
                 {flatMode.type === 'preset' ? 'このプリセットの画像はまだありません' : '該当する画像がありません'}
               </div>
             ) : (
-              <div style={GRID_3}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${thumbColMin}px, 1fr))`, gap: '2px' }}>
                 {flatMode.images.map((img, i) => (
                   <ThumbCell
                     key={img.hash}
@@ -405,7 +443,7 @@ export default function AlbumScreen({ addToast }) {
             {recentImages.length > 0 && (
               <section style={{ marginBottom: '20px' }}>
                 <h2 style={SECTION_LABEL}>新着</h2>
-                <div style={GRID_3}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${thumbColMin}px, 1fr))`, gap: '2px' }}>
                   {recentImages.map((img, i) => (
                     <ThumbCell
                       key={img.hash}
@@ -462,7 +500,7 @@ export default function AlbumScreen({ addToast }) {
                   ))}
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${Math.round(thumbColMin * 2.6)}px, 1fr))`, gap: '8px' }}>
                   <FolderCardTree nodes={galleryData.tree} onNavigate={navigateTo} />
                 </div>
               )}
@@ -493,7 +531,7 @@ export default function AlbumScreen({ addToast }) {
             ) : folderData.images.length === 0 ? (
               <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-body)', textAlign: 'center', padding: '32px 0' }}>画像がありません</div>
             ) : (
-              <div style={GRID_3}>
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(${thumbColMin}px, 1fr))`, gap: '2px' }}>
                 {folderData.images.map((img, i) => (
                   <ThumbCell
                     key={img.hash}
@@ -516,6 +554,8 @@ export default function AlbumScreen({ addToast }) {
           onClose={() => setViewer(null)}
           onFavoriteToggle={handleFavoriteToggle}
           onCaptionSave={handleCaptionSave}
+          addToast={addToast}
+          onDelete={handleDelete}
         />
       )}
     </div>

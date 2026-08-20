@@ -81,6 +81,13 @@ export function deleteByHash(hash) {
   getDb().prepare('DELETE FROM images WHERE hash = ?').run(hash);
 }
 
+export function deleteImage(hash) {
+  const row = getDb().prepare('SELECT rel_path FROM images WHERE hash = ?').get(hash);
+  if (!row) return null;
+  getDb().prepare('DELETE FROM images WHERE hash = ?').run(hash);
+  return row.rel_path;
+}
+
 export function listByFolder(folder) {
   return getDb().prepare(
     'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images WHERE folder = ? ORDER BY created_at DESC'

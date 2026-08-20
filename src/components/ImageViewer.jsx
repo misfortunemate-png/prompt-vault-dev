@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { api } from '../lib/api';
 
-export default function ImageViewer({ images, initialIndex, onClose, onFavoriteToggle, onCaptionSave }) {
+export default function ImageViewer({ images, initialIndex, onClose, onFavoriteToggle, onCaptionSave, addToast, onDelete }) {
   const [idx, setIdx] = useState(initialIndex ?? 0);
   const [detail, setDetail] = useState(null);
   const [overlayExpanded, setOverlayExpanded] = useState(false);
@@ -15,22 +15,44 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     images.forEach(img => { m[img.hash] = img.favorite === 1; });
     return m;
   });
+  const [showCardDialog, setShowCardDialog] = useState(false);
+  const [cardSlots, setCardSlots] = useState([]);
+  const [cardSlotId, setCardSlotId] = useState('');
+  const [cardNewSlotMode, setCardNewSlotMode] = useState(false);
+  const [cardNewSlotName, setCardNewSlotName] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [cardPos, setCardPos] = useState('');
+  const [cardNeg, setCardNeg] = useState('');
+  const [cardSaving, setCardSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
+  const fetchSeqRef = useRef(0);
   const touchRef = useRef({ startX: 0, startY: 0, startDist: 0, isPinch: false, lastTap: 0 });
   const img = images[idx];
+
+  // images が縮小して idx が範囲外になった場合に clamp
+  useEffect(() => {
+    if (images.length > 0 && idx >= images.length) {
+      setIdx(images.length - 1);
+    }
+  }, [idx, images.length]);
 
   useEffect(() => {
     setDetail(null);
     setPromptExpanded(false);
     setNegExpanded(false);
     setCaptionEdit(null);
+    setShowCardDialog(false);
+    setShowDeleteConfirm(false);
   }, [idx]);
 
   useEffect(() => {
     if (!overlayExpanded || !img) return;
     let cancelled = false;
+    const seq = ++fetchSeqRef.current;
     api.getGalleryImage(img.hash)
-      .then(d => { if (!cancelled) setDetail(d); })
+      .then(d => { if (!cancelled && seq === fetchSeqRef.current) setDetail(d); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [overlayExpanded, img?.hash]);
@@ -125,16 +147,98 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
       await api.setCaption(img.hash, captionEdit);
       if (onCaptionSave) onCaptionSave(img.hash, captionEdit);
       const saved = captionEdit;
+      // 保存後に遅延完了した detail fetch が caption を上書きするのを防ぐ
+      fetchSeqRef.current++;
       setDetail(prev => prev ? { ...prev, caption: saved } : { caption: saved });
       setCaptionEdit(null);
     } catch {}
     setCaptionSaving(false);
   }, [img, captionEdit, onCaptionSave]);
 
+  const openCardDialog = useCallback(async () => {
+    try {
+      const data = await api.getCards();
+      setCardSlots(data.slots || []);
+      setCardSlotId(data.slots?.[0]?.id || '');
+    } catch {
+      setCardSlots([]);
+      setCardSlotId('');
+    }
+    setCardNewSlotMode(false);
+    setCardNewSlotName('');
+    setCardName(img?.filename?.replace(/_\d+\.png$/i, '').replace(/[_-]+$/, '') || '');
+    setCardPos(detail?.prompt || '');
+    setCardNeg(detail?.negative || '');
+    setShowCardDialog(true);
+  }, [img, detail]);
+
+  const submitCard = useCallback(async () => {
+    if (cardSaving) return;
+    setCardSaving(true);
+    try {
+      let slotId = cardSlotId;
+      if (cardNewSlotMode) {
+        if (!cardNewSlotName.trim()) {
+          if (addToast) addToast('error', 'スロット名を入力してください');
+          setCardSaving(false);
+          return;
+        }
+        const slot = await api.addSlot({ name: cardNewSlotName.trim() });
+        slotId = slot.id;
+      }
+      if (!slotId) {
+        if (addToast) addToast('error', 'スロットを選択してください');
+        setCardSaving(false);
+        return;
+      }
+      await api.addCard({ slotId, name: cardName.trim() || '無題', positive: cardPos, negative: cardNeg });
+      if (addToast) addToast('success', 'カードを登録しました');
+      setShowCardDialog(false);
+    } catch (e) {
+      if (addToast) addToast('error', e.message?.includes('同名') ? e.message : 'カード登録に失敗しました');
+    }
+    setCardSaving(false);
+  }, [cardSaving, cardSlotId, cardNewSlotMode, cardNewSlotName, cardName, cardPos, cardNeg, addToast]);
+
+  const handleDelete = useCallback(async () => {
+    if (deleting || !img) return;
+    setDeleting(true);
+    try {
+      await api.deleteGalleryImage(img.hash);
+      if (addToast) addToast('success', '画像を削除しました');
+      setShowDeleteConfirm(false);
+      if (onDelete) onDelete(img.hash);
+    } catch {
+      if (addToast) addToast('error', '画像の削除に失敗しました');
+      setDeleting(false);
+    }
+  }, [deleting, img, addToast, onDelete]);
+
   if (!img) return null;
 
   const isFav = favoriteMap[img.hash] ?? false;
   const d = detail;
+
+  const OVERLAY_BTN = {
+    background: 'rgba(255,255,255,0.1)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: '#fff',
+    borderRadius: '6px',
+    padding: '6px 10px',
+    cursor: 'pointer',
+    fontSize: '13px',
+  };
+
+  const DIALOG_INPUT = {
+    width: '100%',
+    padding: '8px',
+    borderRadius: '6px',
+    border: '1px solid var(--line)',
+    background: 'var(--bg)',
+    color: 'var(--text)',
+    fontSize: 'var(--fs-body)',
+    boxSizing: 'border-box',
+  };
 
   return (
     <>
@@ -230,6 +334,12 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
                 </div>
               )}
 
+              {/* アクションボタン行 */}
+              <div style={{ display: 'flex', gap: '8px', margin: '10px 0 8px' }} onClick={e => e.stopPropagation()}>
+                <button onClick={openCardDialog} style={OVERLAY_BTN}>📋 カードに登録</button>
+                <button onClick={() => setShowDeleteConfirm(true)} style={{ ...OVERLAY_BTN, color: '#ff6b6b', borderColor: 'rgba(255,100,100,0.3)' }}>🗑 削除</button>
+              </div>
+
               {/* セリフ */}
               <div style={{ marginTop: '10px' }}>
                 <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '4px' }}>セリフ</div>
@@ -259,6 +369,106 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
           )}
         </div>
       </div>
+
+      {/* カード登録ダイアログ */}
+      {showCardDialog && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ background: 'var(--bg)', width: '100%', borderRadius: '12px 12px 0 0', padding: '16px', maxHeight: '85vh', overflowY: 'auto', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '14px' }}>
+              <span style={{ flex: 1, fontWeight: 600, fontSize: 'var(--fs-title)' }}>📋 カードに登録</span>
+              <button onClick={() => setShowCardDialog(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px', color: 'var(--text-secondary)', padding: '4px' }}>×</button>
+            </div>
+
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>スロット</label>
+              <select
+                value={cardNewSlotMode ? '__new__' : cardSlotId}
+                onChange={e => {
+                  if (e.target.value === '__new__') { setCardNewSlotMode(true); setCardSlotId(''); }
+                  else { setCardNewSlotMode(false); setCardSlotId(e.target.value); }
+                }}
+                style={{ ...DIALOG_INPUT }}
+              >
+                {cardSlots.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+                <option value="__new__">＋ 新規スロット</option>
+              </select>
+            </div>
+
+            {cardNewSlotMode && (
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>新規スロット名</label>
+                <input
+                  type="text"
+                  value={cardNewSlotName}
+                  onChange={e => setCardNewSlotName(e.target.value)}
+                  placeholder="スロット名を入力"
+                  autoFocus
+                  style={{ ...DIALOG_INPUT }}
+                />
+              </div>
+            )}
+
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>カード名</label>
+              <input
+                type="text"
+                value={cardName}
+                onChange={e => setCardName(e.target.value)}
+                placeholder="カード名（省略時: 無題）"
+                style={{ ...DIALOG_INPUT }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>正プロンプト</label>
+              <textarea
+                value={cardPos}
+                onChange={e => setCardPos(e.target.value)}
+                rows={4}
+                style={{ ...DIALOG_INPUT, resize: 'vertical' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>負プロンプト</label>
+              <textarea
+                value={cardNeg}
+                onChange={e => setCardNeg(e.target.value)}
+                rows={3}
+                style={{ ...DIALOG_INPUT, resize: 'vertical' }}
+              />
+            </div>
+
+            <button
+              onClick={submitCard}
+              disabled={cardSaving || (cardNewSlotMode ? !cardNewSlotName.trim() : !cardSlotId)}
+              style={{ width: '100%', padding: '12px', background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '8px', fontSize: 'var(--fs-body)', fontWeight: 600, cursor: 'pointer', opacity: cardSaving ? 0.6 : 1 }}
+            >{cardSaving ? '登録中...' : '登録'}</button>
+          </div>
+        </div>
+      )}
+
+      {/* 削除確認ダイアログ */}
+      {showDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: 'var(--bg)', borderRadius: '12px', padding: '20px', maxWidth: '320px', width: '100%' }}>
+            <p style={{ margin: '0 0 16px', fontSize: 'var(--fs-body)', lineHeight: 1.6 }}>この画像を削除しますか？（元に戻せません）</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{ flex: 1, padding: '10px', background: 'var(--line)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: 'var(--fs-body)', color: 'var(--text)' }}
+              >キャンセル</button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ flex: 1, padding: '10px', background: '#e53e3e', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: 'var(--fs-body)', color: '#fff', opacity: deleting ? 0.6 : 1 }}
+              >{deleting ? '削除中...' : '削除'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

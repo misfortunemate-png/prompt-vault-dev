@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.6.0
-milestone: M5
+version: 3.6.1
+milestone: v3.6.1
 status: done
 updated: 2026-08-20
 ---
@@ -26,3 +26,12 @@ updated: 2026-08-20
 - [x] server/queue.js: インメモリキューエンジン（直列実行・ランダム間隔・エラー中断）
 - [x] server.js: 6キューAPIルート追加
 - [x] GenerateScreen.jsx: ＋キュー・＋直積・キューパネル・直積ダイアログ
+
+## v3.6.1: ビューア機能拡張（完了）
+
+- [x] ImageViewer: ビューアから📋カードに登録ダイアログ（スロット選択・新規スロット・事前入力）
+- [x] ImageViewer: セリフ表示バグ修正（fetchSeqRefで遅延fetch上書きを防止）
+- [x] ImageViewer: 🗑削除ボタン（FS・DB・サムネイル削除・AlbumScreenグリッド即時反映）
+- [x] AlbumScreen: 画像グリッドサイズ制御（小/中/大プリセット＋スライダー、localStorage永続化）
+- [x] server/db.js: deleteImage ヘルパー追加
+- [x] server.js: DELETE /api/gallery/image/:hash ルート追加

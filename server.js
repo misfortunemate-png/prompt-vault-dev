@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, unl
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
-import { getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption } from './server/db.js';
+import { getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, deleteImage } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
@@ -502,6 +502,22 @@ async function start() {
       setCaption(req.params.hash, caption);
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  api.delete('/gallery/image/:hash', (req, res) => {
+    const vaultRoot = process.env.VAULT_ROOT;
+    if (!vaultRoot) return res.status(400).json({ error: 'VAULT_ROOT未設定' });
+    try {
+      const relPath = deleteImage(req.params.hash);
+      if (!relPath) return res.status(404).json({ error: '画像が見つかりません' });
+      const filePath = join(vaultRoot, ...relPath.split('/'));
+      if (existsSync(filePath)) unlinkSync(filePath);
+      const thumbPath = join(__dirname, 'data', 'thumbs', `${req.params.hash}.webp`);
+      if (existsSync(thumbPath)) unlinkSync(thumbPath);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // ── リスキャン ──

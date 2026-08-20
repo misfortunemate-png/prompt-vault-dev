@@ -66,6 +66,7 @@ export const api = {
   searchGallery: (q, limit = 50) => request(`/gallery/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   getByPreset: (presetId, limit = 50) => request(`/gallery/by-preset/${encodeURIComponent(presetId)}?limit=${limit}`),
   setCaption: (hash, caption) => request(`/gallery/image/${encodeURIComponent(hash)}/caption`, { method: 'PUT', body: JSON.stringify({ caption }) }),
+  deleteGalleryImage: (hash) => request(`/gallery/image/${encodeURIComponent(hash)}`, { method: 'DELETE' }),
 
   // Queue M5
   getQueue: () => request('/queue'),
