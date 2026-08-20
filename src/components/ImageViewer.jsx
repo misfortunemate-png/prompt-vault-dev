@@ -154,7 +154,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
       }
       return;
     }
-    if (Math.abs(dy) > 80 && dy < 0 && Math.abs(dx) < Math.abs(dy)) { onClose(); return; }
+    if (captionEdit === null && Math.abs(dy) > 80 && dy < 0 && Math.abs(dx) < Math.abs(dy)) { onClose(); return; }
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { go(dx < 0 ? 1 : -1); return; }
     const now = Date.now();
     if (now - t.lastTap < 300) { setScale(1); t.lastTap = 0; } else { t.lastTap = now; }
@@ -340,13 +340,17 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
 
       <div
         className="iv-root"
-        style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000', userSelect: 'none', touchAction: 'none' }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+        style={{ position: 'fixed', inset: 0, zIndex: 200, background: '#000' }}
       >
+        {/* 画像エリア（タッチジェスチャー対象） */}
+        <div
+          style={{ flex: 1, position: 'relative', touchAction: 'none', userSelect: 'none', minHeight: 0 }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+        >
         {/* × ボタン */}
         <button
           onClick={onClose}
@@ -459,7 +463,9 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
           </div>
         )}
 
-        {/* 情報オーバーレイ */}
+        </div>{/* /画像エリア */}
+
+        {/* 情報オーバーレイ（touchAction:none の外 → モバイルスクロール有効） */}
         <div className="iv-overlay">
           {/* 折りたたみバー */}
           <div
@@ -477,6 +483,55 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
           {/* 展開コンテンツ */}
           {overlayExpanded && (
             <div style={{ padding: '0 14px 14px' }}>
+              {/* セリフ編集中は最上部に表示（仮想キーボード干渉防止） */}
+              {captionEdit !== null && (
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '4px' }}>セリフ</div>
+                  <div onClick={e => e.stopPropagation()}>
+                    <textarea
+                      value={captionEdit}
+                      onChange={e => setCaptionEdit(e.target.value)}
+                      rows={3}
+                      style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '4px', padding: '6px', fontSize: '13px', resize: 'vertical' }}
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Escape') setCaptionEdit(null); }}
+                    />
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>モード</span>
+                        {[['margin', '余白'], ['overlay', '画像内']].map(([v, l]) => (
+                          <button key={v} onClick={() => setCaptionCfg(prev => ({ ...prev, mode: v }))} style={{ padding: '4px 10px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', background: captionCfg.mode === v ? 'rgba(255,255,255,0.2)' : 'transparent', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>{l}</button>
+                        ))}
+                      </div>
+                      {captionCfg.mode === 'overlay' && (
+                        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>画像をタップして位置を指定・ドラッグで調整</div>
+                      )}
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>サイズ</span>
+                        {[['small', '小'], ['medium', '中'], ['large', '大']].map(([v, l]) => (
+                          <button key={v} onClick={() => setCaptionCfg(prev => ({ ...prev, fontSize: v }))} style={{ padding: '4px 9px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', background: captionCfg.fontSize === v ? 'rgba(255,255,255,0.2)' : 'transparent', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>{l}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>色</span>
+                        {['#ffffff', '#000000', '#ff69b4'].map(c => (
+                          <button key={c} onClick={() => setCaptionCfg(prev => ({ ...prev, color: c }))} style={{ width: '22px', height: '22px', borderRadius: '50%', background: c, border: captionCfg.color === c ? '2px solid #7ec8e3' : '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+                        ))}
+                        <input type="color" value={captionCfg.color || '#ffffff'} onChange={e => setCaptionCfg(prev => ({ ...prev, color: e.target.value }))} style={{ width: '28px', height: '22px', padding: 0, border: '1px solid rgba(255,255,255,0.3)', borderRadius: '3px', cursor: 'pointer', background: 'none', flexShrink: 0 }} />
+                      </div>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={captionCfg.outline !== false} onChange={e => setCaptionCfg(prev => ({ ...prev, outline: e.target.checked }))} />
+                        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>縁取り</span>
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      <button onClick={saveCaption} disabled={captionSaving} style={{ flex: 1, background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>保存</button>
+                      <button onClick={() => { setCaptionEdit(null); if (d?.caption_config) { try { setCaptionCfg(JSON.parse(d.caption_config)); } catch {} } else { setCaptionCfg(defaultCaptionStyle || DEFAULT_CAPTION_CFG); } }} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>キャンセル</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ファイル情報 */}
               <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '12px', marginBottom: '10px', lineHeight: 1.6 }}>
                 <div>{img.folder || '(ルート)'}</div>
@@ -520,64 +575,16 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
                 <button onClick={() => setShowDeleteConfirm(true)} style={{ ...OVERLAY_BTN, color: '#ff6b6b', borderColor: 'rgba(255,100,100,0.3)' }}>🗑 削除</button>
               </div>
 
-              {/* #2: セリフ */}
-              <div style={{ marginTop: '10px' }}>
-                <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '4px' }}>セリフ</div>
-                {captionEdit !== null ? (
-                  <div onClick={e => e.stopPropagation()}>
-                    <textarea
-                      value={captionEdit}
-                      onChange={e => setCaptionEdit(e.target.value)}
-                      rows={3}
-                      style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '4px', padding: '6px', fontSize: '13px', resize: 'vertical' }}
-                      autoFocus
-                      onKeyDown={e => { if (e.key === 'Escape') setCaptionEdit(null); }}
-                    />
-                    {/* #2: スタイル設定 */}
-                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {/* モード */}
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>モード</span>
-                        {[['margin', '余白'], ['overlay', '画像内']].map(([v, l]) => (
-                          <button key={v} onClick={() => setCaptionCfg(prev => ({ ...prev, mode: v }))} style={{ padding: '4px 10px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', background: captionCfg.mode === v ? 'rgba(255,255,255,0.2)' : 'transparent', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>{l}</button>
-                        ))}
-                      </div>
-                      {captionCfg.mode === 'overlay' && (
-                        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px' }}>画像をタップして位置を指定・ドラッグで調整</div>
-                      )}
-                      {/* フォントサイズ */}
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>サイズ</span>
-                        {[['small', '小'], ['medium', '中'], ['large', '大']].map(([v, l]) => (
-                          <button key={v} onClick={() => setCaptionCfg(prev => ({ ...prev, fontSize: v }))} style={{ padding: '4px 9px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', background: captionCfg.fontSize === v ? 'rgba(255,255,255,0.2)' : 'transparent', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>{l}</button>
-                        ))}
-                      </div>
-                      {/* 文字色 */}
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', flexShrink: 0 }}>色</span>
-                        {['#ffffff', '#000000', '#ff69b4'].map(c => (
-                          <button key={c} onClick={() => setCaptionCfg(prev => ({ ...prev, color: c }))} style={{ width: '22px', height: '22px', borderRadius: '50%', background: c, border: captionCfg.color === c ? '2px solid #7ec8e3' : '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
-                        ))}
-                        <input type="color" value={captionCfg.color || '#ffffff'} onChange={e => setCaptionCfg(prev => ({ ...prev, color: e.target.value }))} style={{ width: '28px', height: '22px', padding: 0, border: '1px solid rgba(255,255,255,0.3)', borderRadius: '3px', cursor: 'pointer', background: 'none', flexShrink: 0 }} />
-                      </div>
-                      {/* 縁取り */}
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={captionCfg.outline !== false} onChange={e => setCaptionCfg(prev => ({ ...prev, outline: e.target.checked }))} />
-                        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>縁取り</span>
-                      </label>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                      <button onClick={saveCaption} disabled={captionSaving} style={{ flex: 1, background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>保存</button>
-                      <button onClick={() => { setCaptionEdit(null); if (d?.caption_config) { try { setCaptionCfg(JSON.parse(d.caption_config)); } catch {} } else { setCaptionCfg(defaultCaptionStyle || DEFAULT_CAPTION_CFG); } }} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>キャンセル</button>
-                    </div>
-                  </div>
-                ) : (
+              {/* セリフ（非編集時のみ — 編集中は上部に表示） */}
+              {captionEdit === null && (
+                <div style={{ marginTop: '10px' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '4px' }}>セリフ</div>
                   <div
                     onClick={() => setCaptionEdit(d?.caption ?? '')}
                     style={{ color: d?.caption ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.25)', fontSize: '13px', lineHeight: 1.5, cursor: 'pointer', minHeight: '32px', padding: '4px 0' }}
                   >{d?.caption || 'セリフなし'}</div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </div>
