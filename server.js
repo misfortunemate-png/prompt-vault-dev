@@ -10,6 +10,21 @@ import { executeGenerate, executeSave } from './server/generate.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// --env-file 未使用時のフォールバック（node server.js 直接起動対策）
+const _envPath = join(__dirname, '.env');
+if (!process.env.VAULT_ROOT && existsSync(_envPath)) {
+  for (const line of readFileSync(_envPath, 'utf8').split('\n')) {
+    const t = line.trim();
+    if (!t || t.startsWith('#')) continue;
+    const eq = t.indexOf('=');
+    if (eq < 0) continue;
+    const k = t.slice(0, eq).trim();
+    const v = t.slice(eq + 1).trim();
+    if (!process.env[k]) process.env[k] = v;
+  }
+}
+
 const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
 const THUMBS_DIR = join(__dirname, 'data', 'thumbs');
 const PORT = process.env.PORT || 8789;
