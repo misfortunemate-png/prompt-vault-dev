@@ -56,7 +56,7 @@ const arrowBtnStyle = {
 
 const STATUS_ICONS = { pending: '⏳', running: '🔄', done: '✅', error: '❌', skipped: '⏭' };
 
-function ResultCard({ item, onSave }) {
+function ResultCard({ item, onSave, onPreview }) {
   const label = item.filenameSegments?.filter(Boolean).join(' / ') || '（選択なし）';
   return (
     <div style={{
@@ -71,7 +71,8 @@ function ResultCard({ item, onSave }) {
       <img
         src={`/api/images/.tmp/${item.filename}`}
         alt=""
-        style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)' }}
+        onClick={onPreview}
+        style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', cursor: 'zoom-in' }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '2px' }}>
@@ -132,6 +133,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [inlinePos, setInlinePos] = useState('');
   const [inlineNeg, setInlineNeg] = useState('');
   const [inlineSaving, setInlineSaving] = useState(false);
+  const [previewItem, setPreviewItem] = useState(null);
 
   const sortedSlots = cardsData ? [...cardsData.slots].sort((a, b) => a.order - b.order) : [];
 
@@ -720,7 +722,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
       {/* 結果一覧 */}
       {results.map((item, idx) => (
-        <ResultCard key={`${item.filename}-${idx}`} item={item} onSave={() => handleSave(idx)} />
+        <ResultCard key={`${item.filename}-${idx}`} item={item} onSave={() => handleSave(idx)} onPreview={() => setPreviewItem(item)} />
       ))}
 
       {/* キューパネル */}
@@ -865,6 +867,23 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                 style={{ flex: 1, padding: '12px', border: '1px solid var(--line)', borderRadius: 'var(--radius-m)', background: 'none', color: 'var(--text-secondary)', fontSize: 'var(--fs-body)', cursor: 'pointer' }}
               >キャンセル</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 生成画像フルスクリーンプレビュー */}
+      {previewItem && (
+        <div
+          onClick={() => setPreviewItem(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <img
+            src={`/api/images/.tmp/${previewItem.filename}`}
+            alt=""
+            style={{ maxWidth: '100%', maxHeight: 'calc(100% - 60px)', objectFit: 'contain' }}
+          />
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 'var(--fs-label)', marginTop: '10px' }}>
+            {previewItem.width}×{previewItem.height} • seed: {previewItem.seed} • タップして閉じる
           </div>
         </div>
       )}

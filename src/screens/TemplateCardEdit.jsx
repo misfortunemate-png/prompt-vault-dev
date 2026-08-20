@@ -50,7 +50,7 @@ export default function TemplateCardEdit({ card, slots, onSave, onCancel, addToa
   };
 
   return (
-    <div style={{ padding: '0 16px 80px' }}>
+    <div style={{ padding: '0 16px 136px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 0', marginBottom: '8px', borderBottom: '1px solid var(--line)' }}>
         <button onClick={onCancel} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 'var(--fs-body)', padding: 0 }}>‹ 戻る</button>
         <span style={{ fontSize: 'var(--fs-title)', fontWeight: 600 }}>{isNew ? 'カード追加' : 'カード編集'}</span>
@@ -97,7 +97,7 @@ export default function TemplateCardEdit({ card, slots, onSave, onCancel, addToa
         </div>
       </div>
 
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--bg)', borderTop: '1px solid var(--line)', padding: '12px 16px', display: 'flex', gap: '8px', zIndex: 100 }}>
+      <div style={{ position: 'fixed', bottom: 54, left: 0, right: 0, background: 'var(--bg)', borderTop: '1px solid var(--line)', padding: '12px 16px', display: 'flex', gap: '8px', zIndex: 150 }}>
         <button
           onClick={onCancel}
           style={{ flex: 1, padding: '10px', border: '1px solid var(--line)', borderRadius: 'var(--radius-s)', background: 'var(--surface)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
