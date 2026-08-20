@@ -47,9 +47,10 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
   const destPath = join(destDir, newFilename);
   renameSync(srcPath, destPath);
 
+  let hash = null;
   try {
     const buf = readFileSync(destPath);
-    const hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
+    hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
     const meta = parsePngMeta(buf);
     const st = statSync(destPath);
     const now = new Date().toISOString();
@@ -81,5 +82,5 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
     console.warn('[Save] DB登録失敗:', dbErr.message);
   }
 
-  return { saved_path: `${folderPath}/${newFilename}`, filename: newFilename, folder: folderPath };
+  return { saved_path: `${folderPath}/${newFilename}`, filename: newFilename, folder: folderPath, hash };
 }

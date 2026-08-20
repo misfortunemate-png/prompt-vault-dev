@@ -118,7 +118,7 @@ async function runLoop(vaultRoot) {
         preset_id: task.preset_id,
       });
       task.status = 'done';
-      task.result = { filename: saved.filename, seed: result.seed, width: result.width, height: result.height };
+      task.result = { filename: saved.filename, folder: saved.folder, hash: saved.hash, seed: result.seed, width: result.width, height: result.height };
     } catch (e) {
       task.status = 'error';
       task.error = e.message;

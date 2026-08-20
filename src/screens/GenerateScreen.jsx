@@ -766,9 +766,19 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                   <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '8px', borderTop: '1px solid var(--line)' }}>
                     {queueData.tasks.map(task => (
                       <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
-                        <span style={{ fontSize: '14px', flexShrink: 0 }}>{STATUS_ICONS[task.status] || '?'}</span>
+                        {task.status === 'done' && task.result?.hash ? (
+                          <img
+                            src={`/api/thumbs/${task.result.hash}.webp`}
+                            alt=""
+                            onClick={() => setPreviewItem({ filename: null, _hash: task.result.hash, seed: task.result.seed, width: task.result.width, height: task.result.height })}
+                            style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, cursor: 'zoom-in', background: 'var(--line)' }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: '14px', flexShrink: 0, width: 36, textAlign: 'center' }}>{STATUS_ICONS[task.status] || '?'}</span>
+                        )}
                         <span style={{ flex: 1, fontSize: 'var(--fs-label)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: task.status === 'error' ? '#c0392b' : 'var(--text-primary)' }}>
                           {task.label}
+                          {task.status === 'error' && task.error && <span style={{ display: 'block', fontSize: '11px', color: '#c0392b' }}>{task.error}</span>}
                         </span>
                         {task.status === 'pending' && (
                           <button onClick={() => handleRemoveTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '14px', padding: '0 4px', flexShrink: 0 }}>×</button>
@@ -878,7 +888,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
         >
           <img
-            src={`/api/images/.tmp/${previewItem.filename}`}
+            src={previewItem._hash ? `/api/images/full/${previewItem._hash}` : `/api/images/.tmp/${previewItem.filename}`}
             alt=""
             style={{ maxWidth: '100%', maxHeight: 'calc(100% - 60px)', objectFit: 'contain' }}
           />
