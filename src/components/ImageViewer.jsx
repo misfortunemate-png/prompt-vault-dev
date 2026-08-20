@@ -107,6 +107,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
 
   const handleTouchStart = useCallback((e) => {
     const t = touchRef.current;
+    t.inOverlay = !!e.target.closest('.iv-overlay');
     if (e.touches.length === 2) {
       t.isPinch = true;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -134,6 +135,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
   const handleTouchEnd = useCallback((e) => {
     const t = touchRef.current;
     if (t.isPinch) { t.isPinch = false; return; }
+    if (t.inOverlay) return;
     if (!e.changedTouches.length) return;
     const endX = e.changedTouches[0].clientX;
     const endY = e.changedTouches[0].clientY;
@@ -171,11 +173,18 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     }
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     const w = rect.width;
-    if (x < w * 0.25) go(-1);
-    else if (x > w * 0.75) go(1);
-    else setOverlayExpanded(v => !v);
-  }, [go, captionEdit, captionCfg.mode]);
+    const h = rect.height;
+    // デッドゾーン: 端10%（誤タップ防止）
+    if (x < w * 0.1 || x > w * 0.9 || y < h * 0.1 || y > h * 0.9) return;
+    // 中央帯: オーバーレイ切替（左右ナビより優先）
+    if (x > w * 0.35 && x < w * 0.65) { setOverlayExpanded(v => !v); return; }
+    // オーバーレイ展開中は左右タップでナビゲーションしない
+    if (overlayExpanded) { setOverlayExpanded(false); return; }
+    if (x < w * 0.35) go(-1);
+    else go(1);
+  }, [go, captionEdit, captionCfg.mode, overlayExpanded]);
 
   const toggleFavorite = useCallback(async (e) => {
     e.stopPropagation();
