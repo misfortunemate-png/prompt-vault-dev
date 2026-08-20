@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import TagSuggest from '../components/TagSuggest';
 import { api } from '../lib/api';
 
@@ -114,6 +114,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [randomChildMode, setRandomChildMode] = useState({});
   // selectedChildMap: slotId -> childCardId (used when randomChildMode[slotId] === false)
   const [selectedChildMap, setSelectedChildMap] = useState({});
+  const [slotEnabledMap, setSlotEnabledMap] = useState({});
+  const [slotRandomMap, setSlotRandomMap] = useState({});
 
   const [editedPositive, setEditedPositive] = useState('');
   const [editedNegative, setEditedNegative] = useState('');
@@ -140,6 +142,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [inlineNeg, setInlineNeg] = useState('');
   const [inlineSaving, setInlineSaving] = useState(false);
   const [previewItem, setPreviewItem] = useState(null);
+  const promptApplied = useRef(false);
+  const promptEditRef = useRef(null);
 
   const sortedSlots = cardsData ? (() => {
     let slotsArr = [...cardsData.slots];
@@ -163,11 +167,12 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     if (!data) return '';
     return [...data.slots].sort((a, b) => a.order - b.order)
       .map(s => {
+        if (slotEnabledMap[s.id] === false) return '';
+        if (slotRandomMap[s.id]) return '';
         const id = cardMap[s.id];
         if (!id) return '';
         const card = data.cards.find(c => c.id === id);
         if (!card) return '';
-        // When specific child is selected (not random), include child positive in preview
         if (randomChildMode[s.id] === false && selectedChildMap[s.id]) {
           const child = data.cards.find(c => c.id === selectedChildMap[s.id]);
           return [card.positive, child?.positive].filter(Boolean).join(', ');
@@ -175,12 +180,14 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         return card.positive || '';
       })
       .filter(Boolean).join(', ');
-  }, [randomChildMode, selectedChildMap]);
+  }, [randomChildMode, selectedChildMap, slotEnabledMap, slotRandomMap]);
 
   const computeNegative = useCallback((cardMap, data) => {
     if (!data) return '';
     return [...data.slots].sort((a, b) => a.order - b.order)
       .map(s => {
+        if (slotEnabledMap[s.id] === false) return '';
+        if (slotRandomMap[s.id]) return '';
         const id = cardMap[s.id];
         if (!id) return '';
         const card = data.cards.find(c => c.id === id);
@@ -192,14 +199,40 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         return card.negative || '';
       })
       .filter(Boolean).join(', ');
-  }, [randomChildMode, selectedChildMap]);
+  }, [randomChildMode, selectedChildMap, slotEnabledMap, slotRandomMap]);
 
   useEffect(() => {
     if (cardsData) {
-      setEditedPositive(computePositive(selectedCardMap, cardsData));
-      setEditedNegative(computeNegative(selectedCardMap, cardsData));
+      if (promptApplied.current && typeof promptApplied.current === 'object') {
+        setEditedPositive(promptApplied.current.positive || '');
+        setEditedNegative(promptApplied.current.negative || '');
+        promptApplied.current = true;
+      } else {
+        setEditedPositive(computePositive(selectedCardMap, cardsData));
+        setEditedNegative(computeNegative(selectedCardMap, cardsData));
+      }
     }
   }, [selectedCardMap, cardsData, computePositive, computeNegative]);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pv3-last-prompt'));
+      if (stored) {
+        if (stored.model) setModel(stored.model);
+        if (stored.resolution) setResolution(stored.resolution);
+        if (stored.steps != null) setSteps(stored.steps);
+        if (stored.scale != null) setScale(stored.scale);
+        if (stored.sampler) setSampler(stored.sampler);
+        promptApplied.current = stored;
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (showPromptEdit && promptEditRef.current) {
+      promptEditRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [showPromptEdit]);
 
   // ── Data loading ──
 
@@ -216,7 +249,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     async function loadData() {
       try {
         const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
-        if (settings.generation?.model) setModel(settings.generation.model);
+        if (settings.generation?.model && !promptApplied.current) setModel(settings.generation.model);
         const ready = !!info.vaultRoot;
         setVaultReady(ready);
         if (ready) {
@@ -427,6 +460,30 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     }
   };
 
+  // ── Prompt storage ──
+
+  const savePromptToStorage = useCallback(() => {
+    try {
+      localStorage.setItem('pv3-last-prompt', JSON.stringify({
+        positive: editedPositive,
+        negative: editedNegative,
+        model, resolution, steps, scale, sampler,
+      }));
+    } catch {}
+  }, [editedPositive, editedNegative, model, resolution, steps, scale, sampler]);
+
+  const handleClearPrompt = useCallback(() => {
+    localStorage.removeItem('pv3-last-prompt');
+    setEditedPositive('');
+    setEditedNegative('');
+    setModel('nai-diffusion-4-5-full');
+    setResolution('portrait');
+    setSteps(28);
+    setScale(5);
+    setSampler('k_euler_ancestral');
+    setSeed('');
+  }, []);
+
   // ── Random child resolution helper ──
 
   const resolveChildren = (slotIdToCardId) => {
@@ -452,30 +509,74 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const buildSingleTask = () => {
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
+    const allCards = cardsData?.cards || [];
 
-    // Resolve random children
-    const childRes = resolveChildren(selectedCardMap);
+    const effectiveMap = {};
+    const randomPicks = {};
+    sortedSlots.forEach(slot => {
+      if (slotEnabledMap[slot.id] === false) return;
+      if (slotRandomMap[slot.id]) {
+        const slotCards = allCards.filter(c => c.slotId === slot.id);
+        if (slotCards.length > 0) {
+          randomPicks[slot.id] = slotCards[Math.floor(Math.random() * slotCards.length)];
+          effectiveMap[slot.id] = randomPicks[slot.id].id;
+        }
+      } else {
+        effectiveMap[slot.id] = selectedCardMap[slot.id];
+      }
+    });
+
+    const childRes = {};
+    Object.entries(effectiveMap).forEach(([slotId, cardId]) => {
+      if (!cardId || randomPicks[slotId]) return;
+      const children = allCards.filter(c => c.parentId === cardId);
+      if (children.length === 0) return;
+      if (randomChildMode[slotId] === false) {
+        const childId = selectedChildMap[slotId];
+        const child = childId ? children.find(c => c.id === childId) : null;
+        if (child) childRes[slotId] = child;
+      } else {
+        childRes[slotId] = children[Math.floor(Math.random() * children.length)];
+      }
+    });
 
     const getName = (slotId) => {
+      if (randomPicks[slotId]) return randomPicks[slotId].name;
       const child = childRes[slotId];
       if (child) return child.name;
-      const id = selectedCardMap[slotId];
-      return id ? cardsData?.cards.find(c => c.id === id)?.name : null;
+      const id = effectiveMap[slotId];
+      return id ? allCards.find(c => c.id === id)?.name : null;
     };
 
-    // Append child prompts to edited prompts
     let pos = editedPositive;
     let neg = editedNegative;
     sortedSlots.forEach(slot => {
+      if (slotEnabledMap[slot.id] === false) return;
+      const rp = randomPicks[slot.id];
+      if (rp) {
+        if (rp.positive) pos = pos ? pos + ', ' + rp.positive : rp.positive;
+        if (rp.negative) neg = neg ? neg + ', ' + rp.negative : rp.negative;
+        return;
+      }
       const child = childRes[slot.id];
       if (!child) return;
       if (child.positive) pos = pos ? pos + ', ' + child.positive : child.positive;
       if (child.negative) neg = neg ? neg + ', ' + child.negative : child.negative;
     });
 
-    const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => getName(s.id)).filter(Boolean);
-    const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => getName(s.id)).filter(Boolean);
-    const label = sortedSlots.map(s => getName(s.id)).filter(Boolean).join(' × ') || '（選択なし）';
+    const folderSegments = [];
+    sortedSlots.filter(s => s.useAsFolder && slotEnabledMap[s.id] !== false).forEach(s => {
+      const finalCard = randomPicks[s.id] || childRes[s.id] || (effectiveMap[s.id] ? allCards.find(c => c.id === effectiveMap[s.id]) : null);
+      if (!finalCard) return;
+      if (finalCard.parentId) {
+        const parent = allCards.find(c => c.id === finalCard.parentId);
+        if (parent?.name) folderSegments.push(parent.name);
+      }
+      if (finalCard.name) folderSegments.push(finalCard.name);
+    });
+
+    const filenameSegments = sortedSlots.filter(s => s.useInFilename && slotEnabledMap[s.id] !== false).map(s => getName(s.id)).filter(Boolean);
+    const label = sortedSlots.filter(s => slotEnabledMap[s.id] !== false).map(s => getName(s.id)).filter(Boolean).join(' × ') || '（選択なし）';
     return {
       positive: pos,
       negative: neg,
@@ -496,6 +597,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       setQueueData(d);
       setQueueExpanded(true);
       addToast('success', `キューに追加（${r.total}件）`);
+      savePromptToStorage();
     } catch (e) { addToast('error', e.message); }
   };
 
@@ -503,10 +605,13 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
     const params = { model, width: res.width, height: res.height, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null };
     const allCards = cardsData?.cards || [];
-    const slotOptions = sortedSlots.map(slot => {
+    const enabledSlots = sortedSlots.filter(s => slotEnabledMap[s.id] !== false);
+    const slotOptions = enabledSlots.map(slot => {
+      if (slotRandomMap[slot.id]) {
+        return { slot, options: [null], isRandom: true };
+      }
       const mode = cartesianMode[slot.id] ?? 'fixed';
       if (mode === 'expand') {
-        // Expand only root cards (no parentId); children are resolved randomly per task
         const rootCards = allCards.filter(c => c.slotId === slot.id && !c.parentId);
         return { slot, options: rootCards.length > 0 ? rootCards : [null] };
       }
@@ -519,26 +624,49 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       combos = combos.flatMap(combo => options.map(card => ({ ...combo, [slot.id]: card })));
     }
     return combos.map(combo => {
-      // Resolve random children for each slot in this combo
+      const randomPicks = {};
       const childRes = {};
-      sortedSlots.forEach(slot => {
+      enabledSlots.forEach(slot => {
+        if (slotRandomMap[slot.id]) {
+          const slotCards = allCards.filter(c => c.slotId === slot.id);
+          if (slotCards.length > 0) randomPicks[slot.id] = slotCards[Math.floor(Math.random() * slotCards.length)];
+          return;
+        }
         const card = combo[slot.id];
         if (!card) return;
         const children = allCards.filter(c => c.parentId === card.id);
         if (children.length > 0) childRes[slot.id] = children[Math.floor(Math.random() * children.length)];
       });
-      const getName = (slotId) => (childRes[slotId]?.name || combo[slotId]?.name) || null;
-      let positive = sortedSlots.map(s => combo[s.id]?.positive || '').filter(Boolean).join(', ');
-      let negative = sortedSlots.map(s => combo[s.id]?.negative || '').filter(Boolean).join(', ');
-      sortedSlots.forEach(slot => {
+      const getName = (slotId) => {
+        if (randomPicks[slotId]) return randomPicks[slotId].name;
+        return (childRes[slotId]?.name || combo[slotId]?.name) || null;
+      };
+      let positive = enabledSlots.filter(s => !slotRandomMap[s.id]).map(s => combo[s.id]?.positive || '').filter(Boolean).join(', ');
+      let negative = enabledSlots.filter(s => !slotRandomMap[s.id]).map(s => combo[s.id]?.negative || '').filter(Boolean).join(', ');
+      enabledSlots.forEach(slot => {
+        const rp = randomPicks[slot.id];
+        if (rp) {
+          if (rp.positive) positive = positive ? positive + ', ' + rp.positive : rp.positive;
+          if (rp.negative) negative = negative ? negative + ', ' + rp.negative : rp.negative;
+          return;
+        }
         const child = childRes[slot.id];
         if (!child) return;
         if (child.positive) positive = positive ? positive + ', ' + child.positive : child.positive;
         if (child.negative) negative = negative ? negative + ', ' + child.negative : child.negative;
       });
-      const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => getName(s.id)).filter(Boolean);
-      const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => getName(s.id)).filter(Boolean);
-      const label = sortedSlots.map(s => getName(s.id)).filter(Boolean).join(' × ') || '（選択なし）';
+      const folderSegments = [];
+      enabledSlots.filter(s => s.useAsFolder).forEach(s => {
+        const finalCard = randomPicks[s.id] || childRes[s.id] || combo[s.id];
+        if (!finalCard) return;
+        if (finalCard.parentId) {
+          const parent = allCards.find(c => c.id === finalCard.parentId);
+          if (parent?.name) folderSegments.push(parent.name);
+        }
+        if (finalCard.name) folderSegments.push(finalCard.name);
+      });
+      const filenameSegments = enabledSlots.filter(s => s.useInFilename).map(s => getName(s.id)).filter(Boolean);
+      const label = enabledSlots.map(s => getName(s.id)).filter(Boolean).join(' × ') || '（選択なし）';
       return { positive, negative, params, folderSegments, filenameSegments, preset_id: selectedPresetId || null, label };
     });
   };
@@ -554,6 +682,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       setQueueExpanded(true);
       setShowCartesian(false);
       addToast('success', `${r.added}件をキューに追加（計${r.total}件）`);
+      savePromptToStorage();
     } catch (e) { addToast('error', e.message); }
   };
 
@@ -583,22 +712,73 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     if (steps > 28 && !window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
     setGenerating(true);
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
+    const allCards = cardsData?.cards || [];
 
-    // Resolve random children
-    const childRes = resolveChildren(selectedCardMap);
-    const getName = (slotId) => (childRes[slotId]?.name || (selectedCardMap[slotId] ? cardsData.cards.find(c => c.id === selectedCardMap[slotId])?.name : null));
+    const effectiveMap = {};
+    const randomPicks = {};
+    sortedSlots.forEach(slot => {
+      if (slotEnabledMap[slot.id] === false) return;
+      if (slotRandomMap[slot.id]) {
+        const slotCards = allCards.filter(c => c.slotId === slot.id);
+        if (slotCards.length > 0) {
+          randomPicks[slot.id] = slotCards[Math.floor(Math.random() * slotCards.length)];
+          effectiveMap[slot.id] = randomPicks[slot.id].id;
+        }
+      } else {
+        effectiveMap[slot.id] = selectedCardMap[slot.id];
+      }
+    });
+
+    const childRes = {};
+    Object.entries(effectiveMap).forEach(([slotId, cardId]) => {
+      if (!cardId || randomPicks[slotId]) return;
+      const children = allCards.filter(c => c.parentId === cardId);
+      if (children.length === 0) return;
+      if (randomChildMode[slotId] === false) {
+        const childId = selectedChildMap[slotId];
+        const child = childId ? children.find(c => c.id === childId) : null;
+        if (child) childRes[slotId] = child;
+      } else {
+        childRes[slotId] = children[Math.floor(Math.random() * children.length)];
+      }
+    });
+
+    const getName = (slotId) => {
+      if (randomPicks[slotId]) return randomPicks[slotId].name;
+      const child = childRes[slotId];
+      if (child) return child.name;
+      const id = effectiveMap[slotId];
+      return id ? allCards.find(c => c.id === id)?.name : null;
+    };
 
     let pos = editedPositive;
     let neg = editedNegative;
     sortedSlots.forEach(slot => {
+      if (slotEnabledMap[slot.id] === false) return;
+      const rp = randomPicks[slot.id];
+      if (rp) {
+        if (rp.positive) pos = pos ? pos + ', ' + rp.positive : rp.positive;
+        if (rp.negative) neg = neg ? neg + ', ' + rp.negative : rp.negative;
+        return;
+      }
       const child = childRes[slot.id];
       if (!child) return;
       if (child.positive) pos = pos ? pos + ', ' + child.positive : child.positive;
       if (child.negative) neg = neg ? neg + ', ' + child.negative : child.negative;
     });
 
-    const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => getName(s.id)).filter(Boolean);
-    const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => getName(s.id)).filter(Boolean);
+    const folderSegments = [];
+    sortedSlots.filter(s => s.useAsFolder && slotEnabledMap[s.id] !== false).forEach(s => {
+      const finalCard = randomPicks[s.id] || childRes[s.id] || (effectiveMap[s.id] ? allCards.find(c => c.id === effectiveMap[s.id]) : null);
+      if (!finalCard) return;
+      if (finalCard.parentId) {
+        const parent = allCards.find(c => c.id === finalCard.parentId);
+        if (parent?.name) folderSegments.push(parent.name);
+      }
+      if (finalCard.name) folderSegments.push(finalCard.name);
+    });
+
+    const filenameSegments = sortedSlots.filter(s => s.useInFilename && slotEnabledMap[s.id] !== false).map(s => getName(s.id)).filter(Boolean);
 
     try {
       const result = await api.generate({
@@ -611,6 +791,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         const next = [{ ...result.image, folderSegments, filenameSegments, saved: false }, ...prev];
         return next.length > maxResults ? next.slice(0, maxResults) : next;
       });
+      savePromptToStorage();
     } catch (e) {
       addToast('error', '生成に失敗しました: ' + (e.message || ''));
     } finally {
@@ -672,8 +853,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
             const isLast = idx === sortedSlots.length - 1;
 
             return (
-              <div key={slot.id} style={{ marginBottom: idx < sortedSlots.length - 1 ? '12px' : 0 }}>
-                {/* 管理行: ▲▼ / スロット名 / F / N / × */}
+              <div key={slot.id} style={{ marginBottom: idx < sortedSlots.length - 1 ? '12px' : 0, opacity: slotEnabledMap[slot.id] === false ? 0.4 : 1, transition: 'opacity 0.2s' }}>
+                {/* 管理行: ▲▼ / スロット名 / 有効 / ランダム / F / N / × */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flexShrink: 0 }}>
                     <button
@@ -692,6 +873,14 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                     {slot.name}
                   </span>
 
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
+                    <input type="checkbox" checked={slotEnabledMap[slot.id] !== false} onChange={() => setSlotEnabledMap(prev => ({ ...prev, [slot.id]: prev[slot.id] === false }))} />
+                    有効
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
+                    <input type="checkbox" checked={!!slotRandomMap[slot.id]} onChange={() => setSlotRandomMap(prev => ({ ...prev, [slot.id]: !prev[slot.id] }))} />
+                    ランダム
+                  </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
                     <input type="checkbox" checked={!!slot.useAsFolder} onChange={() => handleToggleSlotProp(slot, 'useAsFolder')} />
                     F
@@ -714,12 +903,13 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                     <select
                       value={selectedCardId || ''}
                       onChange={e => handleSlotChange(slot.id, e.target.value || null)}
-                      style={{ ...fieldStyle, width: '100%' }}
+                      disabled={!!slotRandomMap[slot.id]}
+                      style={{ ...fieldStyle, width: '100%', opacity: slotRandomMap[slot.id] ? 0.5 : 1 }}
                     >
                       <option value="">（なし）</option>
                       {slotCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
-                    {selectedChildCount > 0 && (
+                    {selectedChildCount > 0 && !slotRandomMap[slot.id] && (
                       <div style={{ marginTop: '5px' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}>
                           <input
@@ -816,14 +1006,20 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       )}
 
       {/* プロンプト確認・編集 */}
-      <div style={sectionStyle}>
-        <button onClick={() => setShowPromptEdit(!showPromptEdit)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', fontSize: 'var(--fs-body)', padding: 0, width: '100%', textAlign: 'left' }}>
-          {showPromptEdit ? '▼' : '▶'} プロンプト確認・編集
-        </button>
+      <div ref={promptEditRef} style={sectionStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={() => setShowPromptEdit(!showPromptEdit)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', fontSize: 'var(--fs-body)', padding: 0, flex: 1, textAlign: 'left' }}>
+            {showPromptEdit ? '▼' : '▶'} プロンプト確認・編集
+          </button>
+          <button
+            onClick={handleClearPrompt}
+            style={{ padding: '4px 10px', border: '1px solid var(--line)', borderRadius: 'var(--radius-s)', background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 'var(--fs-label)', flexShrink: 0 }}
+          >クリア</button>
+        </div>
         {showPromptEdit && (
           <div style={{ marginTop: '12px' }}>
             <label style={labelStyle}>正プロンプト（一時編集・カードに反映しない）</label>
-            <textarea value={editedPositive} onChange={e => setEditedPositive(e.target.value)} rows={3} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} />
+            <textarea value={editedPositive} onChange={e => setEditedPositive(e.target.value)} rows={8} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5, minHeight: '40vh' }} />
             <label style={{ ...labelStyle, marginTop: '10px' }}>ネガティブ（一時編集）</label>
             <textarea value={editedNegative} onChange={e => setEditedNegative(e.target.value)} rows={2} style={{ ...fieldStyle, resize: 'vertical', lineHeight: 1.5 }} />
           </div>

@@ -6,16 +6,17 @@ const typeStyles = {
   info: { background: 'var(--surface)', color: 'var(--text-secondary)', border: '1px solid var(--line)' },
 };
 
-const AUTO_DISMISS_MS = 10000;
+const AUTO_DISMISS_MAP = { success: 2000, info: 5000, error: 10000 };
 const FADE_MS = 300;
 
 function ToastItem({ toast, onRemove }) {
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    if (toast.type === 'error') return;
-    const fadeTimer = setTimeout(() => setFading(true), AUTO_DISMISS_MS - FADE_MS);
-    const removeTimer = setTimeout(() => onRemove(toast.id), AUTO_DISMISS_MS);
+    if (toast.type === 'error') console.error(toast.message);
+    const dismissMs = AUTO_DISMISS_MAP[toast.type] || AUTO_DISMISS_MAP.info;
+    const fadeTimer = setTimeout(() => setFading(true), dismissMs - FADE_MS);
+    const removeTimer = setTimeout(() => onRemove(toast.id), dismissMs);
     return () => { clearTimeout(fadeTimer); clearTimeout(removeTimer); };
   }, [toast, onRemove]);
 
@@ -53,7 +54,7 @@ export default function Toast({ toasts, removeToast }) {
   return (
     <div style={{
       position: 'fixed',
-      bottom: '62px',
+      top: '56px',
       left: '50%',
       transform: 'translateX(-50%)',
       zIndex: 2000,
