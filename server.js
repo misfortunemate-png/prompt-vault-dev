@@ -3,11 +3,11 @@ import { createServer as createViteServer } from 'vite';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { randomBytes, createHash } from 'crypto';
-import { generate as novelaiGenerate } from './server/providers/novelai.js';
-import { upsertImage, getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption } from './server/db.js';
-import { startScan, getScanStatus, generateThumb } from './server/scanner.js';
-import { parsePngMeta } from './server/png-meta.js';
+import { randomBytes } from 'crypto';
+import { getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption } from './server/db.js';
+import { startScan, getScanStatus } from './server/scanner.js';
+import { executeGenerate, executeSave } from './server/generate.js';
+import { getStatus as queueGetStatus, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
@@ -83,12 +83,6 @@ function createInitialCards() {
     ],
     cards: [],
   };
-}
-
-function sanitizeSegment(s) {
-  let c = String(s).replace(/[\/\\:*?"<>|]/g, '_').trim();
-  if (c === '..' || c === '.') c = 'unnamed';
-  return c || 'unnamed';
 }
 
 function writeLog(level, code, message, detail) {
@@ -542,13 +536,8 @@ async function start() {
   api.post('/generate', requireVaultRoot, async (req, res) => {
     const { prompt, negative_prompt, model, width, height, steps, scale, sampler, seed } = req.body;
     try {
-      const result = await novelaiGenerate({
-        prompt: prompt || '', negativePrompt: negative_prompt || '',
-        model: model || 'nai-diffusion-4-5-full',
-        width: width || 832, height: height || 1216,
-        steps: steps || 28, scale: scale || 5,
-        sampler: sampler || 'k_euler_ancestral',
-        seed: (seed != null && seed >= 0) ? seed : null,
+      const result = await executeGenerate({
+        prompt, negativePrompt: negative_prompt, model, width, height, steps, scale, sampler, seed,
         vaultRoot: process.env.VAULT_ROOT,
       });
       res.json({ success: true, image: result });
@@ -561,70 +550,14 @@ async function start() {
   // ── 保存（M3形式） ──
 
   api.post('/save', requireVaultRoot, (req, res) => {
-    const vaultRoot = process.env.VAULT_ROOT;
     const { filename, seed, folderSegments = [], filenameSegments = [], preset_id } = req.body;
-
-    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-      return res.status(400).json({ error: '不正なファイル名です' });
-    }
-    const srcPath = join(vaultRoot, '.tmp', filename);
-    if (!existsSync(srcPath)) return res.status(404).json({ error: 'ファイルが見つかりません' });
-
-    const validFolders = folderSegments.filter(s => s && s !== '（なし）').map(sanitizeSegment);
-    const folderPath = validFolders.length > 0 ? validFolders.join('/') : 'その他';
-
-    const validNames = filenameSegments.filter(s => s && s !== '（なし）').map(sanitizeSegment);
-    const prefix = validNames.length > 0 ? validNames.join('_') : 'gen';
-    const seedStr = String(seed ?? 0).padStart(10, '0');
-    const newFilename = `${prefix}_${seedStr}.png`;
-
-    const destDir = join(vaultRoot, ...folderPath.split('/'));
-    mkdirSync(destDir, { recursive: true });
-    const destPath = join(destDir, newFilename);
-
     try {
-      renameSync(srcPath, destPath);
+      const saved = executeSave(process.env.VAULT_ROOT, { filename, seed, folderSegments, filenameSegments, preset_id });
+      res.json({ success: true, saved_path: saved.saved_path });
     } catch (e) {
       writeLog('error', 'SAVE_FAILED', e.message, '');
-      return res.status(500).json({ error: e.message });
+      res.status(500).json({ error: e.message });
     }
-
-    // 即時DB登録
-    try {
-      const buf = readFileSync(destPath);
-      const hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
-      const meta = parsePngMeta(buf);
-      const st = statSync(destPath);
-      const now = new Date().toISOString();
-      upsertImage({
-        hash,
-        rel_path: `${folderPath}/${newFilename}`,
-        filename: newFilename,
-        folder: folderPath,
-        size_bytes: buf.length,
-        created_at: st.birthtimeMs ? new Date(st.birthtimeMs).toISOString() : now,
-        modified_at: new Date(st.mtimeMs).toISOString(),
-        width: meta.width ?? null,
-        height: meta.height ?? null,
-        prompt: meta.prompt ?? null,
-        negative: meta.negative ?? null,
-        seed: meta.seed ?? (seed != null ? Number(seed) : null),
-        model: meta.model ?? null,
-        steps: meta.steps ?? null,
-        scale: meta.scale ?? null,
-        sampler: meta.sampler ?? null,
-        preset_id: preset_id || null,
-        favorite: 0,
-        caption: null,
-        thumb_ok: 0,
-        indexed_at: now,
-      });
-      generateThumb(hash, destPath).catch(() => {});
-    } catch (dbErr) {
-      console.warn('[Save] DB登録失敗:', dbErr.message);
-    }
-
-    res.json({ success: true, saved_path: `${folderPath}/${newFilename}` });
   });
 
   // ── 画像配信 ──
@@ -770,6 +703,63 @@ async function start() {
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
+    }
+  });
+
+  // ── Queue (M5) ──
+
+  api.get('/queue', (_req, res) => {
+    res.json(queueGetStatus());
+  });
+
+  api.post('/queue/add', (req, res) => {
+    const { tasks } = req.body;
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+      return res.status(400).json({ error: 'tasksは1件以上の配列が必要です' });
+    }
+    try {
+      const added = addTasks(tasks);
+      res.json({ success: true, added, total: queueGetStatus().tasks.length });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  api.delete('/queue/task/:id', (req, res) => {
+    try {
+      removeTask(req.params.id);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  api.delete('/queue/clear', (_req, res) => {
+    try {
+      clearQueue();
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  api.post('/queue/start', (_req, res) => {
+    const vaultRoot = process.env.VAULT_ROOT;
+    if (!vaultRoot) return res.status(400).json({ error: 'VAULT_ROOT未設定' });
+    try {
+      startQueue(vaultRoot);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  api.post('/queue/stop', (_req, res) => {
+    try {
+      stopQueue();
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
     }
   });
 

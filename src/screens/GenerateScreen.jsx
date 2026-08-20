@@ -54,6 +54,8 @@ const arrowBtnStyle = {
   flexShrink: 0,
 };
 
+const STATUS_ICONS = { pending: '⏳', running: '🔄', done: '✅', error: '❌', skipped: '⏭' };
+
 function ResultCard({ item, onSave }) {
   const label = item.filenameSegments?.filter(Boolean).join(' / ') || '（選択なし）';
   return (
@@ -120,6 +122,12 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const [generating, setGenerating] = useState(false);
 
+  const [queueData, setQueueData] = useState({ state: 'idle', tasks: [], currentIndex: null, startedAt: null });
+  const [queueExpanded, setQueueExpanded] = useState(false);
+  const [showCartesian, setShowCartesian] = useState(false);
+  const [cartesianMode, setCartesianMode] = useState({});
+  const [tick, setTick] = useState(0);
+
   const [inlineSlotId, setInlineSlotId] = useState(null);
   const [inlinePos, setInlinePos] = useState('');
   const [inlineNeg, setInlineNeg] = useState('');
@@ -184,6 +192,20 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     }
     loadData();
   }, [addToast]);
+
+  useEffect(() => {
+    if (queueData.state !== 'running') return;
+    const id = setInterval(async () => {
+      try { const d = await api.getQueue(); setQueueData(d); } catch {}
+    }, 2000);
+    return () => clearInterval(id);
+  }, [queueData.state]);
+
+  useEffect(() => {
+    if (queueData.state !== 'running') return;
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [queueData.state]);
 
   // ── Preset selection ──
 
@@ -301,6 +323,106 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     } finally {
       setInlineSaving(false);
     }
+  };
+
+  // ── Queue ──
+
+  const buildSingleTask = () => {
+    const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
+    const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => {
+      const id = selectedCardMap[s.id];
+      return id ? cardsData?.cards.find(c => c.id === id)?.name : null;
+    }).filter(Boolean);
+    const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => {
+      const id = selectedCardMap[s.id];
+      return id ? cardsData?.cards.find(c => c.id === id)?.name : null;
+    }).filter(Boolean);
+    const label = sortedSlots.map(s => {
+      const id = selectedCardMap[s.id];
+      return id ? cardsData?.cards.find(c => c.id === id)?.name : null;
+    }).filter(Boolean).join(' × ') || '（選択なし）';
+    return {
+      positive: editedPositive,
+      negative: editedNegative,
+      params: { model, width: res.width, height: res.height, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null },
+      folderSegments,
+      filenameSegments,
+      preset_id: selectedPresetId || null,
+      label,
+    };
+  };
+
+  const handleAddToQueue = async () => {
+    if (!vaultReady) { addToast('error', 'VAULT_ROOTが未設定です'); return; }
+    const task = buildSingleTask();
+    try {
+      const r = await api.queueAdd([task]);
+      const d = await api.getQueue();
+      setQueueData(d);
+      setQueueExpanded(true);
+      addToast('success', `キューに追加（${r.total}件）`);
+    } catch (e) { addToast('error', e.message); }
+  };
+
+  const buildCartesianTasks = () => {
+    const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
+    const params = { model, width: res.width, height: res.height, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null };
+    const slotOptions = sortedSlots.map(slot => {
+      const mode = cartesianMode[slot.id] ?? 'fixed';
+      if (mode === 'expand') {
+        const cards = (cardsData?.cards || []).filter(c => c.slotId === slot.id);
+        return { slot, options: cards.length > 0 ? cards : [null] };
+      }
+      const cardId = selectedCardMap[slot.id];
+      const card = cardId ? cardsData?.cards.find(c => c.id === cardId) : null;
+      return { slot, options: [card] };
+    });
+    let combos = [{}];
+    for (const { slot, options } of slotOptions) {
+      combos = combos.flatMap(combo => options.map(card => ({ ...combo, [slot.id]: card })));
+    }
+    return combos.map(combo => {
+      const folderSegments = sortedSlots.filter(s => s.useAsFolder).map(s => combo[s.id]?.name).filter(Boolean);
+      const filenameSegments = sortedSlots.filter(s => s.useInFilename).map(s => combo[s.id]?.name).filter(Boolean);
+      const label = sortedSlots.map(s => combo[s.id]?.name).filter(Boolean).join(' × ') || '（選択なし）';
+      const positive = sortedSlots.map(s => combo[s.id]?.positive || '').filter(Boolean).join(', ');
+      const negative = sortedSlots.map(s => combo[s.id]?.negative || '').filter(Boolean).join(', ');
+      return { positive, negative, params, folderSegments, filenameSegments, preset_id: selectedPresetId || null, label };
+    });
+  };
+
+  const handleAddCartesian = async () => {
+    if (!vaultReady) { addToast('error', 'VAULT_ROOTが未設定です'); return; }
+    const tasks = buildCartesianTasks();
+    if (tasks.length === 0) { addToast('error', '展開するタスクがありません'); return; }
+    try {
+      const r = await api.queueAdd(tasks);
+      const d = await api.getQueue();
+      setQueueData(d);
+      setQueueExpanded(true);
+      setShowCartesian(false);
+      addToast('success', `${r.added}件をキューに追加（計${r.total}件）`);
+    } catch (e) { addToast('error', e.message); }
+  };
+
+  const handleQueueStart = async () => {
+    try { await api.queueStart(); setQueueData(await api.getQueue()); } catch (e) { addToast('error', e.message); }
+  };
+
+  const handleQueueStop = async () => {
+    try { await api.queueStop(); setQueueData(await api.getQueue()); } catch (e) { addToast('error', e.message); }
+  };
+
+  const handleQueueClear = async () => {
+    if (!window.confirm(`キューを全クリアしますか？（${queueData.tasks.length}件）`)) return;
+    try {
+      await api.queueClear();
+      setQueueData({ state: 'idle', tasks: [], currentIndex: null, startedAt: null });
+    } catch (e) { addToast('error', e.message); }
+  };
+
+  const handleRemoveTask = async (id) => {
+    try { await api.queueRemoveTask(id); setQueueData(await api.getQueue()); } catch (e) { addToast('error', e.message); }
   };
 
   // ── Generation / Save ──
@@ -553,25 +675,199 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         )}
       </div>
 
-      {/* 生成ボタン */}
-      <button
-        onClick={handleGenerate}
-        disabled={!vaultReady || generating}
-        style={{
-          width: '100%', padding: '14px',
-          background: 'var(--accent)', color: 'var(--accent-contrast)',
-          border: 'none', borderRadius: 'var(--radius-m)',
-          fontSize: 'var(--fs-body)', fontWeight: 600,
-          cursor: (!vaultReady || generating) ? 'not-allowed' : 'pointer',
-          marginBottom: '16px', minHeight: '48px',
-          opacity: (!vaultReady || generating) ? 0.5 : 1,
-        }}
-      >{generating ? '生成中…' : '生成'}</button>
+      {/* 生成・キューボタン */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
+        <button
+          onClick={handleGenerate}
+          disabled={!vaultReady || generating}
+          style={{
+            flex: 2, padding: '14px',
+            background: 'var(--accent)', color: 'var(--accent-contrast)',
+            border: 'none', borderRadius: 'var(--radius-m)',
+            fontSize: 'var(--fs-body)', fontWeight: 600,
+            cursor: (!vaultReady || generating) ? 'not-allowed' : 'pointer',
+            minHeight: '48px',
+            opacity: (!vaultReady || generating) ? 0.5 : 1,
+          }}
+        >{generating ? '生成中…' : '生成'}</button>
+        <button
+          onClick={handleAddToQueue}
+          disabled={!vaultReady}
+          style={{
+            flex: 1, padding: '14px',
+            background: 'none', color: 'var(--accent)',
+            border: '1px solid var(--accent)', borderRadius: 'var(--radius-m)',
+            fontSize: 'var(--fs-body)', fontWeight: 600,
+            cursor: !vaultReady ? 'not-allowed' : 'pointer',
+            minHeight: '48px',
+            opacity: !vaultReady ? 0.5 : 1,
+          }}
+        >＋キュー</button>
+        <button
+          onClick={() => setShowCartesian(true)}
+          disabled={!vaultReady}
+          style={{
+            flex: 1, padding: '14px',
+            background: 'none', color: 'var(--accent)',
+            border: '1px solid var(--accent)', borderRadius: 'var(--radius-m)',
+            fontSize: 'var(--fs-body)', fontWeight: 600,
+            cursor: !vaultReady ? 'not-allowed' : 'pointer',
+            minHeight: '48px',
+            opacity: !vaultReady ? 0.5 : 1,
+          }}
+        >＋直積</button>
+      </div>
 
       {/* 結果一覧 */}
       {results.map((item, idx) => (
         <ResultCard key={`${item.filename}-${idx}`} item={item} onSave={() => handleSave(idx)} />
       ))}
+
+      {/* キューパネル */}
+      {(() => {
+        const pendingCount = queueData.tasks.filter(t => t.status === 'pending').length;
+        const doneCount = queueData.tasks.filter(t => t.status === 'done').length;
+        const elapsedSec = queueData.startedAt ? (Math.floor((Date.now() - new Date(queueData.startedAt).getTime()) / 1000) + tick * 0) : 0;
+        const realElapsed = queueData.startedAt ? Math.floor((Date.now() - new Date(queueData.startedAt).getTime()) / 1000) : 0;
+        const avgSec = doneCount > 0 ? realElapsed / doneCount : null;
+        const activeCount = queueData.tasks.filter(t => t.status === 'pending' || t.status === 'running').length;
+        const etaSec = avgSec !== null ? Math.floor(avgSec * activeCount) : null;
+        const fmtTime = s => s >= 60 ? `${Math.floor(s / 60)}分${s % 60}秒` : `${s}秒`;
+        const progressPct = queueData.tasks.length > 0 ? Math.round(doneCount / queueData.tasks.length * 100) : 0;
+
+        return (
+          <div style={{ ...sectionStyle, marginTop: '10px' }}>
+            <div
+              onClick={() => setQueueExpanded(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+            >
+              <span style={{ flex: 1, fontWeight: 600, color: 'var(--text-primary)', fontSize: 'var(--fs-body)' }}>
+                {queueExpanded ? '▼' : '▶'} キュー（{queueData.tasks.length}件）
+              </span>
+              {queueData.state === 'running' && (
+                <div style={{ width: 80, height: 6, background: 'var(--line)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ width: `${progressPct}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.3s' }} />
+                </div>
+              )}
+              <span style={{ fontSize: 'var(--fs-label)', color: queueData.state === 'running' ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                {queueData.state === 'running' ? '実行中' : queueData.state === 'paused' ? '中断' : ''}
+              </span>
+            </div>
+
+            {queueExpanded && (
+              <>
+                {queueData.tasks.length === 0 ? (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-label)', textAlign: 'center', padding: '12px 0', marginTop: '8px' }}>
+                    タスクなし
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '8px', borderTop: '1px solid var(--line)' }}>
+                    {queueData.tasks.map(task => (
+                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+                        <span style={{ fontSize: '14px', flexShrink: 0 }}>{STATUS_ICONS[task.status] || '?'}</span>
+                        <span style={{ flex: 1, fontSize: 'var(--fs-label)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: task.status === 'error' ? '#c0392b' : 'var(--text-primary)' }}>
+                          {task.label}
+                        </span>
+                        {task.status === 'pending' && (
+                          <button onClick={() => handleRemoveTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '14px', padding: '0 4px', flexShrink: 0 }}>×</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {queueData.state === 'running' && (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-label)', marginTop: '8px', lineHeight: 1.6 }}>
+                    <div>実行中: {queueData.currentIndex !== null ? queueData.tasks[queueData.currentIndex]?.label : ''}</div>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <span>経過: {fmtTime(realElapsed)}</span>
+                      {etaSec !== null && <span>残り推定: {fmtTime(etaSec)}</span>}
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+                  {queueData.state !== 'running' && (
+                    <button
+                      onClick={handleQueueStart}
+                      disabled={pendingCount === 0}
+                      style={{ padding: '7px 14px', border: 'none', borderRadius: 'var(--radius-s)', background: pendingCount === 0 ? 'var(--line)' : 'var(--accent)', color: pendingCount === 0 ? 'var(--text-secondary)' : 'var(--accent-contrast)', cursor: pendingCount === 0 ? 'default' : 'pointer', fontSize: 'var(--fs-label)' }}
+                    >▶ 実行</button>
+                  )}
+                  {queueData.state === 'running' && (
+                    <button
+                      onClick={handleQueueStop}
+                      style={{ padding: '7px 14px', border: 'none', borderRadius: 'var(--radius-s)', background: '#e67e22', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-label)' }}
+                    >⏸ 中断</button>
+                  )}
+                  {queueData.state !== 'running' && (
+                    <button
+                      onClick={handleQueueClear}
+                      disabled={queueData.tasks.length === 0}
+                      style={{ padding: '7px 14px', border: '1px solid var(--line)', borderRadius: 'var(--radius-s)', background: 'none', color: queueData.tasks.length === 0 ? 'var(--text-secondary)' : '#c0392b', cursor: queueData.tasks.length === 0 ? 'default' : 'pointer', fontSize: 'var(--fs-label)' }}
+                    >🗑 クリア</button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* 直積ダイアログ */}
+      {showCartesian && cardsData && (
+        <div
+          onClick={() => setShowCartesian(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--surface)', borderRadius: 'var(--radius-m) var(--radius-m) 0 0', width: '100%', maxWidth: 540, maxHeight: '80vh', overflowY: 'auto', padding: '20px 16px 24px' }}
+          >
+            <div style={{ fontWeight: 700, fontSize: 'var(--fs-body)', color: 'var(--text-primary)', marginBottom: '16px' }}>＋直積バッチ</div>
+            {sortedSlots.map(slot => {
+              const mode = cartesianMode[slot.id] ?? 'fixed';
+              const slotCards = (cardsData?.cards || []).filter(c => c.slotId === slot.id);
+              const selectedCard = selectedCardMap[slot.id] ? cardsData.cards.find(c => c.id === selectedCardMap[slot.id]) : null;
+              return (
+                <div key={slot.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px', padding: '8px 10px', background: 'var(--bg)', borderRadius: 'var(--radius-s)', border: `1px solid ${mode === 'expand' ? 'var(--accent)' : 'var(--line)'}` }}>
+                  <span style={{ flex: 1, fontSize: 'var(--fs-label)', fontWeight: 600, color: 'var(--text-primary)' }}>{slot.name}</span>
+                  <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {mode === 'fixed' ? (selectedCard?.name || '（なし）') : `${slotCards.length}枚展開`}
+                  </span>
+                  <button
+                    onClick={() => setCartesianMode(m => ({ ...m, [slot.id]: mode === 'fixed' ? 'expand' : 'fixed' }))}
+                    disabled={mode === 'expand' && slotCards.length === 0}
+                    style={{ padding: '4px 10px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-s)', background: mode === 'expand' ? 'var(--accent)' : 'none', color: mode === 'expand' ? 'var(--accent-contrast)' : 'var(--accent)', cursor: 'pointer', fontSize: 'var(--fs-label)', flexShrink: 0 }}
+                  >{mode === 'fixed' ? '全展開' : '固定'}</button>
+                </div>
+              );
+            })}
+            {(() => {
+              const parts = sortedSlots.map(slot => {
+                const mode = cartesianMode[slot.id] ?? 'fixed';
+                return mode === 'expand' ? Math.max(1, (cardsData?.cards || []).filter(c => c.slotId === slot.id).length) : 1;
+              });
+              const total = parts.reduce((a, b) => a * b, 1);
+              return (
+                <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', margin: '14px 0 16px', textAlign: 'center' }}>
+                  {parts.join(' × ')} = <strong style={{ color: 'var(--text-primary)' }}>{total}件</strong>
+                </div>
+              );
+            })()}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleAddCartesian}
+                style={{ flex: 1, padding: '12px', border: 'none', borderRadius: 'var(--radius-m)', background: 'var(--accent)', color: 'var(--accent-contrast)', fontSize: 'var(--fs-body)', fontWeight: 600, cursor: 'pointer' }}
+              >キューに追加</button>
+              <button
+                onClick={() => setShowCartesian(false)}
+                style={{ flex: 1, padding: '12px', border: '1px solid var(--line)', borderRadius: 'var(--radius-m)', background: 'none', color: 'var(--text-secondary)', fontSize: 'var(--fs-body)', cursor: 'pointer' }}
+              >キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -180,6 +180,41 @@
 - ImageViewer props: `images`, `initialIndex`, `onClose`, `onFavoriteToggle`, `onCaptionSave`
 - ThumbCell: `isFavorite`（★オーバーレイ）・`showFolder`（検索・プリセット結果でフォルダ名バッジ）
 
+## M5 ジョブキュー
+
+| ファイル | 用途 |
+|---|---|
+| server/generate.js | executeGenerate / executeSave（server.js・queue.js 共用） |
+| server/queue.js | インメモリキューエンジン（直列実行・ランダム間隔・エラー中断） |
+
+### キュー状態
+
+- `idle`: 待機中
+- `running`: 実行中
+- `paused`: 中断（エラー or 手動停止）
+
+### キューAPI
+
+| メソッド | パス | 用途 |
+|---|---|---|
+| GET | /api/queue | キュー状態取得 |
+| POST | /api/queue/add | タスク追加（body: `{ tasks: TaskInput[] }`） |
+| DELETE | /api/queue/task/:id | pending タスク削除 |
+| DELETE | /api/queue/clear | 全クリア（running中は400） |
+| POST | /api/queue/start | キュー実行開始 |
+| POST | /api/queue/stop | 中断リクエスト |
+
+### ガード設定（data/settings.json .guard）
+
+- `intervalMin` / `intervalMax`: タスク間隔（秒）、デフォルト 2〜5
+- `maxPerJob`: 1キュー最大タスク数、デフォルト 100
+
+### 直積ルール
+
+- スロットごとに「固定（selectedCard）」か「全展開（全カード）」を選択
+- 展開数 = 各スロットのカード枚数の積（固定スロットは 1）
+- ラベル形式: `カード名A × カード名B × …` or `（選択なし）`
+
 ## 認証環境変数
 
 - `NOVELAI_TOKEN` — NovelAI Persistent API Token（生成APIで使用）

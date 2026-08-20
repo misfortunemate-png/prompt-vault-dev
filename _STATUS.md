@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.5.1
-milestone: bugfix
+version: 3.6.0
+milestone: M5
 status: done
 updated: 2026-08-20
 ---
@@ -16,10 +16,13 @@ updated: 2026-08-20
 - [x] ImageViewer.jsx（スワイプ・ピンチ・オーバーレイ・★・セリフ編集）
 - [x] お気に入り・テキスト検索・プリセット別アルバム
 
-## bugfix: 実機フィードバック修正（完了）
+## bugfix v3.5.1（完了）
 
-- [x] #1 landscape CSS削除・オーバーレイ常に下部
-- [x] #2 saveCaption後にdetail.caption即時更新
-- [x] #3 ★トグルoptimistic update・失敗時revert
-- [x] #4 detail lazy fetch（overlayExpanded時のみ）
-- [x] #5 handleInlineSaveAsNewでslotIdをlocal capture
+- [x] landscape CSS削除・lazy fetch・★optimistic・caption即時更新・slotId capture
+
+## M5: ジョブキュー（完了）
+
+- [x] server/generate.js: executeGenerate/executeSave共有ロジック
+- [x] server/queue.js: インメモリキューエンジン（直列実行・ランダム間隔・エラー中断）
+- [x] server.js: 6キューAPIルート追加
+- [x] GenerateScreen.jsx: ＋キュー・＋直積・キューパネル・直積ダイアログ
