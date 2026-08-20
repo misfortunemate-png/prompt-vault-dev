@@ -110,6 +110,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [selectedCardMap, setSelectedCardMap] = useState({});
   const [localSlotOrder, setLocalSlotOrder] = useState(null);
   const [localSlotProps, setLocalSlotProps] = useState({});
+  // randomChildMode: slotId -> false means "pick specific child"; absent/true means random
+  const [randomChildMode, setRandomChildMode] = useState({});
+  // selectedChildMap: slotId -> childCardId (used when randomChildMode[slotId] === false)
+  const [selectedChildMap, setSelectedChildMap] = useState({});
 
   const [editedPositive, setEditedPositive] = useState('');
   const [editedNegative, setEditedNegative] = useState('');
@@ -158,16 +162,37 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const computePositive = useCallback((cardMap, data) => {
     if (!data) return '';
     return [...data.slots].sort((a, b) => a.order - b.order)
-      .map(s => { const id = cardMap[s.id]; return id ? data.cards.find(c => c.id === id)?.positive || '' : ''; })
+      .map(s => {
+        const id = cardMap[s.id];
+        if (!id) return '';
+        const card = data.cards.find(c => c.id === id);
+        if (!card) return '';
+        // When specific child is selected (not random), include child positive in preview
+        if (randomChildMode[s.id] === false && selectedChildMap[s.id]) {
+          const child = data.cards.find(c => c.id === selectedChildMap[s.id]);
+          return [card.positive, child?.positive].filter(Boolean).join(', ');
+        }
+        return card.positive || '';
+      })
       .filter(Boolean).join(', ');
-  }, []);
+  }, [randomChildMode, selectedChildMap]);
 
   const computeNegative = useCallback((cardMap, data) => {
     if (!data) return '';
     return [...data.slots].sort((a, b) => a.order - b.order)
-      .map(s => { const id = cardMap[s.id]; return id ? data.cards.find(c => c.id === id)?.negative || '' : ''; })
+      .map(s => {
+        const id = cardMap[s.id];
+        if (!id) return '';
+        const card = data.cards.find(c => c.id === id);
+        if (!card) return '';
+        if (randomChildMode[s.id] === false && selectedChildMap[s.id]) {
+          const child = data.cards.find(c => c.id === selectedChildMap[s.id]);
+          return [card.negative, child?.negative].filter(Boolean).join(', ');
+        }
+        return card.negative || '';
+      })
       .filter(Boolean).join(', ');
-  }, []);
+  }, [randomChildMode, selectedChildMap]);
 
   useEffect(() => {
     if (cardsData) {
@@ -233,14 +258,14 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       setSelectedCardMap({});
       setLocalSlotOrder(null);
       setLocalSlotProps({});
+      setRandomChildMode({});
+      setSelectedChildMap({});
       return;
     }
     const preset = presetsData?.presets.find(p => p.id === presetId);
     if (!preset) return;
     setSelectedCardMap({ ...preset.cards });
-    // #6: apply slotOrder
     setLocalSlotOrder(preset.slotOrder || null);
-    // #6: apply folder/filename as F/N slot overrides
     if (preset.folder !== undefined || preset.filename !== undefined) {
       const props = {};
       (cardsData?.slots || []).forEach(s => {
@@ -253,11 +278,21 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     } else {
       setLocalSlotProps({});
     }
+    // Load child card selections from preset.childCards
+    const childCards = preset.childCards || {};
+    const newRcm = {}, newScm = {};
+    Object.entries(childCards).forEach(([slotId, childId]) => {
+      if (childId) { newRcm[slotId] = false; newScm[slotId] = childId; }
+    });
+    setRandomChildMode(newRcm);
+    setSelectedChildMap(newScm);
   };
 
   const handleSlotChange = (slotId, cardId) => {
     setSelectedPresetId(null);
     setSelectedCardMap(prev => ({ ...prev, [slotId]: cardId || null }));
+    setRandomChildMode(prev => { const n = {...prev}; delete n[slotId]; return n; });
+    setSelectedChildMap(prev => { const n = {...prev}; delete n[slotId]; return n; });
     if (inlineSlotId === slotId) setInlineSlotId(null);
   };
 
@@ -394,12 +429,19 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   // ── Random child resolution helper ──
 
-  const resolveRandomChildren = (slotIdToCardId) => {
+  const resolveChildren = (slotIdToCardId) => {
     const childResolutions = {};
     Object.entries(slotIdToCardId).forEach(([slotId, cardId]) => {
       if (!cardId) return;
       const children = (cardsData?.cards || []).filter(c => c.parentId === cardId);
-      if (children.length > 0) {
+      if (children.length === 0) return;
+      if (randomChildMode[slotId] === false) {
+        // Specific child
+        const childId = selectedChildMap[slotId];
+        const child = childId ? children.find(c => c.id === childId) : null;
+        if (child) childResolutions[slotId] = child;
+      } else {
+        // Random
         childResolutions[slotId] = children[Math.floor(Math.random() * children.length)];
       }
     });
@@ -412,7 +454,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
 
     // Resolve random children
-    const childRes = resolveRandomChildren(selectedCardMap);
+    const childRes = resolveChildren(selectedCardMap);
 
     const getName = (slotId) => {
       const child = childRes[slotId];
@@ -543,7 +585,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
 
     // Resolve random children
-    const childRes = resolveRandomChildren(selectedCardMap);
+    const childRes = resolveChildren(selectedCardMap);
     const getName = (slotId) => (childRes[slotId]?.name || (selectedCardMap[slotId] ? cardsData.cards.find(c => c.id === selectedCardMap[slotId])?.name : null));
 
     let pos = editedPositive;
@@ -678,7 +720,36 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                       {slotCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                     {selectedChildCount > 0 && (
-                      <div style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '3px' }}>⚄ 子カード {selectedChildCount}種からランダム選択</div>
+                      <div style={{ marginTop: '5px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }}>
+                          <input
+                            type="checkbox"
+                            checked={randomChildMode[slot.id] !== false}
+                            onChange={e => {
+                              const isRandom = e.target.checked;
+                              setRandomChildMode(prev => {
+                                const n = {...prev};
+                                if (isRandom) delete n[slot.id]; else n[slot.id] = false;
+                                return n;
+                              });
+                              if (isRandom) setSelectedChildMap(prev => { const n = {...prev}; delete n[slot.id]; return n; });
+                            }}
+                          />
+                          <span style={{ fontSize: '11px', color: 'var(--accent)' }}>⚄ 子カード {selectedChildCount}種からランダム</span>
+                        </label>
+                        {randomChildMode[slot.id] === false && (
+                          <select
+                            value={selectedChildMap[slot.id] || ''}
+                            onChange={e => setSelectedChildMap(prev => ({ ...prev, [slot.id]: e.target.value || null }))}
+                            style={{ ...fieldStyle, width: '100%', marginTop: '4px', fontSize: '12px' }}
+                          >
+                            <option value="">（子を指定しない）</option>
+                            {(cardsData?.cards || []).filter(c => c.parentId === selectedCardId).map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     )}
                   </div>
                   <button
