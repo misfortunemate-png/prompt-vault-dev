@@ -49,6 +49,19 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
   const [slotFilename, setSlotFilename] = useState(
     preset?.filename !== undefined ? preset.filename : allSlots.filter(s => s.useInFilename).map(s => s.id)
   );
+  // randomChildSlots: slotId -> false = specific child; absent/true = random
+  const [randomChildSlots, setRandomChildSlots] = useState(() => {
+    const childCards = preset?.childCards || {};
+    const rcm = {};
+    Object.entries(childCards).forEach(([sid, cid]) => { if (cid) rcm[sid] = false; });
+    return rcm;
+  });
+  const [selectedChildCards, setSelectedChildCards] = useState(() => {
+    const childCards = preset?.childCards || {};
+    const scm = {};
+    Object.entries(childCards).forEach(([sid, cid]) => { if (cid) scm[sid] = cid; });
+    return scm;
+  });
   const [saving, setSaving] = useState(false);
 
   // Ordered slots for display
@@ -76,6 +89,7 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
   };
 
   const getChildCount = (cardId) => cardId ? cards.filter(c => c.parentId === cardId).length : 0;
+  const getChildren = (cardId) => cardId ? cards.filter(c => c.parentId === cardId) : [];
 
   // Computed previews using orderedSlots + slotFolder/slotFilename
   const computedPositive = orderedSlots
@@ -85,12 +99,30 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
       const card = cards.find(c => c.id === id);
       if (!card) return '';
       const cc = getChildCount(id);
-      return card.positive + (cc > 0 ? ` [＋子${cc}種ランダム]` : '');
+      if (cc === 0) return card.positive || '';
+      if (randomChildSlots[s.id] === false) {
+        const child = selectedChildCards[s.id] ? cards.find(c => c.id === selectedChildCards[s.id]) : null;
+        return child
+          ? [card.positive, child.positive].filter(Boolean).join(', ')
+          : (card.positive || '');
+      }
+      return (card.positive || '') + ` [＋子${cc}種ランダム]`;
     })
     .filter(Boolean).join(', ');
 
   const computedNegative = orderedSlots
-    .map(s => { const id = selectedCards[s.id]; return id ? (cards.find(c => c.id === id)?.negative || '') : ''; })
+    .map(s => {
+      const id = selectedCards[s.id];
+      if (!id) return '';
+      const card = cards.find(c => c.id === id);
+      if (!card) return '';
+      const cc = getChildCount(id);
+      if (cc > 0 && randomChildSlots[s.id] === false && selectedChildCards[s.id]) {
+        const child = cards.find(c => c.id === selectedChildCards[s.id]);
+        return [card.negative, child?.negative].filter(Boolean).join(', ');
+      }
+      return card.negative || '';
+    })
     .filter(Boolean).join(', ');
 
   const folderCardName = slotFolder
@@ -109,6 +141,15 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
     if (!name.trim()) { addToast('error', 'プリセット名は必須です'); return; }
     setSaving(true);
     try {
+      // Build childCards map: slotId -> childId (null = random)
+      const childCards = {};
+      allSlots.forEach(s => {
+        const cardId = selectedCards[s.id];
+        if (!cardId || getChildCount(cardId) === 0) return;
+        childCards[s.id] = randomChildSlots[s.id] === false
+          ? (selectedChildCards[s.id] || null)
+          : null;
+      });
       const data = {
         name: name.trim(),
         tags,
@@ -116,6 +157,7 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
         slotOrder,
         folder: slotFolder,
         filename: slotFilename,
+        childCards,
       };
       let saved;
       if (isNew) {
@@ -171,7 +213,12 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <select
                     value={selectedCards[slot.id] || ''}
-                    onChange={e => setSelectedCards(prev => ({ ...prev, [slot.id]: e.target.value || null }))}
+                    onChange={e => {
+                      const newCardId = e.target.value || null;
+                      setSelectedCards(prev => ({ ...prev, [slot.id]: newCardId }));
+                      setRandomChildSlots(prev => { const n = {...prev}; delete n[slot.id]; return n; });
+                      setSelectedChildCards(prev => { const n = {...prev}; delete n[slot.id]; return n; });
+                    }}
                     style={{ ...fieldStyle, width: '100%', padding: '5px 6px', fontSize: '12px' }}
                   >
                     <option value="">（なし）</option>
@@ -180,7 +227,36 @@ export default function TemplatePresetEdit({ preset, cardsData, allTags, onSave,
                     ))}
                   </select>
                   {getChildCount(selectedCards[slot.id]) > 0 && (
-                    <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '2px' }}>⚄ 子{getChildCount(selectedCards[slot.id])}種ランダム</div>
+                    <div style={{ marginTop: '4px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={randomChildSlots[slot.id] !== false}
+                          onChange={e => {
+                            const isRandom = e.target.checked;
+                            setRandomChildSlots(prev => {
+                              const n = {...prev};
+                              if (isRandom) delete n[slot.id]; else n[slot.id] = false;
+                              return n;
+                            });
+                            if (isRandom) setSelectedChildCards(prev => { const n = {...prev}; delete n[slot.id]; return n; });
+                          }}
+                        />
+                        <span style={{ fontSize: '10px', color: 'var(--accent)' }}>⚄ 子{getChildCount(selectedCards[slot.id])}種ランダム</span>
+                      </label>
+                      {randomChildSlots[slot.id] === false && (
+                        <select
+                          value={selectedChildCards[slot.id] || ''}
+                          onChange={e => setSelectedChildCards(prev => ({ ...prev, [slot.id]: e.target.value || null }))}
+                          style={{ ...fieldStyle, width: '100%', marginTop: '3px', padding: '4px 6px', fontSize: '11px' }}
+                        >
+                          <option value="">（子を指定しない）</option>
+                          {getChildren(selectedCards[slot.id]).map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   )}
                 </div>
 
