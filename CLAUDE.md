@@ -219,3 +219,23 @@
 
 - `NOVELAI_TOKEN` — NovelAI Persistent API Token（生成APIで使用）
 - `NOVELAI_API_KEY` — デバッグ疎通テスト用（M1から継続）
+
+## 外部連携API仕様
+
+外部プロセス（chat-pwa等）がprompt-vaultの画像生成を呼び出すための最小面。
+
+### 疎通確認
+- `GET /api/healthz` → `{ "status": "ok", "version": "3.x.x" }`
+
+### 画像生成
+- `POST /api/generate`
+- Content-Type: application/json
+- リクエスト: `{ "prompt": "必須", "negative_prompt": "任意", "model": "任意", "width": 任意, "height": 任意, "steps": 任意, "scale": 任意, "sampler": "任意", "seed": 任意 }`
+- 成功: `{ "success": true, "image": { "filename": "tmp_xxx.png", "seed": 123, "width": 832, "height": 1216 } }`
+- 失敗: `{ "error": "エラー内容" }`
+- 既定パラメータ（省略時）: data/settings.jsonのgeneration設定に従う
+
+### 一時画像取得
+- `GET /api/images/.tmp/:filename`
+- Content-Type: image/png
+- 生成直後の一時ファイル。保存（POST /api/save）前に取得可能
