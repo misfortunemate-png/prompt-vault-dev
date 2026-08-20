@@ -74,4 +74,5 @@ export const api = {
   queueClear: () => request('/queue/clear', { method: 'DELETE' }),
   queueStart: () => request('/queue/start', { method: 'POST' }),
   queueStop: () => request('/queue/stop', { method: 'POST' }),
+  queueTaskSave: (id) => request(`/queue/task/${encodeURIComponent(id)}/save`, { method: 'POST' }),
 };

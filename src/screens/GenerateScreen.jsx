@@ -766,11 +766,11 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                   <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '8px', borderTop: '1px solid var(--line)' }}>
                     {queueData.tasks.map(task => (
                       <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
-                        {task.status === 'done' && task.result?.hash ? (
+                        {task.status === 'done' && task.result?.filename ? (
                           <img
-                            src={`/api/thumbs/${task.result.hash}.webp`}
+                            src={`/api/images/.tmp/${task.result.filename}`}
                             alt=""
-                            onClick={() => setPreviewItem({ filename: null, _hash: task.result.hash, seed: task.result.seed, width: task.result.width, height: task.result.height })}
+                            onClick={() => setPreviewItem(task.result)}
                             style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, cursor: 'zoom-in', background: 'var(--line)' }}
                           />
                         ) : (
@@ -780,6 +780,16 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                           {task.label}
                           {task.status === 'error' && task.error && <span style={{ display: 'block', fontSize: '11px', color: '#c0392b' }}>{task.error}</span>}
                         </span>
+                        {task.status === 'done' && (
+                          <button
+                            onClick={async () => {
+                              if (task.saved) return;
+                              try { await api.queueTaskSave(task.id); setQueueData(await api.getQueue()); addToast('success', '保存しました'); }
+                              catch (e) { addToast('error', e.message); }
+                            }}
+                            style={{ padding: '3px 10px', border: task.saved ? '1px solid var(--line)' : 'none', borderRadius: 'var(--radius-s)', background: task.saved ? 'none' : 'var(--accent)', color: task.saved ? 'var(--text-secondary)' : 'var(--accent-contrast)', cursor: task.saved ? 'default' : 'pointer', fontSize: '11px', flexShrink: 0 }}
+                          >{task.saved ? '✓' : '保存'}</button>
+                        )}
                         {task.status === 'pending' && (
                           <button onClick={() => handleRemoveTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '14px', padding: '0 4px', flexShrink: 0 }}>×</button>
                         )}
@@ -888,7 +898,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
         >
           <img
-            src={previewItem._hash ? `/api/images/full/${previewItem._hash}` : `/api/images/.tmp/${previewItem.filename}`}
+            src={`/api/images/.tmp/${previewItem.filename}`}
             alt=""
             style={{ maxWidth: '100%', maxHeight: 'calc(100% - 60px)', objectFit: 'contain' }}
           />

@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { executeGenerate, executeSave } from './generate.js';
+import { executeGenerate } from './generate.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SETTINGS_PATH = join(__dirname, '..', 'data', 'settings.json');
@@ -40,6 +40,10 @@ export function getStatus() {
   return { state: q.state, tasks: q.tasks, currentIndex: q.currentIndex, startedAt: q.startedAt };
 }
 
+export function getTask(id) {
+  return q.tasks.find(t => t.id === id) || null;
+}
+
 export function addTasks(tasks) {
   const { maxPerJob } = readGuard();
   if (q.tasks.length + tasks.length > maxPerJob) {
@@ -56,6 +60,7 @@ export function addTasks(tasks) {
     preset_id: t.preset_id || null,
     label: t.label || '（ラベルなし）',
     result: null,
+    saved: false,
     error: null,
   }));
   q.tasks.push(...created);
@@ -110,15 +115,8 @@ async function runLoop(vaultRoot) {
         ...task.params,
         vaultRoot,
       });
-      const saved = executeSave(vaultRoot, {
-        filename: result.filename,
-        seed: result.seed,
-        folderSegments: task.folderSegments,
-        filenameSegments: task.filenameSegments,
-        preset_id: task.preset_id,
-      });
       task.status = 'done';
-      task.result = { filename: saved.filename, folder: saved.folder, hash: saved.hash, seed: result.seed, width: result.width, height: result.height };
+      task.result = { filename: result.filename, seed: result.seed, width: result.width, height: result.height };
     } catch (e) {
       task.status = 'error';
       task.error = e.message;

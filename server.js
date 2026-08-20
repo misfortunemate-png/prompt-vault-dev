@@ -7,7 +7,7 @@ import { randomBytes } from 'crypto';
 import { getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
-import { getStatus as queueGetStatus, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
+import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
@@ -760,6 +760,28 @@ async function start() {
       res.json({ ok: true });
     } catch (e) {
       res.status(400).json({ error: e.message });
+    }
+  });
+
+  api.post('/queue/task/:id/save', (req, res) => {
+    const vaultRoot = process.env.VAULT_ROOT;
+    if (!vaultRoot) return res.status(400).json({ error: 'VAULT_ROOT未設定' });
+    const task = queueGetTask(req.params.id);
+    if (!task) return res.status(404).json({ error: 'タスクが見つかりません' });
+    if (task.status !== 'done') return res.status(400).json({ error: '完了タスクのみ保存できます' });
+    if (task.saved) return res.status(400).json({ error: '既に保存済みです' });
+    try {
+      const saved = executeSave(vaultRoot, {
+        filename: task.result.filename,
+        seed: task.result.seed,
+        folderSegments: task.folderSegments,
+        filenameSegments: task.filenameSegments,
+        preset_id: task.preset_id,
+      });
+      task.saved = true;
+      res.json({ ok: true, saved_path: saved.saved_path });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
     }
   });
 
