@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.6.2
-milestone: v3.6.2
+version: 3.7.0
+milestone: M6
 status: done
 updated: 2026-08-20
 ---
@@ -13,13 +13,5 @@ updated: 2026-08-20
 - [x] M5: ジョブキュー・直積
 - [x] bugfix v3.5.1: CSS・fetchSeq・captionバグ
 - [x] v3.6.1: ビューアからカード登録・削除・グリッドサイズ
-
-## v3.6.2: 一括改善（完了）
-
-- [x] #1 ImageViewer: サムネイル先行＋前後プリロード
-- [x] #2 台詞表示: 余白/画像内モード・スタイル設定・DB保存
-- [x] #3 カード一覧リデザイン: 2×2サムネ・直接ボタン・⋯廃止
-- [x] #4 プリセット一覧リデザイン: 2×2サムネ・スロット割当・⋯廃止
-- [x] #5 プリセット編集リデザイン: F/N＋並び順＋プレビュー
-- [x] #6 プリセット拡張モデル: slotOrder/folder/filename
-- [x] #7 F排他制御: 生成画面＋プリセット編集
+- [x] v3.6.2: サムネ先行・台詞表示・カード/プリセットリデザイン・F排他
+- [x] M6: ローカルHTTP API（chat-pwa vault_generate接続・外部連携API仕様）
