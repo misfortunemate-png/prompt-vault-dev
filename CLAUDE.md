@@ -104,6 +104,34 @@
 - カード編集: TagSuggestによるdanbooru補完
 - プリセット管理: タグフィルタ → プリセット編集（スロット別カード選択＋保存先プレビュー）
 
+## M4-A ギャラリー基盤
+
+| ファイル | 用途 |
+|---|---|
+| server/db.js | better-sqlite3 SQLite初期化・ヘルパー |
+| server/png-meta.js | NovelAI PNG tEXt/iTXt チャンク解析（外部ライブラリなし） |
+| server/scanner.js | リスキャン・サムネイル生成（sharp） |
+| data/index.db | SQLiteインデックス（.gitignore対象） |
+| data/thumbs/{hash}.webp | サムネイルキャッシュ（長辺300px・WebP品質80） |
+
+### M4-A API
+
+| メソッド | パス | 用途 |
+|---|---|---|
+| GET | /api/gallery | フォルダツリー取得 |
+| GET | /api/gallery/folder?path= | フォルダ内画像一覧 |
+| GET | /api/gallery/recent?limit= | 新着画像（既定20件） |
+| GET | /api/gallery/image/:hash | 画像メタデータ |
+| GET | /api/gallery/stats | インデックス統計 |
+| GET | /api/thumbs/:hash.webp | サムネイル（Cache-Control: public, max-age=86400） |
+| GET | /api/images/full/:hash | 原寸PNG（ハッシュベース） |
+| POST | /api/rescan | リスキャン手動実行 |
+| GET | /api/rescan/status | スキャン進捗（scanning/total/processed/newCount/movedCount/deletedCount） |
+
+- `hash`: ファイル全体のSHA-256先頭16文字hex
+- 起動時にVAULT_ROOTが設定されていれば `setImmediate` でバックグラウンドスキャン開始
+- `POST /api/save` 成功時に即時DB登録・非同期サムネイル生成
+
 ## M2-Aからの継続 API
 
 | メソッド | パス | 用途 |

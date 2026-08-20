@@ -1,130 +1,193 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 
 function FolderIcon() {
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z" />
     </svg>
   );
 }
 
-function extractLabel(filename) {
-  return filename.split('_')[0] || filename;
+function Placeholder() {
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', fontSize: '18px' }}>
+      ⟳
+    </div>
+  );
 }
 
-const GRID = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gap: '4px',
-};
+function ThumbCell({ image, onClick }) {
+  return (
+    <div onClick={onClick} style={{ cursor: 'pointer' }}>
+      <div style={{ aspectRatio: '1/1', overflow: 'hidden', background: 'var(--line)' }}>
+        {image.thumb_ok ? (
+          <img
+            src={image.thumbUrl}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            loading="lazy"
+          />
+        ) : (
+          <Placeholder />
+        )}
+      </div>
+    </div>
+  );
+}
 
-const SECTION_LABEL = {
-  fontSize: 'var(--fs-title)',
-  fontWeight: 600,
-  marginBottom: '8px',
-};
+function FolderRow({ node, depth, onNavigate }) {
+  return (
+    <>
+      <button
+        onClick={() => onNavigate(node.path)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          width: '100%',
+          background: 'none',
+          border: 'none',
+          borderBottom: '1px solid var(--line)',
+          cursor: 'pointer',
+          padding: `10px 12px 10px ${12 + depth * 16}px`,
+          color: 'var(--text)',
+          fontSize: 'var(--fs-body)',
+          textAlign: 'left',
+          minHeight: '44px',
+        }}
+      >
+        <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}><FolderIcon /></span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.name}</span>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-label)', flexShrink: 0 }}>{node.imageCount}枚</span>
+      </button>
+      {node.children?.map(child => (
+        <FolderRow key={child.path} node={child} depth={depth + 1} onNavigate={onNavigate} />
+      ))}
+    </>
+  );
+}
 
-const IMG_LABEL = {
-  fontSize: 'var(--fs-label)',
-  color: 'var(--text-secondary)',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  padding: '2px 2px 0',
-};
+const GRID_3 = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2px' };
+const SECTION_LABEL = { fontSize: 'var(--fs-title)', fontWeight: 600, margin: '0 0 8px' };
 
 export default function AlbumScreen({ addToast }) {
-  const [albumData, setAlbumData] = useState(null);
-  const [path, setPath] = useState([]);
-  const [folderFiles, setFolderFiles] = useState([]);
+  const [galleryData, setGalleryData] = useState(null);
+  const [recentImages, setRecentImages] = useState([]);
+  const [path, setPath] = useState(null);
+  const [folderData, setFolderData] = useState(null);
+  const [viewerImages, setViewerImages] = useState([]);
   const [viewerIdx, setViewerIdx] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanStatus, setScanStatus] = useState({ total: 0, processed: 0, newCount: 0, movedCount: 0, deletedCount: 0 });
   const [loading, setLoading] = useState(true);
+  const pollRef = useRef(null);
 
-  const loadAlbum = useCallback(async () => {
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  const loadRoot = useCallback(async () => {
     try {
-      const data = await api.getImages();
-      setAlbumData(data);
+      const [gallery, recent] = await Promise.all([
+        api.getGallery(),
+        api.getRecentImages(20),
+      ]);
+      setGalleryData(gallery);
+      setRecentImages(recent.images || []);
     } catch (e) {
       if (!e.message?.includes('400')) {
-        addToast('error', 'アルバムの読み込みに失敗しました');
+        addToast('error', 'ギャラリーの読み込みに失敗しました');
       }
-      setAlbumData({ folders: [], recent: [] });
+      setGalleryData({ tree: [], totalImages: 0, totalFolders: 0 });
+      setRecentImages([]);
+    }
+  }, [addToast]);
+
+  const loadFolder = useCallback(async (folderPath) => {
+    try {
+      const data = await api.getGalleryFolder(folderPath);
+      setFolderData(data);
+    } catch {
+      addToast('error', 'フォルダの読み込みに失敗しました');
     }
   }, [addToast]);
 
   useEffect(() => {
-    loadAlbum().finally(() => setLoading(false));
-  }, [loadAlbum]);
+    loadRoot().finally(() => setLoading(false));
+  }, [loadRoot]);
 
-  const openFolder = useCallback(async (folderName, openIdx = null) => {
-    setPath([folderName]);
-    setFolderFiles([]);
+  const navigateTo = useCallback(async (folderPath) => {
+    setPath(folderPath);
+    setFolderData(null);
     setViewerIdx(null);
-    try {
-      const data = await api.getImageFolder(folderName);
-      const files = data.files || [];
-      setFolderFiles(files);
-      if (openIdx !== null && files.length > 0) {
-        setViewerIdx(Math.min(openIdx, files.length - 1));
-      }
-    } catch {
-      addToast('error', 'フォルダの読み込みに失敗しました');
-    }
-  }, [addToast]);
-
-  const openRecentImage = useCallback(async (folder, filename) => {
-    setPath([folder]);
-    setFolderFiles([]);
-    setViewerIdx(null);
-    try {
-      const data = await api.getImageFolder(folder);
-      const files = data.files || [];
-      setFolderFiles(files);
-      const idx = files.indexOf(filename);
-      setViewerIdx(idx >= 0 ? idx : 0);
-    } catch {
-      addToast('error', 'フォルダの読み込みに失敗しました');
-    }
-  }, [addToast]);
+    await loadFolder(folderPath);
+  }, [loadFolder]);
 
   const goRoot = useCallback(() => {
-    setPath([]);
+    setPath(null);
+    setFolderData(null);
     setViewerIdx(null);
-    loadAlbum();
-  }, [loadAlbum]);
+    loadRoot();
+  }, [loadRoot]);
+
+  const goUp = useCallback((targetPath) => {
+    if (!targetPath) { goRoot(); return; }
+    setPath(targetPath);
+    setFolderData(null);
+    setViewerIdx(null);
+    loadFolder(targetPath);
+  }, [goRoot, loadFolder]);
+
+  const handleRescan = useCallback(async () => {
+    if (scanning) return;
+    try {
+      await api.postRescan();
+      setScanning(true);
+      pollRef.current = setInterval(async () => {
+        try {
+          const status = await api.getRescanStatus();
+          setScanStatus(status);
+          if (!status.scanning) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+            setScanning(false);
+            addToast('success', `リスキャン完了: 新規${status.newCount}枚、移動${status.movedCount}枚、削除${status.deletedCount}枚`);
+            if (path) { await loadFolder(path); } else { await loadRoot(); }
+          }
+        } catch {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setScanning(false);
+        }
+      }, 3000);
+    } catch {
+      addToast('error', 'リスキャンの開始に失敗しました');
+    }
+  }, [scanning, path, addToast, loadFolder, loadRoot]);
+
+  const openViewer = (images, idx) => {
+    setViewerImages(images);
+    setViewerIdx(idx);
+  };
 
   const closeViewer = () => setViewerIdx(null);
 
   const nextImage = useCallback(() => {
-    setViewerIdx(prev => (prev !== null && prev < folderFiles.length - 1 ? prev + 1 : prev));
-  }, [folderFiles.length]);
+    setViewerIdx(prev => (prev !== null && prev < viewerImages.length - 1 ? prev + 1 : prev));
+  }, [viewerImages.length]);
 
   const prevImage = useCallback(() => {
     setViewerIdx(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
   }, []);
 
-  const nextFolder = useCallback(async () => {
-    if (!albumData?.folders?.length) return;
-    const folders = albumData.folders;
-    const currentFolderName = path[0];
-    const currentIdx = folders.findIndex(f => f.name === currentFolderName);
-    const nextIdx = (currentIdx + 1) % folders.length;
-    await openFolder(folders[nextIdx].name, 0);
-  }, [albumData, path, openFolder]);
-
   const handleViewerClick = useCallback((e) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const isLeft = x < rect.width / 2;
-    const isTop = y < rect.height / 2;
-
+    const isLeft = e.clientX - rect.left < rect.width / 2;
+    const isTop = e.clientY - rect.top < rect.height / 2;
     if (isLeft && isTop) closeViewer();
-    else if (!isLeft && isTop) nextFolder();
+    else if (!isLeft && isTop) nextImage();
     else if (!isLeft && !isTop) nextImage();
     else prevImage();
-  }, [nextFolder, nextImage, prevImage]);
+  }, [nextImage, prevImage]);
 
   if (loading) {
     return (
@@ -134,67 +197,76 @@ export default function AlbumScreen({ addToast }) {
     );
   }
 
-  const currentFolder = path[0] ?? null;
-  const isRoot = path.length === 0;
+  const breadcrumb = path
+    ? path.split('/').map((name, i, arr) => ({ name, path: arr.slice(0, i + 1).join('/') }))
+    : [];
+
+  const currentImages = path ? (folderData?.images || []) : recentImages;
 
   return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ overflowY: 'auto', height: 'calc(100dvh - 48px - 54px)', padding: '12px 16px 24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100dvh - 48px - 54px)' }}>
+      {/* ヘッダー行 */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', borderBottom: '1px solid var(--line)', minHeight: '44px', flexShrink: 0, gap: '6px' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', overflow: 'hidden', fontSize: 'var(--fs-label)' }}>
+          <button
+            onClick={goRoot}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: path ? 'var(--accent)' : 'var(--text)', padding: '4px 0', minHeight: '44px', flexShrink: 0, fontSize: 'var(--fs-label)' }}
+          >
+            ルート
+          </button>
+          {breadcrumb.map((item, i) => (
+            <span key={item.path} style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+              <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>›</span>
+              <button
+                onClick={() => goUp(item.path)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: i === breadcrumb.length - 1 ? 'var(--text)' : 'var(--accent)', padding: '4px 0', minHeight: '44px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--fs-label)' }}
+              >
+                {item.name}
+              </button>
+            </span>
+          ))}
+        </div>
+        {scanning && (
+          <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-label)', flexShrink: 0 }}>
+            {scanStatus.processed}/{scanStatus.total}枚
+          </span>
+        )}
+        <button
+          onClick={handleRescan}
+          disabled={scanning}
+          style={{ background: 'none', border: 'none', cursor: scanning ? 'default' : 'pointer', padding: '4px 6px', minHeight: '44px', fontSize: '18px', opacity: scanning ? 0.5 : 1, flexShrink: 0 }}
+          title="リスキャン"
+        >
+          {scanning ? '⟳' : '🔄'}
+        </button>
+      </div>
 
-        {isRoot ? (
+      {/* コンテンツ */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 24px' }}>
+        {path === null ? (
           /* ルート表示 */
           <>
-            {/* 新着欄 */}
-            {albumData?.recent?.length > 0 && (
-              <section style={{ marginBottom: '16px' }}>
+            {recentImages.length > 0 && (
+              <section style={{ marginBottom: '20px' }}>
                 <h2 style={SECTION_LABEL}>新着</h2>
-                <div style={GRID}>
-                  {albumData.recent.map((item, i) => (
-                    <div
-                      key={i}
-                      onClick={() => openRecentImage(item.folder, item.filename)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <div style={{ aspectRatio: '1/1', overflow: 'hidden', background: 'var(--line)' }}>
-                        <img
-                          src={`/api/images/${encodeURIComponent(item.folder)}/${encodeURIComponent(item.filename)}`}
-                          alt=""
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                          loading="lazy"
-                        />
-                      </div>
-                      <div style={IMG_LABEL}>{item.folder}</div>
-                    </div>
+                <div style={GRID_3}>
+                  {recentImages.map((img, i) => (
+                    <ThumbCell key={img.hash} image={img} onClick={() => openViewer(recentImages, i)} />
                   ))}
                 </div>
               </section>
             )}
 
-            {/* フォルダ欄 */}
             <section>
               <h2 style={SECTION_LABEL}>フォルダ</h2>
-              {(!albumData?.folders?.length) ? (
+              {!galleryData?.tree?.length ? (
                 <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-body)', textAlign: 'center', padding: '32px 0' }}>
                   保存済み画像はありません
                 </div>
               ) : (
-                <div style={GRID}>
-                  {albumData.folders.map((folder, i) => (
-                    <div
-                      key={i}
-                      onClick={() => openFolder(folder.name)}
-                      style={{ cursor: 'pointer', textAlign: 'center', padding: '8px 4px' }}
-                    >
-                      <div style={{ color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'center' }}>
-                        <FolderIcon />
-                      </div>
-                      <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
-                        {folder.count}枚
-                      </div>
-                      <div style={{ fontSize: 'var(--fs-label)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {folder.name}
-                      </div>
-                    </div>
+                <div style={{ border: '1px solid var(--line)', borderRadius: '6px', overflow: 'hidden' }}>
+                  {galleryData.tree.map(node => (
+                    <FolderRow key={node.path} node={node} depth={0} onNavigate={navigateTo} />
                   ))}
                 </div>
               )}
@@ -203,40 +275,37 @@ export default function AlbumScreen({ addToast }) {
         ) : (
           /* フォルダ内表示 */
           <>
-            {/* パンくず */}
-            <div style={{ marginBottom: '12px', fontSize: 'var(--fs-label)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button
-                onClick={goRoot}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 'var(--fs-label)', padding: 0, minHeight: '44px' }}
-              >
-                VAULT
-              </button>
-              <span style={{ color: 'var(--text-secondary)' }}>›</span>
-              <span style={{ color: 'var(--text)' }}>{currentFolder}</span>
-            </div>
+            {/* サブフォルダ */}
+            {folderData?.subfolders?.length > 0 && (
+              <section style={{ marginBottom: '16px' }}>
+                <div style={{ border: '1px solid var(--line)', borderRadius: '6px', overflow: 'hidden' }}>
+                  {folderData.subfolders.map(sf => (
+                    <button
+                      key={sf.path}
+                      onClick={() => navigateTo(sf.path)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: 'none', border: 'none', borderBottom: '1px solid var(--line)', cursor: 'pointer', padding: '10px 12px', color: 'var(--text)', fontSize: 'var(--fs-body)', textAlign: 'left', minHeight: '44px' }}
+                    >
+                      <span style={{ color: 'var(--text-secondary)' }}><FolderIcon /></span>
+                      <span>{sf.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
-            {folderFiles.length === 0 ? (
+            {/* 画像グリッド */}
+            {folderData === null ? (
               <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-body)', textAlign: 'center', padding: '32px 0' }}>
                 読み込み中...
               </div>
+            ) : folderData.images.length === 0 ? (
+              <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-body)', textAlign: 'center', padding: '32px 0' }}>
+                画像がありません
+              </div>
             ) : (
-              <div style={GRID}>
-                {folderFiles.map((filename, i) => (
-                  <div
-                    key={i}
-                    onClick={() => setViewerIdx(i)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div style={{ aspectRatio: '1/1', overflow: 'hidden', background: 'var(--line)' }}>
-                      <img
-                        src={`/api/images/${encodeURIComponent(currentFolder)}/${encodeURIComponent(filename)}`}
-                        alt=""
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        loading="lazy"
-                      />
-                    </div>
-                    <div style={IMG_LABEL}>{extractLabel(filename)}</div>
-                  </div>
+              <div style={GRID_3}>
+                {folderData.images.map((img, i) => (
+                  <ThumbCell key={img.hash} image={img} onClick={() => openViewer(folderData.images, i)} />
                 ))}
               </div>
             )}
@@ -245,41 +314,27 @@ export default function AlbumScreen({ addToast }) {
       </div>
 
       {/* 4象限ビューア */}
-      {viewerIdx !== null && currentFolder && folderFiles[viewerIdx] && (
+      {viewerIdx !== null && viewerImages[viewerIdx] && (
         <div
           onClick={handleViewerClick}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 200,
-            background: 'rgba(0,0,0,0.94)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            userSelect: 'none',
-            touchAction: 'none',
-          }}
+          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.94)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', userSelect: 'none', touchAction: 'none' }}
         >
-          {/* 四隅ガイド */}
           <div style={{ position: 'absolute', top: 20, left: 16, color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>✕ 戻る</div>
-          <div style={{ position: 'absolute', top: 20, right: 16, color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>次フォルダ ▶</div>
+          <div style={{ position: 'absolute', top: 20, right: 16, color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>次 ▶</div>
           <div style={{ position: 'absolute', bottom: 70, left: 16, color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>◀ 前</div>
           <div style={{ position: 'absolute', bottom: 70, right: 16, color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>次 ▶</div>
 
-          {/* 画像 */}
           <img
-            src={`/api/images/${encodeURIComponent(currentFolder)}/${encodeURIComponent(folderFiles[viewerIdx])}`}
+            src={`/api/images/full/${viewerImages[viewerIdx].hash}`}
             alt=""
             style={{ width: '75%', maxWidth: '320px', objectFit: 'contain', borderRadius: '4px', display: 'block' }}
           />
 
-          {/* ファイル名・位置 */}
           <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', marginTop: '12px', textAlign: 'center', maxWidth: '80%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {folderFiles[viewerIdx]}
+            {viewerImages[viewerIdx].filename}
           </div>
           <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '11px', marginTop: '4px' }}>
-            {viewerIdx + 1} / {folderFiles.length}
+            {viewerIdx + 1} / {viewerImages.length}
           </div>
         </div>
       )}

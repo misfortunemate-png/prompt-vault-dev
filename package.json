@@ -1,6 +1,6 @@
 {
   "name": "prompt-vault",
-  "version": "3.3.1",
+  "version": "3.4.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -10,7 +10,9 @@
     "inspect": "node scripts/inspect.mjs"
   },
   "dependencies": {
-    "express": "^4.21.0"
+    "better-sqlite3": "^13.0.3",
+    "express": "^4.21.0",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",

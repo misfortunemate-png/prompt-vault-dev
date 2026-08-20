@@ -3,11 +3,15 @@ import { createServer as createViteServer } from 'vite';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { generate as novelaiGenerate } from './server/providers/novelai.js';
+import { upsertImage, getByHash, listFolders, listByFolder, getRecent, getStats } from './server/db.js';
+import { startScan, getScanStatus, generateThumb } from './server/scanner.js';
+import { parsePngMeta } from './server/png-meta.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
+const THUMBS_DIR = join(__dirname, 'data', 'thumbs');
 const PORT = process.env.PORT || 8789;
 
 mkdirSync(join(__dirname, 'data'), { recursive: true });
@@ -176,6 +180,7 @@ function initVaultStructure() {
       console.error('VAULT_ROOT .tmp 初期化エラー:', e.message);
     }
     runMigration(vaultRoot);
+    setImmediate(() => startScan(vaultRoot));
   }
   // Ensure cards.json and presets.json exist
   readCardsData();
@@ -366,6 +371,106 @@ async function start() {
     res.json(newPreset);
   });
 
+  // ── ギャラリー ──
+
+  function buildFolderTree(rows) {
+    const folderCounts = {};
+    for (const { folder, count } of rows) {
+      if (!folder) continue;
+      folderCounts[folder] = count;
+      const parts = folder.split('/');
+      for (let i = 1; i < parts.length; i++) {
+        const p = parts.slice(0, i).join('/');
+        if (!(p in folderCounts)) folderCounts[p] = 0;
+      }
+    }
+    const nodeMap = {};
+    const root = [];
+    for (const path of Object.keys(folderCounts).sort()) {
+      const parts = path.split('/');
+      const node = { name: parts[parts.length - 1], path, imageCount: folderCounts[path], children: [] };
+      nodeMap[path] = node;
+      if (parts.length === 1) {
+        root.push(node);
+      } else {
+        const parent = parts.slice(0, -1).join('/');
+        (nodeMap[parent] ? nodeMap[parent].children : root).push(node);
+      }
+    }
+    return root;
+  }
+
+  api.get('/gallery', (_req, res) => {
+    try {
+      const rows = listFolders();
+      const tree = buildFolderTree(rows);
+      const totalImages = rows.reduce((s, r) => s + r.count, 0);
+      const totalFolders = rows.filter(r => r.folder).length;
+      res.json({ tree, totalImages, totalFolders });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.get('/gallery/stats', (_req, res) => {
+    try { res.json(getStats()); } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  api.get('/gallery/recent', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 20;
+      const images = getRecent(limit).map(r => ({
+        ...r,
+        thumbUrl: `/api/thumbs/${r.hash}.webp`,
+      }));
+      res.json({ images });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.get('/gallery/folder', (req, res) => {
+    const { path: folderPath = '' } = req.query;
+    try {
+      const images = listByFolder(folderPath).map(r => ({
+        ...r,
+        thumbUrl: `/api/thumbs/${r.hash}.webp`,
+      }));
+      const allFolders = listFolders();
+      const prefix = folderPath ? folderPath + '/' : '';
+      const subfolders = allFolders
+        .filter(r => r.folder.startsWith(prefix) && r.folder !== folderPath)
+        .map(r => ({ name: r.folder.slice(prefix.length).split('/')[0], path: r.folder }))
+        .filter((v, i, a) => a.findIndex(x => x.name === v.name) === i);
+      res.json({ path: folderPath, images, subfolders });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  api.get('/gallery/image/:hash', (req, res) => {
+    try {
+      const row = getByHash(req.params.hash);
+      if (!row) return res.status(404).json({ error: '画像が見つかりません' });
+      res.json(row);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ── リスキャン ──
+
+  api.post('/rescan', (_req, res) => {
+    const vaultRoot = process.env.VAULT_ROOT;
+    if (!vaultRoot) return res.status(400).json({ error: 'VAULT_ROOT未設定' });
+    startScan(vaultRoot).catch(e => console.error('[Rescan]', e.message));
+    res.json({ ok: true, scanning: true });
+  });
+
+  api.get('/rescan/status', (_req, res) => {
+    res.json(getScanStatus());
+  });
+
   // ── danbooruタグ ──
 
   api.get('/tags/search', (req, res) => {
@@ -405,7 +510,7 @@ async function start() {
 
   api.post('/save', requireVaultRoot, (req, res) => {
     const vaultRoot = process.env.VAULT_ROOT;
-    const { filename, seed, folderSegments = [], filenameSegments = [] } = req.body;
+    const { filename, seed, folderSegments = [], filenameSegments = [], preset_id } = req.body;
 
     if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       return res.status(400).json({ error: '不正なファイル名です' });
@@ -431,10 +536,67 @@ async function start() {
       writeLog('error', 'SAVE_FAILED', e.message, '');
       return res.status(500).json({ error: e.message });
     }
+
+    // 即時DB登録
+    try {
+      const buf = readFileSync(destPath);
+      const hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
+      const meta = parsePngMeta(buf);
+      const st = statSync(destPath);
+      const now = new Date().toISOString();
+      upsertImage({
+        hash,
+        rel_path: `${folderPath}/${newFilename}`,
+        filename: newFilename,
+        folder: folderPath,
+        size_bytes: buf.length,
+        created_at: st.birthtimeMs ? new Date(st.birthtimeMs).toISOString() : now,
+        modified_at: new Date(st.mtimeMs).toISOString(),
+        width: meta.width ?? null,
+        height: meta.height ?? null,
+        prompt: meta.prompt ?? null,
+        negative: meta.negative ?? null,
+        seed: meta.seed ?? (seed != null ? Number(seed) : null),
+        model: meta.model ?? null,
+        steps: meta.steps ?? null,
+        scale: meta.scale ?? null,
+        sampler: meta.sampler ?? null,
+        preset_id: preset_id || null,
+        favorite: 0,
+        caption: null,
+        thumb_ok: 0,
+        indexed_at: now,
+      });
+      generateThumb(hash, destPath).catch(() => {});
+    } catch (dbErr) {
+      console.warn('[Save] DB登録失敗:', dbErr.message);
+    }
+
     res.json({ success: true, saved_path: `${folderPath}/${newFilename}` });
   });
 
   // ── 画像配信 ──
+
+  // ── サムネイル ──
+
+  api.get('/thumbs/:hash.webp', (req, res) => {
+    const thumbPath = join(THUMBS_DIR, `${req.params.hash}.webp`);
+    if (!existsSync(thumbPath)) return res.status(404).end();
+    res.setHeader('Content-Type', 'image/webp');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.sendFile(thumbPath);
+  });
+
+  // ── 原寸画像（ハッシュベース） ──
+
+  api.get('/images/full/:hash', requireVaultRoot, (req, res) => {
+    const row = getByHash(req.params.hash);
+    if (!row) return res.status(404).json({ error: '画像が見つかりません' });
+    const filePath = join(process.env.VAULT_ROOT, row.rel_path);
+    if (!existsSync(filePath)) return res.status(404).json({ error: 'ファイルが見つかりません' });
+    res.setHeader('Content-Type', 'image/png');
+    res.sendFile(filePath);
+  });
 
   api.get('/images/.tmp/:filename', requireVaultRoot, (req, res) => {
     const { filename } = req.params;

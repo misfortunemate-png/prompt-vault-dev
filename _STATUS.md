@@ -1,9 +1,9 @@
 ---
 project: prompt-vault
-version: 3.3.1
-milestone: M3-fix
+version: 3.4.0
+milestone: M4-A
 status: done
-updated: 2026-08-19
+updated: 2026-08-20
 ---
 
 ## M1: 基盤構築（完了）
@@ -17,11 +17,11 @@ updated: 2026-08-19
 
 ## M3: カードシステム（完了）
 
-- [x] data/cards.json・data/presets.json 初期化・CRUD API
-- [x] danbooruタグ検索API（GET /api/tags/search）
-- [x] M2マイグレーション（VAULT_ROOT/presets.json→cards.json）
-- [x] 保存API M3形式（folderSegments/filenameSegments/seed）
-- [x] TemplateScreen（スロット・カード・プリセット管理）
-- [x] TagSuggest・TagInput コンポーネント
-- [x] GenerateScreen カードベース合成・インライン編集
-- [x] Toastの10秒自動フェードアウト
+- [x] cards.json/presets.json CRUD・danbooruタグ検索・M2マイグレーション
+- [x] TemplateScreen・TagSuggest・TagInput・GenerateScreen・Toast
+
+## M4-A: ギャラリー基盤（完了）
+
+- [x] better-sqlite3 SQLite・sharpサムネイル・PNGメタデータパーサー
+- [x] リスキャン（起動時＋手動）・即時DB登録（保存API連携）
+- [x] AlbumScreen書き直し（FSミラーツリー＋サムネイルグリッド）

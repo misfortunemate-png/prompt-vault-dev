@@ -45,7 +45,18 @@ export const api = {
   generate: (data) => request('/generate', { method: 'POST', body: JSON.stringify(data) }),
   saveImage: (data) => request('/save', { method: 'POST', body: JSON.stringify(data) }),
 
-  // Images
+  // Images (legacy M2)
   getImages: () => request('/images'),
   getImageFolder: (folder) => request(`/images/${encodeURIComponent(folder)}`),
+
+  // Gallery (M4-A)
+  getGallery: () => request('/gallery'),
+  getGalleryFolder: (path) => request(`/gallery/folder?path=${encodeURIComponent(path)}`),
+  getRecentImages: (limit = 20) => request(`/gallery/recent?limit=${limit}`),
+  getGalleryImage: (hash) => request(`/gallery/image/${encodeURIComponent(hash)}`),
+  getGalleryStats: () => request('/gallery/stats'),
+
+  // Rescan
+  postRescan: () => request('/rescan', { method: 'POST' }),
+  getRescanStatus: () => request('/rescan/status'),
 };
