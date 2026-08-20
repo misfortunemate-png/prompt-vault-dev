@@ -20,13 +20,20 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
   const img = images[idx];
 
   useEffect(() => {
-    if (!img) return;
     setDetail(null);
     setPromptExpanded(false);
     setNegExpanded(false);
     setCaptionEdit(null);
-    api.getGalleryImage(img.hash).then(setDetail).catch(() => {});
-  }, [idx, img?.hash]);
+  }, [idx]);
+
+  useEffect(() => {
+    if (!overlayExpanded || !img) return;
+    let cancelled = false;
+    api.getGalleryImage(img.hash)
+      .then(d => { if (!cancelled) setDetail(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [overlayExpanded, img?.hash]);
 
   const go = useCallback((delta) => {
     setIdx(prev => {
@@ -102,11 +109,13 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     e.stopPropagation();
     if (!img) return;
     const newVal = favoriteMap[img.hash] ? 0 : 1;
+    setFavoriteMap(m => ({ ...m, [img.hash]: newVal === 1 }));
     try {
       await api.setFavorite(img.hash, newVal);
-      setFavoriteMap(m => ({ ...m, [img.hash]: newVal === 1 }));
       if (onFavoriteToggle) onFavoriteToggle(img.hash, newVal);
-    } catch {}
+    } catch {
+      setFavoriteMap(m => ({ ...m, [img.hash]: newVal !== 1 }));
+    }
   }, [img, favoriteMap, onFavoriteToggle]);
 
   const saveCaption = useCallback(async () => {
@@ -115,6 +124,8 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
     try {
       await api.setCaption(img.hash, captionEdit);
       if (onCaptionSave) onCaptionSave(img.hash, captionEdit);
+      const saved = captionEdit;
+      setDetail(prev => prev ? { ...prev, caption: saved } : { caption: saved });
       setCaptionEdit(null);
     } catch {}
     setCaptionSaving(false);
@@ -130,11 +141,6 @@ export default function ImageViewer({ images, initialIndex, onClose, onFavoriteT
       <style>{`
         .iv-root { display: flex; flex-direction: column; }
         .iv-overlay { background: rgba(0,0,0,0.8); flex-shrink: 0; max-height: 55vh; overflow-y: auto; }
-        @media (orientation: landscape) {
-          .iv-root { flex-direction: row !important; }
-          .iv-image-area { flex: 1; height: 100% !important; }
-          .iv-overlay { width: 280px; max-height: 100vh; flex-shrink: 0; }
-        }
       `}</style>
 
       <div

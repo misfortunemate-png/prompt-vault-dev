@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.5.0
-milestone: M4-B
+version: 3.5.1
+milestone: bugfix
 status: done
 updated: 2026-08-20
 ---
@@ -10,13 +10,16 @@ updated: 2026-08-20
 
 - [x] サーバー骨格・PWA・novelai.js・AlbumScreen・カードシステム
 
-## M4-A / M4-A-fix: ギャラリー基盤（完了）
+## M4-A / M4-A-fix / M4-B: ギャラリー（完了）
 
 - [x] SQLiteインデックス・サムネイル・リスキャン・フォルダ表示モード切替
+- [x] ImageViewer.jsx（スワイプ・ピンチ・オーバーレイ・★・セリフ編集）
+- [x] お気に入り・テキスト検索・プリセット別アルバム
 
-## M4-B: ビューア本装・お気に入り・検索・プリセット別・セリフ（完了）
+## bugfix: 実機フィードバック修正（完了）
 
-- [x] ImageViewer.jsx（スワイプ・ピンチ・横向き・情報オーバーレイ・★・セリフ編集）
-- [x] お気に入りトグル・フィルタ・ThumbCell★オーバーレイ
-- [x] テキスト検索（prompt/negative/folder/filename/caption OR LIKE）
-- [x] プリセット別アルバム（チップUI）
+- [x] #1 landscape CSS削除・オーバーレイ常に下部
+- [x] #2 saveCaption後にdetail.caption即時更新
+- [x] #3 ★トグルoptimistic update・失敗時revert
+- [x] #4 detail lazy fetch（overlayExpanded時のみ）
+- [x] #5 handleInlineSaveAsNewでslotIdをlocal capture

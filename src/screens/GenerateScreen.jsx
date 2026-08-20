@@ -285,13 +285,15 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   };
 
   const handleInlineSaveAsNew = async () => {
+    const slotId = inlineSlotId;
+    if (!slotId) return;
     const nameVal = window.prompt('新しいカード名を入力してください:');
     if (!nameVal?.trim()) return;
     setInlineSaving(true);
     try {
-      const newCard = await api.addCard({ slotId: inlineSlotId, name: nameVal.trim(), positive: inlinePos, negative: inlineNeg });
+      const newCard = await api.addCard({ slotId, name: nameVal.trim(), positive: inlinePos, negative: inlineNeg });
       await refreshCardsData();
-      setSelectedCardMap(prev => ({ ...prev, [inlineSlotId]: newCard.id }));
+      setSelectedCardMap(prev => ({ ...prev, [slotId]: newCard.id }));
       addToast('success', '新しいカードを作成しました');
       setInlineSlotId(null);
     } catch (e) {
