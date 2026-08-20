@@ -5,7 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes, createHash } from 'crypto';
 import { generate as novelaiGenerate } from './server/providers/novelai.js';
-import { upsertImage, getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes } from './server/db.js';
+import { upsertImage, getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption } from './server/db.js';
 import { startScan, getScanStatus, generateThumb } from './server/scanner.js';
 import { parsePngMeta } from './server/png-meta.js';
 
@@ -463,6 +463,51 @@ async function start() {
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // ── お気に入り・検索・プリセット別・セリフ ──
+
+  api.put('/gallery/image/:hash/favorite', (req, res) => {
+    try {
+      const { favorite } = req.body;
+      if (favorite !== 0 && favorite !== 1) return res.status(400).json({ error: 'favorite は 0 または 1' });
+      setFavorite(req.params.hash, favorite);
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  api.get('/gallery/favorites', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 50;
+      const images = getFavorites(limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
+      res.json({ images });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  api.get('/gallery/search', (req, res) => {
+    const { q, limit } = req.query;
+    if (!q || !q.trim()) return res.status(400).json({ error: '検索クエリが空です' });
+    try {
+      const images = dbSearch(q.trim(), parseInt(limit) || 50).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
+      res.json({ images });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  api.get('/gallery/by-preset/:presetId', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit) || 50;
+      const images = getByPreset(req.params.presetId, limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
+      res.json({ images });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  api.put('/gallery/image/:hash/caption', (req, res) => {
+    try {
+      const { caption } = req.body;
+      if (typeof caption !== 'string') return res.status(400).json({ error: 'caption は文字列' });
+      setCaption(req.params.hash, caption);
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   // ── リスキャン ──

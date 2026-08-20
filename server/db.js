@@ -83,7 +83,7 @@ export function deleteByHash(hash) {
 
 export function listByFolder(folder) {
   return getDb().prepare(
-    'SELECT hash, filename, folder, thumb_ok, created_at, width, height FROM images WHERE folder = ? ORDER BY created_at DESC'
+    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images WHERE folder = ? ORDER BY created_at DESC'
   ).all(folder);
 }
 
@@ -95,7 +95,7 @@ export function listFolders() {
 
 export function getRecent(limit = 20) {
   return getDb().prepare(
-    'SELECT hash, filename, folder, thumb_ok, created_at, width, height FROM images ORDER BY created_at DESC LIMIT ?'
+    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images ORDER BY created_at DESC LIMIT ?'
   ).all(limit);
 }
 
@@ -113,6 +113,35 @@ export function setThumbOk(hash, val) {
 
 export function getAllHashes() {
   return getDb().prepare('SELECT hash, rel_path FROM images').all();
+}
+
+export function setFavorite(hash, flag) {
+  getDb().prepare('UPDATE images SET favorite = ? WHERE hash = ?').run(flag, hash);
+}
+
+export function getFavorites(limit = 50) {
+  return getDb().prepare(
+    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images WHERE favorite = 1 ORDER BY created_at DESC LIMIT ?'
+  ).all(limit);
+}
+
+export function search(query, limit = 50) {
+  const like = `%${query}%`;
+  return getDb().prepare(
+    `SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images
+     WHERE prompt LIKE ? OR negative LIKE ? OR folder LIKE ? OR filename LIKE ? OR caption LIKE ?
+     ORDER BY created_at DESC LIMIT ?`
+  ).all(like, like, like, like, like, limit);
+}
+
+export function getByPreset(presetId, limit = 50) {
+  return getDb().prepare(
+    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images WHERE preset_id = ? ORDER BY created_at DESC LIMIT ?'
+  ).all(presetId, limit);
+}
+
+export function setCaption(hash, text) {
+  getDb().prepare('UPDATE images SET caption = ? WHERE hash = ?').run(text, hash);
 }
 
 export function getAllPreviewHashes(limit = 4) {

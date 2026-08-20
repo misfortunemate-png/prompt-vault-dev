@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.4.1
-milestone: M4-A-fix
+version: 3.5.0
+milestone: M4-B
 status: done
 updated: 2026-08-20
 ---
@@ -10,14 +10,13 @@ updated: 2026-08-20
 
 - [x] サーバー骨格・PWA・novelai.js・AlbumScreen・カードシステム
 
-## M4-A: ギャラリー基盤（完了）
+## M4-A / M4-A-fix: ギャラリー基盤（完了）
 
-- [x] better-sqlite3 SQLite・sharpサムネイル・PNGメタデータパーサー
-- [x] リスキャン（起動時＋手動）・即時DB登録（保存API連携）
-- [x] AlbumScreen書き直し（FSミラーツリー＋サムネイルグリッド）
+- [x] SQLiteインデックス・サムネイル・リスキャン・フォルダ表示モード切替
 
-## M4-A-fix: フォルダ表示モード切替（完了）
+## M4-B: ビューア本装・お気に入り・検索・プリセット別・セリフ（完了）
 
-- [x] getAllPreviewHashes() — SQLiteウィンドウ関数でフォルダ別上位4件
-- [x] /api/gallery に previewHashes フィールド追加
-- [x] AlbumScreen: ☰/▦ トグル・アイコンモード（2×2サムネイルカード）
+- [x] ImageViewer.jsx（スワイプ・ピンチ・横向き・情報オーバーレイ・★・セリフ編集）
+- [x] お気に入りトグル・フィルタ・ThumbCell★オーバーレイ
+- [x] テキスト検索（prompt/negative/folder/filename/caption OR LIKE）
+- [x] プリセット別アルバム（チップUI）

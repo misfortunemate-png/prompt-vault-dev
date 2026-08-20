@@ -59,4 +59,11 @@ export const api = {
   // Rescan
   postRescan: () => request('/rescan', { method: 'POST' }),
   getRescanStatus: () => request('/rescan/status'),
+
+  // Gallery M4-B
+  setFavorite: (hash, favorite) => request(`/gallery/image/${encodeURIComponent(hash)}/favorite`, { method: 'PUT', body: JSON.stringify({ favorite }) }),
+  getFavorites: (limit = 50) => request(`/gallery/favorites?limit=${limit}`),
+  searchGallery: (q, limit = 50) => request(`/gallery/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  getByPreset: (presetId, limit = 50) => request(`/gallery/by-preset/${encodeURIComponent(presetId)}?limit=${limit}`),
+  setCaption: (hash, caption) => request(`/gallery/image/${encodeURIComponent(hash)}/caption`, { method: 'PUT', body: JSON.stringify({ caption }) }),
 };

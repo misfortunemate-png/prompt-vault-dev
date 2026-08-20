@@ -156,6 +156,30 @@
 - フォルダ内表示: 画像を4列グリッド・名前順（サーバーソート済み）
 - 4象限ビューア: 全画面オーバーレイ。左上=閉じる、右上=次フォルダ、右下=次画像、左下=前画像
 
+## M4-B ギャラリー本装
+
+| ファイル | 用途 |
+|---|---|
+| src/components/ImageViewer.jsx | ビューア本装（スワイプ・ピンチ・横向き・情報オーバーレイ） |
+
+### M4-B API
+
+| メソッド | パス | 用途 |
+|---|---|---|
+| PUT | /api/gallery/image/:hash/favorite | お気に入りトグル body: `{ favorite: 0\|1 }` |
+| GET | /api/gallery/favorites?limit=50 | お気に入り画像一覧 |
+| GET | /api/gallery/search?q=&limit=50 | テキスト検索（prompt/negative/folder/filename/caption OR LIKE） |
+| GET | /api/gallery/by-preset/:presetId?limit=50 | プリセット別画像一覧 |
+| PUT | /api/gallery/image/:hash/caption | セリフ更新 body: `{ caption: "..." }` |
+
+### M4-B AlbumScreen
+
+- ヘッダー: ★（お気に入りフィルタ）・🔍（検索バー展開）・🔄（リスキャン）
+- ルート表示: 新着 → プリセット別チップ → フォルダ（☰/▦ トグル）
+- フラット表示: お気に入り・検索結果・プリセット別（3列グリッド、フォルダラベル付き）
+- ImageViewer props: `images`, `initialIndex`, `onClose`, `onFavoriteToggle`, `onCaptionSave`
+- ThumbCell: `isFavorite`（★オーバーレイ）・`showFolder`（検索・プリセット結果でフォルダ名バッジ）
+
 ## 認証環境変数
 
 - `NOVELAI_TOKEN` — NovelAI Persistent API Token（生成APIで使用）
