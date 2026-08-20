@@ -49,6 +49,28 @@ export default function TemplateCardList({ addToast }) {
 
   useEffect(() => { refresh(); }, []);
 
+  // ────── Load thumbnails for card list view ──────
+  useEffect(() => {
+    if (nav.view !== 'cards' || !cardsData) return;
+    const currentSlot = nav.selectedSlot ? cardsData.slots.find(s => s.id === nav.selectedSlot) : null;
+    const slotCards = currentSlot ? cardsData.cards.filter(c => c.slotId === currentSlot.id) : [];
+    if (!slotCards.length) return;
+    let cancelled = false;
+    const loadThumbs = async () => {
+      const results = {};
+      await Promise.all(slotCards.map(async (card) => {
+        try {
+          if (!card.positive) { results[card.id] = { images: [], total: 0 }; return; }
+          const r = await api.getGalleryByCard(card.positive, 4);
+          results[card.id] = r;
+        } catch { results[card.id] = { images: [], total: 0 }; }
+      }));
+      if (!cancelled) setCardThumbs(results);
+    };
+    loadThumbs();
+    return () => { cancelled = true; };
+  }, [nav.view, nav.selectedSlot, cardsData]);
+
   if (!cardsData) return <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>読み込み中…</div>;
 
   const slots = [...cardsData.slots].sort((a, b) => a.order - b.order);
@@ -100,25 +122,6 @@ export default function TemplateCardList({ addToast }) {
       await refresh();
     } catch (e) { addToast('error', e.message); }
   };
-
-  // ────── Load thumbnails for card list view ──────
-  useEffect(() => {
-    if (nav.view !== 'cards' || !slotCards.length) return;
-    let cancelled = false;
-    const loadThumbs = async () => {
-      const results = {};
-      await Promise.all(slotCards.map(async (card) => {
-        try {
-          if (!card.positive) { results[card.id] = { images: [], total: 0 }; return; }
-          const r = await api.getGalleryByCard(card.positive, 4);
-          results[card.id] = r;
-        } catch { results[card.id] = { images: [], total: 0 }; }
-      }));
-      if (!cancelled) setCardThumbs(results);
-    };
-    loadThumbs();
-    return () => { cancelled = true; };
-  }, [nav.view, nav.selectedSlot, slotCards.map(c => c.id).join(',')]);
 
   // ────── Card edit view ──────
   if (nav.view === 'edit') {
