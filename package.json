@@ -4,9 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "node server.js",
+    "dev": "node --env-file=.env server.js",
     "build": "vite build",
-    "start": "NODE_ENV=production node server.js",
+    "start": "NODE_ENV=production node --env-file=.env server.js",
     "inspect": "node scripts/inspect.mjs"
   },
   "dependencies": {
