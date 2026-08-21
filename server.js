@@ -291,6 +291,11 @@ async function start() {
     if (data.cards.some(c => c.slotId === slotId && c.name === name.trim())) {
       return res.status(400).json({ error: '同じスロット内に同名カードが存在します' });
     }
+    if (parentId) {
+      const parent = data.cards.find(c => c.id === parentId);
+      if (!parent) return res.status(400).json({ error: '親カードが見つかりません' });
+      if (parent.slotId !== slotId) return res.status(400).json({ error: '親カードは同じスロット内である必要があります' });
+    }
     const card = { id: generateId('c_'), slotId, name: name.trim(), positive, negative };
     if (parentId) card.parentId = parentId;
     data.cards.push(card);
@@ -308,6 +313,12 @@ async function start() {
     const targetName = name?.trim() || data.cards[idx].name;
     if (data.cards.some((c, i) => i !== idx && c.slotId === targetSlotId && c.name === targetName)) {
       return res.status(400).json({ error: '同じスロット内に同名カードが存在します' });
+    }
+    const newParentId = req.body.parentId !== undefined ? req.body.parentId : data.cards[idx].parentId;
+    if (newParentId) {
+      const parent = data.cards.find(c => c.id === newParentId);
+      if (!parent) return res.status(400).json({ error: '親カードが見つかりません' });
+      if (parent.slotId !== targetSlotId) return res.status(400).json({ error: '親カードは同じスロット内である必要があります' });
     }
     data.cards[idx] = { ...data.cards[idx], ...req.body, name: targetName };
     writeCardsData(data);
