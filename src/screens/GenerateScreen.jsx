@@ -100,7 +100,7 @@ function ResultCard({ item, onSave, onPreview }) {
   );
 }
 
-export default function GenerateScreen({ addToast, results, setResults, maxResults }) {
+export default function GenerateScreen({ addToast, results, setResults, maxResults, resetKey }) {
   const [cardsData, setCardsData] = useState(null);
   const [presetsData, setPresetsData] = useState(null);
   const [vaultReady, setVaultReady] = useState(false);
@@ -227,6 +227,35 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       }
     } catch {}
   }, []);
+
+  // #7: カード選択の永続化 — 復元
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pv3-selected-cards'));
+      if (stored && typeof stored === 'object') {
+        setSelectedCardMap(stored);
+      }
+    } catch {}
+  }, []);
+
+  // #7: カード選択の永続化 — 保存（初回復元を除外するためにrefで管理）
+  const cardMapInitialized = useRef(false);
+  useEffect(() => {
+    if (!cardMapInitialized.current) {
+      cardMapInitialized.current = true;
+      return;
+    }
+    try {
+      localStorage.setItem('pv3-selected-cards', JSON.stringify(selectedCardMap));
+    } catch {}
+  }, [selectedCardMap]);
+
+  // #10: resetKey — スクロールトップ
+  useEffect(() => {
+    if (resetKey > 0) {
+      window.scrollTo(0, 0);
+    }
+  }, [resetKey]);
 
   useEffect(() => {
     if (showPromptEdit && promptEditRef.current) {
@@ -474,6 +503,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const handleClearPrompt = useCallback(() => {
     localStorage.removeItem('pv3-last-prompt');
+    localStorage.removeItem('pv3-selected-cards');
     setEditedPositive('');
     setEditedNegative('');
     setModel('nai-diffusion-4-5-full');
@@ -482,6 +512,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     setScale(5);
     setSampler('k_euler_ancestral');
     setSeed('');
+    setSelectedCardMap({});
+    setSelectedPresetId(null);
   }, []);
 
   // ── Random child resolution helper ──
@@ -844,7 +876,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         <div style={sectionStyle}>
           {sortedSlots.map((slot, idx) => {
             // Show only root cards in dropdown; children are resolved randomly at generation time
-            const slotCards = cardsData.cards.filter(c => c.slotId === slot.id && !c.parentId);
+            const slotCards = cardsData.cards.filter(c => c.slotId === slot.id && !c.parentId && (c.positive?.trim() || c.negative?.trim()));
             const selectedCardId = selectedCardMap[slot.id];
             const selectedChildCount = selectedCardId
               ? cardsData.cards.filter(c => c.parentId === selectedCardId).length

@@ -1,7 +1,7 @@
 ---
 project: prompt-vault
-version: 3.8.0
-milestone: 生成画面UI改善
+version: 3.9.0
+milestone: バグ修正バッチ2
 status: done
 updated: 2026-08-21
 ---
@@ -17,3 +17,4 @@ updated: 2026-08-21
 - [x] M6: ローカルHTTP API（chat-pwa vault_generate接続・外部連携API仕様）
 - [x] v3.7.0: .env fallback・ImageViewerセリフ編集改善・四象限タップ復元
 - [x] v3.8.0: 生成画面UI改善（トースト・プロンプト記憶・有効/ランダム・フォルダ親子・入力欄拡大）
+- [x] v3.9.0: バッチ2（NAI v4.5キャラプロンプト・カード選択永続化・サムネ修正・空カードフィルタ・タブリセット）

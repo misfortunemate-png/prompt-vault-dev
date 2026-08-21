@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TemplateCardList from './TemplateCardList';
 import TemplatePresetList from './TemplatePresetList';
 
-export default function TemplateScreen({ addToast }) {
+export default function TemplateScreen({ addToast, resetKey }) {
   const [subNav, setSubNav] = useState('cards');
+
+  useEffect(() => {
+    if (resetKey > 0) {
+      setSubNav('cards');
+      window.scrollTo(0, 0);
+    }
+  }, [resetKey]);
 
   return (
     <div style={{ height: 'calc(100dvh - 48px - 54px)', overflowY: 'auto' }}>

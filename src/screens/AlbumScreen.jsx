@@ -136,7 +136,7 @@ function FolderCardTree({ nodes, onNavigate, depth = 0 }) {
 const SECTION_LABEL = { fontSize: 'var(--fs-title)', fontWeight: 600, margin: '0 0 8px' };
 const SIZE_PRESETS = [{ label: '小', val: 80 }, { label: '中', val: 110 }, { label: '大', val: 160 }];
 
-export default function AlbumScreen({ addToast }) {
+export default function AlbumScreen({ addToast, resetKey }) {
   const [galleryData, setGalleryData] = useState(null);
   const [recentImages, setRecentImages] = useState([]);
   const [presets, setPresets] = useState([]);
@@ -198,6 +198,19 @@ export default function AlbumScreen({ addToast }) {
   useEffect(() => {
     loadRoot().finally(() => setLoading(false));
   }, [loadRoot]);
+
+  useEffect(() => {
+    if (resetKey > 0) {
+      setPath(null);
+      setFlatMode(null);
+      setFolderData(null);
+      setViewer(null);
+      setSearchOpen(false);
+      setSearchQuery('');
+      loadRoot();
+      window.scrollTo(0, 0);
+    }
+  }, [resetKey, loadRoot]);
 
   const navigateTo = useCallback(async (folderPath) => {
     setPath(folderPath);

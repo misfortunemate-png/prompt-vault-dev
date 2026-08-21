@@ -89,11 +89,20 @@ function PlaceholderView({ message }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('generate');
+  const [resetKey, setResetKey] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [displaySettings, setDisplaySettings] = useState(loadDisplaySettings);
   const [results, setResults] = useState([]);
   const [maxResults, setMaxResults] = useState(5);
+
+  const handleTabChange = useCallback((tab) => {
+    if (tab === activeTab) {
+      setResetKey(k => k + 1);
+    } else {
+      setActiveTab(tab);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     applyDisplaySettings(displaySettings);
@@ -128,11 +137,11 @@ export default function App() {
 
   let mainContent;
   if (activeTab === 'generate') {
-    mainContent = <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} />;
+    mainContent = <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} />;
   } else if (activeTab === 'album') {
-    mainContent = <AlbumScreen addToast={addToast} />;
+    mainContent = <AlbumScreen addToast={addToast} resetKey={resetKey} />;
   } else if (activeTab === 'template') {
-    mainContent = <TemplateScreen addToast={addToast} />;
+    mainContent = <TemplateScreen addToast={addToast} resetKey={resetKey} />;
   } else {
     mainContent = <PlaceholderView message="未実装のタブです" />;
   }
@@ -141,7 +150,7 @@ export default function App() {
     <>
       <Header activeTab={activeTab} onOpenSettings={() => setSettingsOpen(true)} />
       {mainContent}
-      <Footer activeTab={activeTab} onTabChange={setActiveTab} />
+      <Footer activeTab={activeTab} onTabChange={handleTabChange} />
       <Toast toasts={toasts} removeToast={removeToast} />
       {settingsOpen && (
         <SettingsScreen

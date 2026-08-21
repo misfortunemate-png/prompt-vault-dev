@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { readFileSync, mkdirSync, renameSync, existsSync, statSync } from 'fs';
+import { readFileSync, mkdirSync, copyFileSync, existsSync, statSync } from 'fs';
 import { createHash } from 'crypto';
 import { generate as novelaiGenerate } from './providers/novelai.js';
 import { upsertImage } from './db.js';
@@ -45,7 +45,7 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
   const destDir = join(vaultRoot, ...folderPath.split('/'));
   mkdirSync(destDir, { recursive: true });
   const destPath = join(destDir, newFilename);
-  renameSync(srcPath, destPath);
+  copyFileSync(srcPath, destPath);
 
   let hash = null;
   try {

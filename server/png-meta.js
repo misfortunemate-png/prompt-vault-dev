@@ -67,6 +67,25 @@ function parseNovelAiChunk(keyword, text, result) {
       if (parsed.scale != null) result.scale = Number(parsed.scale);
       if (parsed.sampler != null) result.sampler = String(parsed.sampler);
       if (parsed.model != null) result.model = String(parsed.model);
+      // NAI v4/4.5: キャラクタープロンプトの読み取り
+      if (parsed.v4_prompt?.caption?.char_captions?.length) {
+        const charParts = parsed.v4_prompt.caption.char_captions
+          .map(c => c.char_caption)
+          .filter(Boolean);
+        if (charParts.length) {
+          const base = parsed.v4_prompt.caption.base_caption || result.prompt || '';
+          result.prompt = [base, ...charParts].filter(Boolean).join(', ');
+        }
+      }
+      if (parsed.v4_negative_prompt?.caption?.char_captions?.length) {
+        const charNegParts = parsed.v4_negative_prompt.caption.char_captions
+          .map(c => c.char_caption)
+          .filter(Boolean);
+        if (charNegParts.length) {
+          const baseNeg = parsed.v4_negative_prompt.caption.base_caption || result.negative || '';
+          result.negative = [baseNeg, ...charNegParts].filter(Boolean).join(', ');
+        }
+      }
     } catch {}
   }
 }
