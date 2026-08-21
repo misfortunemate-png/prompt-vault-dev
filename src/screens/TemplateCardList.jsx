@@ -128,7 +128,8 @@ export default function TemplateCardList({ addToast }) {
     return (
       <TemplateCardEdit
         card={nav.editCard || null}
-        slots={slots}
+        slotId={nav.selectedSlot}
+        slotName={currentSlot?.name || ''}
         cards={slotCards}
         defaultParentId={nav.editParentId || null}
         onSave={async () => { await refresh(); setNav({ view: 'cards', selectedSlot: nav.selectedSlot }); }}

@@ -20,9 +20,9 @@ const labelStyle = {
   marginBottom: '4px',
 };
 
-export default function TemplateCardEdit({ card, slots, cards = [], defaultParentId = null, onSave, onCancel, addToast }) {
+export default function TemplateCardEdit({ card, slotId: fixedSlotId, slotName, cards = [], defaultParentId = null, onSave, onCancel, addToast }) {
   const [name, setName] = useState(card?.name || '');
-  const [slotId, setSlotId] = useState(card?.slotId || slots[0]?.id || '');
+  const slotId = fixedSlotId;
   const [positive, setPositive] = useState(card?.positive || '');
   const [negative, setNegative] = useState(card?.negative || '');
   const [parentId, setParentId] = useState(card?.parentId || defaultParentId || '');
@@ -73,10 +73,8 @@ export default function TemplateCardEdit({ card, slots, cards = [], defaultParen
         </div>
 
         <div>
-          <label style={labelStyle}>スロット *</label>
-          <select value={slotId} onChange={e => setSlotId(e.target.value)} style={fieldStyle}>
-            {slots.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          <label style={labelStyle}>スロット</label>
+          <div style={{ ...fieldStyle, background: 'var(--surface)', color: 'var(--text-secondary)' }}>{slotName}</div>
         </div>
 
         {parentOptions.length > 0 && (
