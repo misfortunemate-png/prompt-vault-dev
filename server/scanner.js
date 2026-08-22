@@ -85,8 +85,9 @@ export async function startScan(vaultRoot) {
         const fileStat = await stat(filePath);
         const now = new Date().toISOString();
 
+        const meta = parsePngMeta(buf);
+
         if (!existing) {
-          const meta = parsePngMeta(buf);
           upsertImage({
             hash,
             rel_path: relPath,
@@ -112,20 +113,27 @@ export async function startScan(vaultRoot) {
           });
           scanState.newCount++;
           thumbQueue.push({ hash, filePath });
-        } else if (existing.rel_path !== relPath) {
-          const now2 = new Date().toISOString();
+        } else {
+          const moved = existing.rel_path !== relPath;
           upsertImage({
             ...existing,
             rel_path: relPath,
             filename,
             folder,
             modified_at: new Date(fileStat.mtimeMs).toISOString(),
-            indexed_at: now2,
+            prompt: meta.prompt ?? existing.prompt,
+            negative: meta.negative ?? existing.negative,
+            seed: meta.seed ?? existing.seed,
+            model: meta.model ?? existing.model,
+            steps: meta.steps ?? existing.steps,
+            scale: meta.scale ?? existing.scale,
+            sampler: meta.sampler ?? existing.sampler,
+            width: meta.width ?? existing.width,
+            height: meta.height ?? existing.height,
+            indexed_at: now,
           });
-          scanState.movedCount++;
+          if (moved) scanState.movedCount++;
           if (!existing.thumb_ok) thumbQueue.push({ hash, filePath });
-        } else if (!existing.thumb_ok) {
-          thumbQueue.push({ hash, filePath });
         }
       } catch (e) {
         console.warn(`[Scanner] ファイル処理失敗 ${filePath}: ${e.message}`);
