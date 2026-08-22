@@ -67,6 +67,7 @@ function parseNovelAiChunk(keyword, text, result) {
       if (parsed.scale != null) result.scale = Number(parsed.scale);
       if (parsed.sampler != null) result.sampler = String(parsed.sampler);
       if (parsed.model != null) result.model = String(parsed.model);
+      else if (parsed.model_name != null) result.model = String(parsed.model_name);
       // NAI v4/4.5: キャラクタープロンプトの読み取り
       if (parsed.v4_prompt?.caption?.char_captions?.length) {
         const charParts = parsed.v4_prompt.caption.char_captions

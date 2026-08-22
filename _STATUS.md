@@ -1,9 +1,9 @@
 ---
 project: prompt-vault
-version: 3.9.0
-milestone: バグ修正バッチ2
+version: 3.10.0
+milestone: NAI V5対応
 status: done
-updated: 2026-08-21
+updated: 2026-08-22
 ---
 
 ## 完了マイルストーン
@@ -18,3 +18,4 @@ updated: 2026-08-21
 - [x] v3.7.0: .env fallback・ImageViewerセリフ編集改善・四象限タップ復元
 - [x] v3.8.0: 生成画面UI改善（トースト・プロンプト記憶・有効/ランダム・フォルダ親子・入力欄拡大）
 - [x] v3.9.0: バッチ2（NAI v4.5キャラプロンプト・カード選択永続化・サムネ修正・空カードフィルタ・タブリセット）
+- [x] v3.10.0: NAI V5対応（V5 Full/Curated追加・PoC成功・キャラプロンプト検証・model_name対応）

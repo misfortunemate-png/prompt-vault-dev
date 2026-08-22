@@ -3,6 +3,8 @@ import TagSuggest from '../components/TagSuggest';
 import { api } from '../lib/api';
 
 const MODELS = [
+  { value: 'nai-diffusion-5-full',       label: 'V5 Full ⚡' },
+  { value: 'nai-diffusion-5-curated',    label: 'V5 Curated ⚡' },
   { value: 'nai-diffusion-4-5-full',     label: 'V4.5 Full' },
   { value: 'nai-diffusion-4-5-curated',  label: 'V4.5 Curated' },
   { value: 'nai-diffusion-4-full',       label: 'V4 Full' },

@@ -52,6 +52,7 @@ export async function generate({ prompt, negativePrompt, model, width, height, s
 
   const resolvedSeed = (seed != null && seed >= 0) ? seed : randomInt(0, 2 ** 32);
   const isV3 = model === 'nai-diffusion-3';
+  const isV5 = model.startsWith('nai-diffusion-5');
 
   const parameters = {
     width,
