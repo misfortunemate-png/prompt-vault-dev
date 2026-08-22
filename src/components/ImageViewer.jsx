@@ -230,6 +230,23 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
     setShowCardDialog(true);
   }, [img, detail]);
 
+  const openCharCardDialog = useCallback(async (ch) => {
+    try {
+      const data = await api.getCards();
+      setCardSlots(data.slots || []);
+      setCardSlotId(data.slots?.[0]?.id || '');
+    } catch {
+      setCardSlots([]);
+      setCardSlotId('');
+    }
+    setCardNewSlotMode(false);
+    setCardNewSlotName('');
+    setCardName('');
+    setCardPos(ch.positive || '');
+    setCardNeg(ch.negative || '');
+    setShowCardDialog(true);
+  }, []);
+
   const submitCard = useCallback(async () => {
     if (cardSaving) return;
     setCardSaving(true);
@@ -543,27 +560,62 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
                 )}
               </div>
 
-              {/* プロンプト */}
-              {d?.prompt && (
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '3px' }}>プロンプト</div>
-                  <div
-                    onClick={() => setPromptExpanded(v => !v)}
-                    style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', lineHeight: 1.5, cursor: 'pointer', ...(promptExpanded ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}
-                  >{d.prompt}</div>
-                </div>
-              )}
-
-              {/* ネガティブ */}
-              {d?.negative && (
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '3px' }}>ネガティブ</div>
-                  <div
-                    onClick={() => setNegExpanded(v => !v)}
-                    style={{ color: 'rgba(255,120,120,0.75)', fontSize: '12px', lineHeight: 1.5, cursor: 'pointer', ...(negExpanded ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}
-                  >{d.negative}</div>
-                </div>
-              )}
+              {/* プロンプト（ベース＋キャラ分離表示） */}
+              {(() => {
+                const parsed = d?.char_prompts ? (() => { try { return JSON.parse(d.char_prompts); } catch { return null; } })() : null;
+                const charData = parsed?.chars || (Array.isArray(parsed) ? parsed : null);
+                const basePrompt = charData ? (parsed.base_positive || d.prompt) : d?.prompt;
+                const baseNeg = charData ? (parsed.base_negative || d.negative) : d?.negative;
+                if (!charData) {
+                  return (
+                    <>
+                      {d?.prompt && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '3px' }}>プロンプト</div>
+                          <div onClick={() => setPromptExpanded(v => !v)} style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', lineHeight: 1.5, cursor: 'pointer', ...(promptExpanded ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>{d.prompt}</div>
+                        </div>
+                      )}
+                      {d?.negative && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '3px' }}>ネガティブ</div>
+                          <div onClick={() => setNegExpanded(v => !v)} style={{ color: 'rgba(255,120,120,0.75)', fontSize: '12px', lineHeight: 1.5, cursor: 'pointer', ...(negExpanded ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>{d.negative}</div>
+                        </div>
+                      )}
+                    </>
+                  );
+                }
+                return (
+                  <>
+                    {basePrompt && (
+                      <div style={{ marginBottom: '6px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '3px' }}>ベース</div>
+                        <div onClick={() => setPromptExpanded(v => !v)} style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', lineHeight: 1.5, cursor: 'pointer', ...(promptExpanded ? {} : { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>{basePrompt}</div>
+                      </div>
+                    )}
+                    {baseNeg && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', marginBottom: '3px' }}>ベース ネガティブ</div>
+                        <div onClick={() => setNegExpanded(v => !v)} style={{ color: 'rgba(255,120,120,0.75)', fontSize: '12px', lineHeight: 1.5, cursor: 'pointer', ...(negExpanded ? {} : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>{baseNeg}</div>
+                      </div>
+                    )}
+                    {charData.map((ch, ci) => (
+                      <div key={ci} style={{ marginBottom: '8px', paddingLeft: '8px', borderLeft: '2px solid rgba(100,180,255,0.3)' }}
+                        onContextMenu={e => { e.preventDefault(); openCharCardDialog(ch); }}
+                        onTouchStart={e => {
+                          const t = setTimeout(() => openCharCardDialog(ch), 500);
+                          e.currentTarget._lpt = t;
+                        }}
+                        onTouchEnd={e => { clearTimeout(e.currentTarget._lpt); }}
+                        onTouchMove={e => { clearTimeout(e.currentTarget._lpt); }}
+                      >
+                        <div style={{ color: 'rgba(100,180,255,0.6)', fontSize: '11px', marginBottom: '3px' }}>キャラ {ci + 1}</div>
+                        {ch.positive && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', lineHeight: 1.5 }}>{ch.positive}</div>}
+                        {ch.negative && <div style={{ color: 'rgba(255,120,120,0.75)', fontSize: '11px', lineHeight: 1.4, marginTop: '2px' }}>{ch.negative}</div>}
+                      </div>
+                    ))}
+                  </>
+                );
+              })()}
 
               {/* アクションボタン行 */}
               <div style={{ display: 'flex', gap: '8px', margin: '10px 0 8px' }} onClick={e => e.stopPropagation()}>

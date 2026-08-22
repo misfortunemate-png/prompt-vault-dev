@@ -1,5 +1,5 @@
 export function parsePngMeta(buffer) {
-  const result = { prompt: null, negative: null, seed: null, model: null, steps: null, scale: null, sampler: null, width: null, height: null };
+  const result = { prompt: null, negative: null, char_prompts: null, seed: null, model: null, steps: null, scale: null, sampler: null, width: null, height: null };
 
   if (!Buffer.isBuffer(buffer) || buffer.length < 8) return result;
   if (buffer[0] !== 0x89 || buffer[1] !== 0x50 || buffer[2] !== 0x4e || buffer[3] !== 0x47) return result;
@@ -68,24 +68,20 @@ function parseNovelAiChunk(keyword, text, result) {
       if (parsed.sampler != null) result.sampler = String(parsed.sampler);
       if (parsed.model != null) result.model = String(parsed.model);
       else if (parsed.model_name != null) result.model = String(parsed.model_name);
-      // NAI v4/4.5: キャラクタープロンプトの読み取り
-      if (parsed.v4_prompt?.caption?.char_captions?.length) {
-        const charParts = parsed.v4_prompt.caption.char_captions
-          .map(c => c.char_caption)
-          .filter(Boolean);
-        if (charParts.length) {
-          const base = parsed.v4_prompt.caption.base_caption || result.prompt || '';
-          result.prompt = [base, ...charParts].filter(Boolean).join(', ');
+      // NAI v4/4.5/5: キャラクタープロンプトの読み取り
+      const posChars = parsed.v4_prompt?.caption?.char_captions || [];
+      const negChars = parsed.v4_negative_prompt?.caption?.char_captions || [];
+      if (posChars.length) {
+        const base = parsed.v4_prompt.caption.base_caption || result.prompt || '';
+        result.prompt = base || null;
+        if (parsed.v4_negative_prompt?.caption?.base_caption != null) {
+          result.negative = parsed.v4_negative_prompt.caption.base_caption || null;
         }
-      }
-      if (parsed.v4_negative_prompt?.caption?.char_captions?.length) {
-        const charNegParts = parsed.v4_negative_prompt.caption.char_captions
-          .map(c => c.char_caption)
-          .filter(Boolean);
-        if (charNegParts.length) {
-          const baseNeg = parsed.v4_negative_prompt.caption.base_caption || result.negative || '';
-          result.negative = [baseNeg, ...charNegParts].filter(Boolean).join(', ');
-        }
+        result.char_prompts = posChars.map((c, i) => ({
+          positive: c.char_caption || '',
+          negative: negChars[i]?.char_caption || '',
+        })).filter(c => c.positive || c.negative);
+        if (!result.char_prompts.length) result.char_prompts = null;
       }
     } catch {}
   }

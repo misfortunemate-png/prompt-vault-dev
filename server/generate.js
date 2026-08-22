@@ -52,6 +52,10 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
     const buf = readFileSync(destPath);
     hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
     const meta = parsePngMeta(buf);
+    const charJson = meta.char_prompts ? JSON.stringify({ base_positive: meta.prompt || '', base_negative: meta.negative || '', chars: meta.char_prompts }) : null;
+    const searchPrompt = meta.char_prompts
+      ? [meta.prompt, ...meta.char_prompts.map(c => c.positive)].filter(Boolean).join(', ')
+      : meta.prompt;
     const st = statSync(destPath);
     const now = new Date().toISOString();
     upsertImage({
@@ -64,8 +68,9 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
       modified_at: new Date(st.mtimeMs).toISOString(),
       width: meta.width ?? null,
       height: meta.height ?? null,
-      prompt: meta.prompt ?? null,
+      prompt: searchPrompt ?? null,
       negative: meta.negative ?? null,
+      char_prompts: charJson,
       seed: meta.seed ?? (seed != null ? Number(seed) : null),
       model: meta.model ?? null,
       steps: meta.steps ?? null,

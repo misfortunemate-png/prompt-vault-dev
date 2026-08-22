@@ -86,6 +86,10 @@ export async function startScan(vaultRoot) {
         const now = new Date().toISOString();
 
         const meta = parsePngMeta(buf);
+        const charJson = meta.char_prompts ? JSON.stringify({ base_positive: meta.prompt || '', base_negative: meta.negative || '', chars: meta.char_prompts }) : null;
+        const searchPrompt = meta.char_prompts
+          ? [meta.prompt, ...meta.char_prompts.map(c => c.positive)].filter(Boolean).join(', ')
+          : meta.prompt;
 
         if (!existing) {
           upsertImage({
@@ -98,8 +102,9 @@ export async function startScan(vaultRoot) {
             modified_at: new Date(fileStat.mtimeMs).toISOString(),
             width: meta.width ?? null,
             height: meta.height ?? null,
-            prompt: meta.prompt ?? null,
+            prompt: searchPrompt ?? null,
             negative: meta.negative ?? null,
+            char_prompts: charJson,
             seed: meta.seed ?? null,
             model: meta.model ?? null,
             steps: meta.steps ?? null,
@@ -121,8 +126,9 @@ export async function startScan(vaultRoot) {
             filename,
             folder,
             modified_at: new Date(fileStat.mtimeMs).toISOString(),
-            prompt: meta.prompt ?? existing.prompt,
+            prompt: searchPrompt ?? existing.prompt,
             negative: meta.negative ?? existing.negative,
+            char_prompts: charJson ?? existing.char_prompts ?? null,
             seed: meta.seed ?? existing.seed,
             model: meta.model ?? existing.model,
             steps: meta.steps ?? existing.steps,

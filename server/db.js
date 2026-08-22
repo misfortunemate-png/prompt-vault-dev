@@ -42,6 +42,7 @@ function getDb() {
       CREATE INDEX IF NOT EXISTS idx_favorite ON images(favorite);
     `);
     try { db.exec('ALTER TABLE images ADD COLUMN caption_config TEXT'); } catch {}
+    try { db.exec('ALTER TABLE images ADD COLUMN char_prompts TEXT'); } catch {}
   }
   return db;
 }
@@ -51,12 +52,13 @@ export function getByHash(hash) {
 }
 
 export function upsertImage(row) {
+  const r = { char_prompts: null, ...row };
   getDb().prepare(`
     INSERT INTO images (hash, rel_path, filename, folder, size_bytes, created_at, modified_at,
-      width, height, prompt, negative, seed, model, steps, scale, sampler, preset_id,
+      width, height, prompt, negative, char_prompts, seed, model, steps, scale, sampler, preset_id,
       favorite, caption, thumb_ok, indexed_at)
     VALUES (@hash, @rel_path, @filename, @folder, @size_bytes, @created_at, @modified_at,
-      @width, @height, @prompt, @negative, @seed, @model, @steps, @scale, @sampler, @preset_id,
+      @width, @height, @prompt, @negative, @char_prompts, @seed, @model, @steps, @scale, @sampler, @preset_id,
       @favorite, @caption, @thumb_ok, @indexed_at)
     ON CONFLICT(hash) DO UPDATE SET
       rel_path    = excluded.rel_path,
@@ -68,6 +70,7 @@ export function upsertImage(row) {
       height      = COALESCE(excluded.height, images.height),
       prompt      = COALESCE(excluded.prompt, images.prompt),
       negative    = COALESCE(excluded.negative, images.negative),
+      char_prompts = COALESCE(excluded.char_prompts, images.char_prompts),
       seed        = COALESCE(excluded.seed, images.seed),
       model       = COALESCE(excluded.model, images.model),
       steps       = COALESCE(excluded.steps, images.steps),
@@ -75,7 +78,7 @@ export function upsertImage(row) {
       sampler     = COALESCE(excluded.sampler, images.sampler),
       preset_id   = COALESCE(excluded.preset_id, images.preset_id),
       indexed_at  = excluded.indexed_at
-  `).run(row);
+  `).run(r);
 }
 
 export function deleteByHash(hash) {
