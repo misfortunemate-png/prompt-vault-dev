@@ -1,10 +1,22 @@
-const BASE = '/api';
+import { getConnection } from './connection.js';
 
 async function request(path, opts = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-  });
+  const conn = getConnection();
+  let base;
+  if (conn.route === 'fran') {
+    base = conn.franUrl;
+  } else if (conn.route === 'cloud') {
+    base = conn.cloudUrl;
+  } else {
+    throw new Error('サーバーに接続できません');
+  }
+
+  const headers = { 'Content-Type': 'application/json', ...opts.headers };
+  if (conn.route === 'cloud' && conn.token) {
+    headers['Authorization'] = `Bearer ${conn.token}`;
+  }
+
+  const res = await fetch(`${base}${path}`, { ...opts, headers });
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
   return res.json();
 }

@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
 import { FONT_REGISTRY, DISPLAY_DEFAULTS } from '../App';
+import {
+  getConnection, checkReachability, switchRoute, clearManual, updateSettings, getTimeoutSetting,
+} from '../lib/connection';
+import {
+  hasVaultKey, getVaultKey, setVaultKey, clearVaultKey, generateVaultKey,
+} from '../lib/crypto';
 
 const SAMPLER_OPTIONS = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2m_sde'];
 
@@ -76,14 +82,45 @@ function SelectRow({ label, value, options, onChange }) {
   );
 }
 
-export default function SettingsScreen({ onClose, addToast, displaySettings, updateDisplay }) {
+const LS_SELECTION_KEY = 'pv-selection-rules';
+const SELECTION_DEFAULTS = { days: 30, includeFavorites: true, r2LimitMb: 5120 };
+
+function loadSelectionRules() {
+  try {
+    const v = localStorage.getItem(LS_SELECTION_KEY);
+    return v ? { ...SELECTION_DEFAULTS, ...JSON.parse(v) } : { ...SELECTION_DEFAULTS };
+  } catch { return { ...SELECTION_DEFAULTS }; }
+}
+
+function saveSelectionRules(rules) {
+  try { localStorage.setItem(LS_SELECTION_KEY, JSON.stringify(rules)); } catch {}
+}
+
+export default function SettingsScreen({ onClose, addToast, displaySettings, updateDisplay, connectionState, onConnectionChange, debugInitialOpen }) {
   const [gen, setGen] = useState(null);
   const [guard, setGuard] = useState(null);
   const [captionStyle, setCaptionStyle] = useState(null);
   const [systemInfo, setSystemInfo] = useState(null);
-  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(!!debugInitialOpen);
   const [version, setVersion] = useState('');
   const [errors, setErrors] = useState([]);
+
+  // 接続設定
+  const [conn, setConn] = useState(() => connectionState ?? getConnection());
+  const [timeoutMs, setTimeoutMs] = useState(() => getTimeoutSetting());
+  const [connChecking, setConnChecking] = useState(false);
+
+  // 選定則
+  const [selection, setSelection] = useState(loadSelectionRules);
+
+  // vault鍵管理
+  const [vaultKeyId, setVaultKeyId] = useState(() => {
+    if (!hasVaultKey()) return null;
+    try { return JSON.parse(localStorage.getItem('pv-vault-key'))?.id ?? null; } catch { return null; }
+  });
+  const [vaultExportVal, setVaultExportVal] = useState('');
+  const [vaultImportVal, setVaultImportVal] = useState('');
+  const [vaultGenResult, setVaultGenResult] = useState(null);
 
   useEffect(() => {
     api.getSettings().then(s => {
@@ -114,6 +151,96 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
       addToast('error', '設定の保存に失敗しました');
     }
   };
+
+  // 接続設定が変わるたびにlocalStorageへ即時書込み
+  const handleConnSettingChange = useCallback((patch) => {
+    const next = { ...conn, ...patch };
+    setConn(next);
+    const updated = updateSettings({
+      franUrl: next.franUrl,
+      cloudUrl: next.cloudUrl,
+      token: next.token,
+    });
+    if (onConnectionChange) onConnectionChange(updated);
+  }, [conn, onConnectionChange]);
+
+  const handleTimeoutChange = useCallback((val) => {
+    setTimeoutMs(val);
+    updateSettings({ timeoutMs: val });
+  }, []);
+
+  const handleRecheck = useCallback(async () => {
+    setConnChecking(true);
+    try {
+      const result = await checkReachability();
+      setConn(result);
+      if (onConnectionChange) onConnectionChange(result);
+      const label = result.route === 'fran' ? 'Fran' : result.route === 'cloud' ? 'Cloud' : '未接続';
+      addToast(result.route !== 'offline' ? 'success' : 'error', `接続先: ${label}`);
+    } catch {
+      addToast('error', '再接続に失敗しました');
+    } finally {
+      setConnChecking(false);
+    }
+  }, [addToast, onConnectionChange]);
+
+  const handleSwitch = useCallback((target) => {
+    const result = switchRoute(target);
+    setConn(result);
+    if (onConnectionChange) onConnectionChange(result);
+  }, [onConnectionChange]);
+
+  const handleClearManual = useCallback(async () => {
+    setConnChecking(true);
+    try {
+      const result = await clearManual();
+      setConn(result);
+      if (onConnectionChange) onConnectionChange(result);
+    } finally {
+      setConnChecking(false);
+    }
+  }, [onConnectionChange]);
+
+  const handleFranUrlReset = useCallback(() => {
+    handleConnSettingChange({ franUrl: 'https://fraine.tail204746.ts.net/api' });
+  }, [handleConnSettingChange]);
+
+  // vault鍵ハンドラー
+  const handleGenKey = useCallback(async () => {
+    const result = await generateVaultKey();
+    setVaultKeyId(result.id);
+    setVaultGenResult(result.raw);
+    addToast('success', 'vault鍵を生成しました');
+  }, [addToast]);
+
+  const handleExportKey = useCallback(async () => {
+    const key = await getVaultKey();
+    if (!key) { addToast('error', 'vault鍵が設定されていません'); return; }
+    try {
+      const rec = JSON.parse(localStorage.getItem('pv-vault-key'));
+      setVaultExportVal(rec.raw);
+    } catch { addToast('error', 'エクスポートに失敗しました'); }
+  }, [addToast]);
+
+  const handleImportKey = useCallback(() => {
+    const val = vaultImportVal.trim();
+    if (!val) { addToast('error', 'base64文字列を入力してください'); return; }
+    try {
+      setVaultKey(val);
+      setVaultKeyId('vault:v1');
+      setVaultImportVal('');
+      addToast('success', 'vault鍵をインポートしました');
+    } catch { addToast('error', 'インポートに失敗しました'); }
+  }, [addToast, vaultImportVal]);
+
+  const handleDeleteKey = useCallback(() => {
+    if (!confirm('vault鍵を削除しますか？削除後は暗号化済みデータを復号できなくなります')) return;
+    clearVaultKey();
+    setVaultKeyId(null);
+    setVaultExportVal('');
+    setVaultGenResult(null);
+    addToast('success', 'vault鍵を削除しました');
+  }, [addToast]);
 
   const loadDebug = useCallback(async () => {
     try {
@@ -510,7 +637,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
           }}
         >保存</button>
 
-        {/* §4.6 デバッグ */}
+        {/* §4.6 デバッグ・接続 */}
         <div style={sectionStyle}>
           <button
             onClick={() => setDebugOpen(!debugOpen)}
@@ -524,10 +651,76 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
               width: '100%',
               textAlign: 'left',
             }}
-          >{debugOpen ? '▼' : '▶'} デバッグ</button>
+          >{debugOpen ? '▼' : '▶'} デバッグ・接続</button>
 
           {debugOpen && (
             <div style={{ marginTop: '12px' }}>
+              {/* 接続経路ボックス */}
+              <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius-s)', padding: '12px', marginBottom: '12px' }}>
+                <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '6px' }}>現在の接続先</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{
+                    width: '8px', height: '8px', borderRadius: '50', flexShrink: 0,
+                    background: conn.route === 'fran' ? '#22c55e' : conn.route === 'cloud' ? '#ef4444' : '#9ca3af',
+                  }} />
+                  <span style={{ fontSize: 'var(--fs-body)', fontWeight: 500 }}>
+                    {conn.route === 'fran' ? 'Fran' : conn.route === 'cloud' ? 'Cloud' : '未接続'}
+                  </span>
+                  <span style={{
+                    fontSize: '10px', padding: '1px 6px', borderRadius: '8px',
+                    background: 'var(--code-bg)', color: 'var(--text-secondary)', marginLeft: 'auto',
+                  }}>
+                    {conn.route === 'fran' ? '全機能' : conn.route === 'cloud' ? '縮退' : '—'}
+                  </span>
+                </div>
+                {conn.route !== 'offline' && (
+                  <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
+                    {conn.route === 'fran' ? conn.franUrl : conn.cloudUrl}
+                  </div>
+                )}
+                {conn.lastCheck && (
+                  <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    最終確認: {new Date(conn.lastCheck).toLocaleString('ja-JP')}
+                  </div>
+                )}
+                {conn.manual && (
+                  <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: '4px' }}>手動固定中</div>
+                )}
+              </div>
+
+              {/* 操作ボタン2列 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                <button onClick={handleRecheck} disabled={connChecking} style={debugBtnStyle}>
+                  🔄 再接続
+                </button>
+                {conn.manual ? (
+                  <button onClick={handleClearManual} disabled={connChecking} style={debugBtnStyle}>
+                    🔓 手動解除
+                  </button>
+                ) : conn.route === 'fran' ? (
+                  <button onClick={() => handleSwitch('cloud')} style={debugBtnStyle}>
+                    🔀 Cloudへ切替
+                  </button>
+                ) : (
+                  <button onClick={() => handleSwitch('fran')} style={debugBtnStyle}>
+                    🔀 Franへ切替
+                  </button>
+                )}
+              </div>
+
+              {/* クラウド状態ボックス */}
+              {conn.cloudUrl ? (
+                conn.route === 'cloud' && (
+                  <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius-s)', padding: '10px', marginBottom: '12px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
+                    Cloud URL: {conn.cloudUrl}
+                  </div>
+                )
+              ) : (
+                <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                  クラウドURLが未設定です
+                </div>
+              )}
+
               <div style={{ marginBottom: '12px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
                 バージョン: {version || '取得中...'}
               </div>
@@ -544,6 +737,20 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
                 </button>
                 <button onClick={handleTestFs} style={debugBtnStyle}>
                   FS書込テスト
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch((conn.cloudUrl || '') + '/healthz');
+                      const data = await res.json();
+                      addToast('success', `R2/DO疎通OK: ${data.status || 'ok'}`);
+                    } catch (e) {
+                      addToast('error', `R2/DO疎通失敗: ${e.message}`);
+                    }
+                  }}
+                  style={debugBtnStyle}
+                >
+                  R2/DO疎通
                 </button>
               </div>
 
@@ -573,6 +780,158 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
               </div>
             </div>
           )}
+        </div>
+
+        {/* 接続設定 */}
+        <div style={sectionStyle}>
+          <h3 style={{ fontSize: 'var(--fs-title)', marginBottom: '12px' }}>接続設定</h3>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>フランURL</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                value={conn.franUrl}
+                onChange={e => handleConnSettingChange({ franUrl: e.target.value })}
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button onClick={handleFranUrlReset} style={{ ...debugBtnStyle, padding: '8px 10px', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                リセット
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>クラウドURL（空欄でクラウド経路無効）</label>
+            <input
+              type="text"
+              value={conn.cloudUrl}
+              onChange={e => handleConnSettingChange({ cloudUrl: e.target.value })}
+              style={inputStyle}
+              placeholder="https://..."
+            />
+          </div>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>認証トークン</label>
+            <input
+              type="password"
+              value={conn.token}
+              onChange={e => handleConnSettingChange({ token: e.target.value })}
+              style={inputStyle}
+              placeholder="Bearer トークン"
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={labelStyle}>到達確認タイムアウト (ms)</label>
+            <input
+              type="number"
+              value={timeoutMs}
+              min={500}
+              max={30000}
+              onChange={e => handleTimeoutChange(Number(e.target.value))}
+              style={inputStyle}
+            />
+          </div>
+
+          {/* vault鍵管理 */}
+          <div style={{ borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
+            <h4 style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px' }}>vault鍵</h4>
+            <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+              状態: {vaultKeyId ? `設定済み（${vaultKeyId}）` : '未設定'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+              <button onClick={handleGenKey} style={debugBtnStyle}>新規生成</button>
+              <button onClick={handleExportKey} style={debugBtnStyle}>エクスポート</button>
+            </div>
+            {vaultGenResult && (
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '4px' }}>生成されたbase64鍵（保存してください）:</div>
+                <div style={{ background: 'var(--bg)', padding: '8px', borderRadius: 'var(--radius-s)', fontSize: '10px', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                  {vaultGenResult}
+                </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(vaultGenResult).then(() => addToast('success', 'コピーしました'))}
+                  style={{ ...debugBtnStyle, width: '100%', marginTop: '6px', fontSize: '11px' }}
+                >コピー</button>
+              </div>
+            )}
+            {vaultExportVal && (
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '4px' }}>現在のvault鍵:</div>
+                <div style={{ background: 'var(--bg)', padding: '8px', borderRadius: 'var(--radius-s)', fontSize: '10px', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                  {vaultExportVal}
+                </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(vaultExportVal).then(() => addToast('success', 'コピーしました'))}
+                  style={{ ...debugBtnStyle, width: '100%', marginTop: '6px', fontSize: '11px' }}
+                >コピー</button>
+              </div>
+            )}
+            <div style={{ marginBottom: '8px' }}>
+              <label style={labelStyle}>インポート（base64）</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={vaultImportVal}
+                  onChange={e => setVaultImportVal(e.target.value)}
+                  style={{ ...inputStyle, flex: 1, fontSize: '11px' }}
+                  placeholder="base64文字列を貼り付け"
+                />
+                <button onClick={handleImportKey} style={{ ...debugBtnStyle, padding: '8px 10px', fontSize: '11px', whiteSpace: 'nowrap' }}>
+                  読込
+                </button>
+              </div>
+            </div>
+            {vaultKeyId && (
+              <button onClick={handleDeleteKey} style={{ ...debugBtnStyle, width: '100%', color: '#c0392b' }}>
+                vault鍵を削除
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 選定則 */}
+        <div style={sectionStyle}>
+          <h3 style={{ fontSize: 'var(--fs-title)', marginBottom: '12px' }}>選定則</h3>
+          <SliderRow
+            label="日数"
+            value={selection.days}
+            min={7} max={90} step={1}
+            suffix="日"
+            onChange={v => {
+              const next = { ...selection, days: v };
+              setSelection(next);
+              saveSelectionRules(next);
+            }}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '12px' }}>
+            <input
+              type="checkbox"
+              checked={selection.includeFavorites}
+              onChange={e => {
+                const next = { ...selection, includeFavorites: e.target.checked };
+                setSelection(next);
+                saveSelectionRules(next);
+              }}
+            />
+            <span style={{ fontSize: 'var(--fs-label)', color: 'var(--text-primary)' }}>お気に入りを含める</span>
+          </label>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>R2上限 (MB)</label>
+            <input
+              type="number"
+              value={selection.r2LimitMb}
+              min={100}
+              onChange={e => {
+                const next = { ...selection, r2LimitMb: Number(e.target.value) };
+                setSelection(next);
+                saveSelectionRules(next);
+              }}
+              style={inputStyle}
+            />
+          </div>
         </div>
       </div>
     </div>

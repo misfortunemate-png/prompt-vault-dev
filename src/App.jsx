@@ -7,6 +7,7 @@ import AlbumScreen from './screens/AlbumScreen';
 import TemplateScreen from './screens/TemplateScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { api } from './lib/api';
+import { getConnection, checkReachability, initVisibilityCheck, destroyVisibilityCheck } from './lib/connection';
 
 const DISPLAY_KEY = 'pv-display-settings';
 
@@ -91,10 +92,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('generate');
   const [resetKey, setResetKey] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [debugInitialOpen, setDebugInitialOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [displaySettings, setDisplaySettings] = useState(loadDisplaySettings);
   const [results, setResults] = useState([]);
   const [maxResults, setMaxResults] = useState(5);
+  const [connectionState, setConnectionState] = useState(() => getConnection());
 
   const handleTabChange = useCallback((tab) => {
     if (tab === activeTab) {
@@ -112,6 +115,14 @@ export default function App() {
     api.getSettings().then(s => {
       if (s.generation?.maxResults) setMaxResults(s.generation.maxResults);
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    checkReachability().then(setConnectionState).catch(() => {});
+    initVisibilityCheck(() => {
+      checkReachability().then(setConnectionState).catch(() => {});
+    });
+    return () => destroyVisibilityCheck();
   }, []);
 
   const addToast = useCallback((type, message) => {
@@ -148,16 +159,24 @@ export default function App() {
 
   return (
     <>
-      <Header activeTab={activeTab} onOpenSettings={() => setSettingsOpen(true)} />
+      <Header
+        activeTab={activeTab}
+        onOpenSettings={() => { setDebugInitialOpen(false); setSettingsOpen(true); }}
+        onLampClick={() => { setDebugInitialOpen(true); setSettingsOpen(true); }}
+        connectionState={connectionState}
+      />
       {mainContent}
       <Footer activeTab={activeTab} onTabChange={handleTabChange} />
       <Toast toasts={toasts} removeToast={removeToast} />
       {settingsOpen && (
         <SettingsScreen
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => { setSettingsOpen(false); setDebugInitialOpen(false); }}
           addToast={addToast}
           displaySettings={displaySettings}
           updateDisplay={updateDisplay}
+          connectionState={connectionState}
+          onConnectionChange={setConnectionState}
+          debugInitialOpen={debugInitialOpen}
         />
       )}
     </>
