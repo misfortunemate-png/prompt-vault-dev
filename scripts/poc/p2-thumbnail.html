@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoC P-2: 端末サムネイル生成</title>
+<style>
+  body { font-family: monospace; background: #111; color: #eee; padding: 16px; max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1rem; margin-bottom: 16px; color: #adf; }
+  label { display: block; margin-bottom: 8px; }
+  input[type=file] { color: #eee; }
+  #metrics { margin-top: 16px; border-collapse: collapse; width: 100%; }
+  #metrics th, #metrics td { border: 1px solid #444; padding: 6px 10px; text-align: left; }
+  #metrics th { background: #222; color: #adf; }
+  #metrics td { background: #1a1a1a; }
+  #preview { margin-top: 16px; }
+  #preview img { max-width: 320px; border: 1px solid #444; display: block; }
+  #status { margin-top: 8px; color: #8f8; min-height: 1.2em; }
+  #err { color: #f88; margin-top: 8px; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<h1>PoC P-2: 端末サムネイル生成（canvas → WebP → AES-256-GCM）</h1>
+
+<label>PNG画像を選択:
+  <input type="file" id="fileInput" accept="image/png">
+</label>
+
+<div id="status"></div>
+<div id="err"></div>
+
+<table id="metrics" style="display:none">
+  <thead><tr><th>項目</th><th>値</th></tr></thead>
+  <tbody id="metricsBody"></tbody>
+</table>
+
+<div id="preview"></div>
+<canvas id="canvas" style="display:none"></canvas>
+
+<script>
+const MAX_WIDTH = 320;
+
+function status(msg) { document.getElementById('status').textContent = msg; }
+function showError(msg) { document.getElementById('err').textContent = '❌ ' + msg; }
+
+function setMetrics(rows) {
+  const tbody = document.getElementById('metricsBody');
+  tbody.innerHTML = '';
+  for (const [k, v] of rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${k}</td><td>${v}</td>`;
+    tbody.appendChild(tr);
+  }
+  document.getElementById('metrics').style.display = '';
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('err').textContent = '';
+  document.getElementById('preview').innerHTML = '';
+  document.getElementById('metrics').style.display = 'none';
+
+  const totalStart = performance.now();
+
+  try {
+    // 1. ファイル読み込み
+    const inputBytes = file.size;
+    status('画像読み込み中...');
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+    URL.revokeObjectURL(url);
+
+    // 2. canvas 描画
+    const drawStart = performance.now();
+    const canvas = document.getElementById('canvas');
+    const scale = Math.min(1, MAX_WIDTH / img.naturalWidth);
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const drawMs = performance.now() - drawStart;
+    status('WebP変換中...');
+
+    // 3. WebP 変換
+    const webpStart = performance.now();
+    const webpBlob = await new Promise(res => canvas.toBlob(res, 'image/webp', 0.8));
+    const webpMs = performance.now() - webpStart;
+    const webpBytes = webpBlob.size;
+    const webpAb = await webpBlob.arrayBuffer();
+    status('暗号化中...');
+
+    // 4. AES-256-GCM 暗号化
+    const key = await crypto.subtle.generateKey(
+      { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
+    );
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encStart = performance.now();
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, webpAb);
+    const encMs = performance.now() - encStart;
+    status('復号中...');
+
+    // 5. 復号 & 表示
+    const decStart = performance.now();
+    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+    const decMs = performance.now() - decStart;
+
+    const totalMs = performance.now() - totalStart;
+
+    // 表示
+    const decBlob = new Blob([decrypted], { type: 'image/webp' });
+    const decUrl = URL.createObjectURL(decBlob);
+    const previewEl = document.getElementById('preview');
+    previewEl.innerHTML = '<p style="color:#adf;margin:8px 0 4px">復号結果プレビュー:</p>';
+    const previewImg = document.createElement('img');
+    previewImg.src = decUrl;
+    previewEl.appendChild(previewImg);
+
+    setMetrics([
+      ['入力PNGサイズ', `${(inputBytes / 1024).toFixed(1)} KB (${inputBytes} bytes)`],
+      ['canvas サイズ', `${canvas.width} × ${canvas.height} px`],
+      ['canvas 描画時間', `${drawMs.toFixed(2)} ms`],
+      ['WebP変換時間', `${webpMs.toFixed(2)} ms`],
+      ['WebPサイズ', `${(webpBytes / 1024).toFixed(1)} KB (${webpBytes} bytes)`],
+      ['暗号化時間 (AES-GCM)', `${encMs.toFixed(2)} ms`],
+      ['復号時間 (AES-GCM)', `${decMs.toFixed(2)} ms`],
+      ['合計処理時間', `${totalMs.toFixed(2)} ms`],
+    ]);
+
+    status('✅ 完了');
+  } catch (err) {
+    showError(err.message);
+    status('');
+  }
+});
+</script>
+</body>
+</html>

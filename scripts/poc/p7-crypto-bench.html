@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoC P-7: 暗号化・復号バッチ性能</title>
+<style>
+  body { font-family: monospace; background: #111; color: #eee; padding: 16px; max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1rem; margin-bottom: 8px; color: #adf; }
+  p { color: #aaa; font-size: 0.85rem; margin: 0 0 16px; }
+  #status { color: #ff8; margin-bottom: 12px; min-height: 1.2em; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+  th, td { border: 1px solid #444; padding: 6px 10px; text-align: right; }
+  th { background: #222; color: #adf; text-align: center; }
+  td:first-child { text-align: left; }
+  .ok { color: #8f8; }
+  .ng { color: #f88; }
+  #estimate { background: #1a2a1a; border: 1px solid #4a8; padding: 12px; border-radius: 4px; margin-top: 8px; color: #cf9; }
+</style>
+</head>
+<body>
+<h1>PoC P-7: AES-256-GCM 暗号化・復号バッチ性能</h1>
+<p>ページ読み込み時に自動実行。ランダムデータで計測します。</p>
+<div id="status">計測準備中...</div>
+<table id="results" style="display:none">
+  <thead>
+    <tr>
+      <th>パターン</th>
+      <th>件数</th>
+      <th>1件あたり暗号化 (ms)</th>
+      <th>1件あたり復号 (ms)</th>
+      <th>合計時間 (ms)</th>
+      <th>round_trip_match</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"></tbody>
+</table>
+<div id="estimate" style="display:none"></div>
+
+<script>
+function status(msg) { document.getElementById('status').textContent = msg; }
+
+function randomBytes(n) {
+  const buf = new Uint8Array(n);
+  crypto.getRandomValues(buf);
+  return buf;
+}
+
+async function benchPattern(label, sizeBytes, count) {
+  const key = await crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
+  );
+
+  let totalEncMs = 0;
+  let totalDecMs = 0;
+  let allMatch = true;
+
+  for (let i = 0; i < count; i++) {
+    const data = randomBytes(sizeBytes);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    const t0 = performance.now();
+    const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+    totalEncMs += performance.now() - t0;
+
+    const t1 = performance.now();
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
+    totalDecMs += performance.now() - t1;
+
+    // 一致確認（最初の1件のみ、全件だと時間がかかる）
+    if (i === 0) {
+      const a = new Uint8Array(plain);
+      if (a.length !== data.length || !a.every((b, j) => b === data[j])) allMatch = false;
+    }
+  }
+
+  return {
+    label,
+    count,
+    encPerItem: totalEncMs / count,
+    decPerItem: totalDecMs / count,
+    totalMs: totalEncMs + totalDecMs,
+    match: allMatch,
+  };
+}
+
+async function run() {
+  const patterns = [
+    { label: '大サイズ (1.5MB × 1回)', size: 1.5 * 1024 * 1024, count: 1 },
+    { label: '小サイズバッチ (50KB × 50回)', size: 50 * 1024, count: 50 },
+    { label: '極小バッチ (5KB × 100回)', size: 5 * 1024, count: 100 },
+  ];
+
+  const tbody = document.getElementById('tbody');
+  const results = [];
+
+  for (const p of patterns) {
+    status(`計測中: ${p.label}...`);
+    const r = await benchPattern(p.label, p.size, p.count);
+    results.push(r);
+
+    const tr = document.createElement('tr');
+    const matchClass = r.match ? 'ok' : 'ng';
+    tr.innerHTML = `
+      <td>${r.label}</td>
+      <td style="text-align:center">${r.count}</td>
+      <td>${r.encPerItem.toFixed(2)}</td>
+      <td>${r.decPerItem.toFixed(2)}</td>
+      <td>${r.totalMs.toFixed(1)}</td>
+      <td class="${matchClass}" style="text-align:center">${r.match}</td>
+    `;
+    tbody.appendChild(tr);
+    document.getElementById('results').style.display = '';
+  }
+
+  // Pixel 10 サムネイル50枚見積もり
+  const thumbPattern = results.find(r => r.label.includes('50KB'));
+  const estimateEl = document.getElementById('estimate');
+  if (thumbPattern) {
+    const est = thumbPattern.totalMs;
+    estimateEl.textContent =
+      `Pixel 10で50枚のサムネイル表示（AES-GCM復号のみ）は約 ${est.toFixed(0)} ms の見積もり`;
+    estimateEl.style.display = '';
+  }
+
+  status('✅ 計測完了');
+}
+
+run().catch(e => { status('❌ ' + e.message); });
+</script>
+</body>
+</html>
