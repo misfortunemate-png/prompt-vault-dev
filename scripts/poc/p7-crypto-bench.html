@@ -42,7 +42,10 @@ function status(msg) { document.getElementById('status').textContent = msg; }
 
 function randomBytes(n) {
   const buf = new Uint8Array(n);
-  crypto.getRandomValues(buf);
+  const CHUNK = 65536;
+  for (let offset = 0; offset < n; offset += CHUNK) {
+    crypto.getRandomValues(buf.subarray(offset, Math.min(offset + CHUNK, n)));
+  }
   return buf;
 }
 
