@@ -118,3 +118,9 @@ function _handleVisibility() {
   const state = getConnection();
   if (!state.manual && _onRecheck) _onRecheck();
 }
+
+export function resolveApiUrl(path) {
+  const conn = getConnection();
+  if (conn.route === 'cloud') return conn.cloudUrl + path;
+  return conn.franUrl + path;
+}

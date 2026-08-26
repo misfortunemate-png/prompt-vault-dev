@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 import ImageViewer from '../components/ImageViewer';
+import { getConnection } from '../lib/connection';
+import { decrypt } from '../lib/crypto';
 
 function findNextSibling(tree, targetPath) {
   function search(nodes) {
@@ -36,12 +38,46 @@ function Placeholder() {
 }
 
 function ThumbCell({ image, onClick, isFavorite, showFolder }) {
+  const conn = getConnection();
+  const isCloud = conn.route === 'cloud';
+  const [blobUrl, setBlobUrl] = useState(null);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!isCloud || !image.thumb_ok || !image.thumbUrl) return;
+    let url = null;
+    let cancelled = false;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      obs.disconnect();
+      const fullUrl = conn.cloudUrl + image.thumbUrl;
+      const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+      fetch(fullUrl, { headers })
+        .then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+        .then(buf => decrypt(buf))
+        .then(plain => {
+          if (cancelled) return;
+          url = URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
+          setBlobUrl(url);
+        })
+        .catch(() => {});
+    }, { rootMargin: '200px' });
+    if (rootRef.current) obs.observe(rootRef.current);
+    return () => {
+      cancelled = true;
+      obs.disconnect();
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [isCloud, image.thumbUrl, image.thumb_ok, conn.cloudUrl, conn.token]);
+
+  const imgSrc = isCloud ? blobUrl : image.thumbUrl;
+
   return (
-    <div onClick={onClick} style={{ cursor: 'pointer', position: 'relative' }}>
+    <div ref={rootRef} onClick={onClick} style={{ cursor: 'pointer', position: 'relative' }}>
       <div style={{ aspectRatio: '1/1', overflow: 'hidden', background: 'var(--line)' }}>
-        {image.thumb_ok ? (
+        {image.thumb_ok && imgSrc ? (
           <img
-            src={image.thumbUrl}
+            src={imgSrc}
             alt=""
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             loading="lazy"

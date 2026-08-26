@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { api } from '../lib/api';
+import { getConnection } from '../lib/connection';
+import { decrypt } from '../lib/crypto';
 
 const FONT_SIZE_MAP = { small: '14px', medium: '20px', large: '28px' };
 const DEFAULT_CAPTION_CFG = { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true, x: 50, y: 20 };
@@ -54,20 +56,63 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
     setShowDeleteConfirm(false);
   }, [idx]);
 
-  // #1: thumbnail-first + preload
+  // #1: thumbnail-first + preload (フラン/クラウド 経路分岐)
   useEffect(() => {
     if (!img) return;
-    setDisplaySrc(`/api/thumbs/${img.hash}.webp`);
-    setImgLoading(true);
-    const fullUrl = `/api/images/full/${img.hash}`;
-    const loader = new Image();
-    loader.onload = () => { setDisplaySrc(fullUrl); setImgLoading(false); };
-    loader.src = fullUrl;
-    return () => { loader.onload = null; };
+    const conn = getConnection();
+    let cancelled = false;
+    const blobsToRevoke = [];
+
+    if (conn.route === 'cloud') {
+      setImgLoading(true);
+      const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+      // thumb先行
+      const thumbUrl = conn.cloudUrl + `/thumbs/${img.hash}`;
+      fetch(thumbUrl, { headers })
+        .then(r => r.ok ? r.arrayBuffer() : null)
+        .then(buf => buf ? decrypt(buf) : null)
+        .then(plain => {
+          if (cancelled || !plain) return;
+          const url = URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
+          blobsToRevoke.push(url);
+          setDisplaySrc(url);
+          // full image
+          return fetch(conn.cloudUrl + `/gallery/image/${img.hash}/data`, { headers });
+        })
+        .then(r => r && r.ok ? r.arrayBuffer() : null)
+        .then(buf => buf ? decrypt(buf) : null)
+        .then(plain => {
+          if (cancelled || !plain) return;
+          const url = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
+          blobsToRevoke.push(url);
+          setDisplaySrc(url);
+          setImgLoading(false);
+        })
+        .catch(() => { if (!cancelled) setImgLoading(false); });
+    } else {
+      setDisplaySrc(`/api/thumbs/${img.hash}.webp`);
+      setImgLoading(true);
+      const fullUrl = `/api/images/full/${img.hash}`;
+      const loader = new Image();
+      loader.onload = () => { if (!cancelled) { setDisplaySrc(fullUrl); setImgLoading(false); } };
+      loader.src = fullUrl;
+      return () => {
+        cancelled = true;
+        loader.onload = null;
+        blobsToRevoke.forEach(u => URL.revokeObjectURL(u));
+      };
+    }
+
+    return () => {
+      cancelled = true;
+      blobsToRevoke.forEach(u => URL.revokeObjectURL(u));
+    };
   }, [img?.hash]);
 
-  // #1: adjacent preload
+  // #1: adjacent preload (フラン経路のみ)
   useEffect(() => {
+    const conn = getConnection();
+    if (conn.route === 'cloud') return;
     [images[idx - 1], images[idx + 1]].forEach(adj => {
       if (adj) { const i = new Image(); i.src = `/api/images/full/${adj.hash}`; }
     });

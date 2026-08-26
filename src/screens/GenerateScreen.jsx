@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import TagSuggest from '../components/TagSuggest';
 import { api } from '../lib/api';
+import { getConnection } from '../lib/connection';
+import { decrypt, encrypt } from '../lib/crypto';
 
 const MODELS = [
   { value: 'nai-diffusion-5-full',       label: 'V5 Full ⚡' },
@@ -58,8 +60,95 @@ const arrowBtnStyle = {
 
 const STATUS_ICONS = { pending: '⏳', running: '🔄', done: '✅', error: '❌', skipped: '⏭' };
 
+function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
+  const conn = getConnection();
+  const isCloud = conn.route === 'cloud';
+  const [blobUrl, setBlobUrl] = useState(null);
+
+  useEffect(() => {
+    if (task.status !== 'done') return;
+    if (!isCloud || !task.result?.hash) return;
+    let url = null;
+    let cancelled = false;
+    const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+    fetch(conn.cloudUrl + `/gallery/image/${task.result.hash}/data`, { headers })
+      .then(r => r.ok ? r.arrayBuffer() : null)
+      .then(buf => buf ? decrypt(buf) : null)
+      .then(plain => {
+        if (cancelled || !plain) return;
+        url = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
+        setBlobUrl(url);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [task.status, task.result?.hash, isCloud, conn.cloudUrl, conn.token]);
+
+  const hasThumb = isCloud ? !!blobUrl : !!(task.result?.filename);
+  const thumbSrc = isCloud ? blobUrl : (task.result?.filename ? `/api/images/.tmp/${task.result.filename}` : null);
+  const previewResult = isCloud ? { ...task.result, blobUrl } : task.result;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+      {task.status === 'done' && hasThumb ? (
+        <img
+          src={thumbSrc}
+          alt=""
+          onClick={() => onPreview(previewResult)}
+          style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, cursor: 'zoom-in', background: 'var(--line)' }}
+        />
+      ) : (
+        <span style={{ fontSize: '14px', flexShrink: 0, width: 36, textAlign: 'center' }}>{STATUS_ICONS[task.status] || '?'}</span>
+      )}
+      <span style={{ flex: 1, fontSize: 'var(--fs-label)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: task.status === 'error' ? '#c0392b' : 'var(--text-primary)' }}>
+        {task.label}
+        {task.status === 'error' && task.error && <span style={{ display: 'block', fontSize: '11px', color: '#c0392b' }}>{task.error}</span>}
+      </span>
+      {task.status === 'done' && (
+        <button
+          onClick={onSave}
+          style={{ padding: '3px 10px', border: task.saved ? '1px solid var(--line)' : 'none', borderRadius: 'var(--radius-s)', background: task.saved ? 'none' : 'var(--accent)', color: task.saved ? 'var(--text-secondary)' : 'var(--accent-contrast)', cursor: task.saved ? 'default' : 'pointer', fontSize: '11px', flexShrink: 0 }}
+        >{task.saved ? '✓' : '保存'}</button>
+      )}
+      {task.status === 'pending' && (
+        <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '14px', padding: '0 4px', flexShrink: 0 }}>×</button>
+      )}
+    </div>
+  );
+}
+
+async function generateCloudThumbnail(hash, addToast) {
+  const conn = getConnection();
+  if (conn.route !== 'cloud') return;
+  const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+  try {
+    const res = await fetch(conn.cloudUrl + `/gallery/image/${hash}/data`, { headers });
+    if (!res.ok) throw new Error(`fetch ${res.status}`);
+    const plain = await decrypt(await res.arrayBuffer());
+    const imgUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
+    const imgEl = new Image();
+    await new Promise((ok, ng) => { imgEl.onload = ok; imgEl.onerror = ng; imgEl.src = imgUrl; });
+    URL.revokeObjectURL(imgUrl);
+    const MAX_W = 320;
+    const sc = Math.min(1, MAX_W / imgEl.naturalWidth);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(imgEl.naturalWidth * sc);
+    canvas.height = Math.round(imgEl.naturalHeight * sc);
+    canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+    const webpBlob = await new Promise(r => canvas.toBlob(r, 'image/webp', 0.8));
+    const encThumb = await encrypt(new Uint8Array(await webpBlob.arrayBuffer()));
+    await fetch(conn.cloudUrl + `/thumbs/${hash}`, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/octet-stream' },
+      body: encThumb,
+    });
+  } catch (e) {
+    if (addToast) addToast('error', `サムネイル生成失敗: ${e.message}`);
+  }
+}
+
 function ResultCard({ item, onSave, onPreview }) {
   const label = item.filenameSegments?.filter(Boolean).join(' / ') || '（選択なし）';
+  const imgSrc = item.blobUrl || `/api/images/.tmp/${item.filename}`;
   return (
     <div style={{
       background: 'var(--surface)',
@@ -71,7 +160,7 @@ function ResultCard({ item, onSave, onPreview }) {
       alignItems: 'flex-start',
     }}>
       <img
-        src={`/api/images/.tmp/${item.filename}`}
+        src={imgSrc}
         alt=""
         onClick={onPreview}
         style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', cursor: 'zoom-in' }}
@@ -821,10 +910,29 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         model, width: res.width, height: res.height, steps, scale, sampler,
         seed: seed !== '' ? parseInt(seed, 10) : null,
       });
-      setResults(prev => {
-        const next = [{ ...result.image, folderSegments, filenameSegments, saved: false }, ...prev];
-        return next.length > maxResults ? next.slice(0, maxResults) : next;
-      });
+      const conn = getConnection();
+      if (conn.route === 'cloud' && result.image?.hash) {
+        const hash = result.image.hash;
+        const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+        let blobUrl = null;
+        try {
+          const imgRes = await fetch(conn.cloudUrl + `/gallery/image/${hash}/data`, { headers });
+          if (imgRes.ok) {
+            const plain = await decrypt(await imgRes.arrayBuffer());
+            blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
+          }
+        } catch {}
+        setResults(prev => {
+          const next = [{ ...result.image, folderSegments, filenameSegments, saved: false, blobUrl }, ...prev];
+          return next.length > maxResults ? next.slice(0, maxResults) : next;
+        });
+        generateCloudThumbnail(hash, addToast);
+      } else {
+        setResults(prev => {
+          const next = [{ ...result.image, folderSegments, filenameSegments, saved: false }, ...prev];
+          return next.length > maxResults ? next.slice(0, maxResults) : next;
+        });
+      }
       savePromptToStorage();
     } catch (e) {
       addToast('error', '生成に失敗しました: ' + (e.message || ''));
@@ -1189,35 +1297,11 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                 ) : (
                   <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '8px', borderTop: '1px solid var(--line)' }}>
                     {queueData.tasks.map(task => (
-                      <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
-                        {task.status === 'done' && task.result?.filename ? (
-                          <img
-                            src={`/api/images/.tmp/${task.result.filename}`}
-                            alt=""
-                            onClick={() => setPreviewItem(task.result)}
-                            style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, cursor: 'zoom-in', background: 'var(--line)' }}
-                          />
-                        ) : (
-                          <span style={{ fontSize: '14px', flexShrink: 0, width: 36, textAlign: 'center' }}>{STATUS_ICONS[task.status] || '?'}</span>
-                        )}
-                        <span style={{ flex: 1, fontSize: 'var(--fs-label)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: task.status === 'error' ? '#c0392b' : 'var(--text-primary)' }}>
-                          {task.label}
-                          {task.status === 'error' && task.error && <span style={{ display: 'block', fontSize: '11px', color: '#c0392b' }}>{task.error}</span>}
-                        </span>
-                        {task.status === 'done' && (
-                          <button
-                            onClick={async () => {
-                              if (task.saved) return;
-                              try { await api.queueTaskSave(task.id); setQueueData(await api.getQueue()); addToast('success', '保存しました'); }
-                              catch (e) { addToast('error', e.message); }
-                            }}
-                            style={{ padding: '3px 10px', border: task.saved ? '1px solid var(--line)' : 'none', borderRadius: 'var(--radius-s)', background: task.saved ? 'none' : 'var(--accent)', color: task.saved ? 'var(--text-secondary)' : 'var(--accent-contrast)', cursor: task.saved ? 'default' : 'pointer', fontSize: '11px', flexShrink: 0 }}
-                          >{task.saved ? '✓' : '保存'}</button>
-                        )}
-                        {task.status === 'pending' && (
-                          <button onClick={() => handleRemoveTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '14px', padding: '0 4px', flexShrink: 0 }}>×</button>
-                        )}
-                      </div>
+                      <QueueTaskRow key={task.id} task={task} onPreview={setPreviewItem} onSave={async () => {
+                        if (task.saved) return;
+                        try { await api.queueTaskSave(task.id); setQueueData(await api.getQueue()); addToast('success', '保存しました'); }
+                        catch (e) { addToast('error', e.message); }
+                      }} onRemove={() => handleRemoveTask(task.id)} />
                     ))}
                   </div>
                 )}
@@ -1322,7 +1406,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
         >
           <img
-            src={`/api/images/.tmp/${previewItem.filename}`}
+            src={previewItem.blobUrl || `/api/images/.tmp/${previewItem.filename}`}
             alt=""
             style={{ maxWidth: '100%', maxHeight: 'calc(100% - 60px)', objectFit: 'contain' }}
           />
