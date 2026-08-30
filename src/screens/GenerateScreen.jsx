@@ -369,17 +369,26 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     if (!connectionRoute || connectionRoute === 'offline') return;
     async function loadData() {
       try {
-        const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
-        if (settings.generation?.model && !promptApplied.current) setModel(settings.generation.model);
-        const ready = !!info.vaultRoot;
-        setVaultReady(ready);
-        if (ready) {
-          const [cd, pd] = await Promise.all([api.getCards(), api.getPresets()]);
-          setCardsData(cd);
-          setPresetsData(pd);
+        if (connectionRoute === 'cloud') {
+          setVaultReady(true);
+          try {
+            const [cd, pd] = await Promise.all([api.getCards(), api.getPresets()]);
+            setCardsData(cd);
+            setPresetsData(pd);
+          } catch { /* cloud では cards/presets なしでも動作可 */ }
         } else {
-          const cd = await api.getCards();
-          setCardsData(cd);
+          const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
+          if (settings.generation?.model && !promptApplied.current) setModel(settings.generation.model);
+          const ready = !!info.vaultRoot;
+          setVaultReady(ready);
+          if (ready) {
+            const [cd, pd] = await Promise.all([api.getCards(), api.getPresets()]);
+            setCardsData(cd);
+            setPresetsData(pd);
+          } else {
+            const cd = await api.getCards();
+            setCardsData(cd);
+          }
         }
       } catch {
         addToast('error', 'データの読み込みに失敗しました');
