@@ -191,7 +191,7 @@ function ResultCard({ item, onSave, onPreview }) {
   );
 }
 
-export default function GenerateScreen({ addToast, results, setResults, maxResults, resetKey }) {
+export default function GenerateScreen({ addToast, results, setResults, maxResults, resetKey, connectionRoute }) {
   const [cardsData, setCardsData] = useState(null);
   const [presetsData, setPresetsData] = useState(null);
   const [vaultReady, setVaultReady] = useState(false);
@@ -366,6 +366,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   }, [addToast]);
 
   useEffect(() => {
+    if (!connectionRoute || connectionRoute === 'offline') return;
     async function loadData() {
       try {
         const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
@@ -387,7 +388,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       }
     }
     loadData();
-  }, [addToast]);
+  }, [addToast, connectionRoute]);
 
   useEffect(() => {
     if (queueData.state !== 'running') return;

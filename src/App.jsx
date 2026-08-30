@@ -148,9 +148,9 @@ export default function App() {
 
   let mainContent;
   if (activeTab === 'generate') {
-    mainContent = <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} />;
+    mainContent = <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} />;
   } else if (activeTab === 'album') {
-    mainContent = <AlbumScreen addToast={addToast} resetKey={resetKey} />;
+    mainContent = <AlbumScreen addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />;
   } else if (activeTab === 'template') {
     mainContent = <TemplateScreen addToast={addToast} resetKey={resetKey} />;
   } else {

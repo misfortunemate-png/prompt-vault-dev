@@ -5,15 +5,28 @@ const DEFAULTS = {
   route: 'offline',
   manual: false,
   lastCheck: null,
-  franUrl: 'https://fraine.tail204746.ts.net/api',
+  franUrl: 'https://fraine.tail204746.ts.net:8445/api',
   cloudUrl: '',
   token: '',
 };
 
+// 旧デフォルト URL（ポート未指定→443→別サービス）を自動修正
+function migrateState(state) {
+  if (state.franUrl === 'https://fraine.tail204746.ts.net/api') {
+    return { ...state, franUrl: 'https://fraine.tail204746.ts.net:8445/api' };
+  }
+  return state;
+}
+
 export function getConnection() {
   try {
     const saved = localStorage.getItem(LS_KEY);
-    if (saved) return { ...DEFAULTS, ...JSON.parse(saved) };
+    if (saved) {
+      const raw = JSON.parse(saved);
+      const parsed = migrateState(raw);
+      if (parsed !== raw) localStorage.setItem(LS_KEY, JSON.stringify(parsed));
+      return { ...DEFAULTS, ...parsed };
+    }
   } catch {}
   return { ...DEFAULTS };
 }

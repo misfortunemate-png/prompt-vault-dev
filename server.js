@@ -215,6 +215,7 @@ async function start() {
   const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
   app.use((req, res, next) => {
     const origin = req.headers.origin;
+    res.setHeader('Vary', 'Origin');
     if (origin && ALLOWED_ORIGINS.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
