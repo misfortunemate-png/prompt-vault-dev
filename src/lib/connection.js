@@ -46,6 +46,7 @@ async function fetchReachable(url, timeoutMs) {
 
 export async function checkReachability() {
   const state = getConnection();
+  if (state.manual) return state;
   const timeoutMs = getTimeoutMs();
   const lastCheck = new Date().toISOString();
 
