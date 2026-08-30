@@ -40,8 +40,8 @@ export function saveConnection(state) {
 function getTimeoutMs() {
   try {
     const v = localStorage.getItem(LS_TIMEOUT_KEY);
-    return v ? Number(v) : 3000;
-  } catch { return 3000; }
+    return v ? Number(v) : 8000;
+  } catch { return 8000; }
 }
 
 async function fetchReachable(url, timeoutMs) {
