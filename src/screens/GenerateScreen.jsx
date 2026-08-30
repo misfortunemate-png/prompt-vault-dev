@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import TagSuggest from '../components/TagSuggest';
 import { api } from '../lib/api';
-import { getConnection } from '../lib/connection';
+import { getConnection, resolveTmpImgUrl } from '../lib/connection';
 import { decrypt, encrypt } from '../lib/crypto';
 
 const MODELS = [
@@ -84,7 +84,7 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
   }, [task.status, task.result?.hash, isCloud, conn.cloudUrl, conn.token]);
 
   const hasThumb = isCloud ? !!blobUrl : !!(task.result?.filename);
-  const thumbSrc = isCloud ? blobUrl : (task.result?.filename ? `/api/images/.tmp/${task.result.filename}` : null);
+  const thumbSrc = isCloud ? blobUrl : (task.result?.filename ? resolveTmpImgUrl(task.result.filename) : null);
   const previewResult = isCloud ? { ...task.result, blobUrl } : task.result;
 
   return (
@@ -148,7 +148,7 @@ async function generateCloudThumbnail(hash, addToast) {
 
 function ResultCard({ item, onSave, onPreview }) {
   const label = item.filenameSegments?.filter(Boolean).join(' / ') || '（選択なし）';
-  const imgSrc = item.blobUrl || `/api/images/.tmp/${item.filename}`;
+  const imgSrc = item.blobUrl || resolveTmpImgUrl(item.filename);
   return (
     <div style={{
       background: 'var(--surface)',
@@ -1406,7 +1406,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
         >
           <img
-            src={previewItem.blobUrl || `/api/images/.tmp/${previewItem.filename}`}
+            src={previewItem.blobUrl || resolveTmpImgUrl(previewItem.filename)}
             alt=""
             style={{ maxWidth: '100%', maxHeight: 'calc(100% - 60px)', objectFit: 'contain' }}
           />

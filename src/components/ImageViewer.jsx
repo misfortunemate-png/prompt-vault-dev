@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { api } from '../lib/api';
-import { getConnection } from '../lib/connection';
+import { getConnection, resolveThumbUrl, resolveFullImgUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
 
 const FONT_SIZE_MAP = { small: '14px', medium: '20px', large: '28px' };
@@ -90,9 +90,9 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
         })
         .catch(() => { if (!cancelled) setImgLoading(false); });
     } else {
-      setDisplaySrc(`/api/thumbs/${img.hash}.webp`);
+      setDisplaySrc(resolveThumbUrl(img.hash));
       setImgLoading(true);
-      const fullUrl = `/api/images/full/${img.hash}`;
+      const fullUrl = resolveFullImgUrl(img.hash);
       const loader = new Image();
       loader.onload = () => { if (!cancelled) { setDisplaySrc(fullUrl); setImgLoading(false); } };
       loader.src = fullUrl;
@@ -114,7 +114,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
     const conn = getConnection();
     if (conn.route === 'cloud') return;
     [images[idx - 1], images[idx + 1]].forEach(adj => {
-      if (adj) { const i = new Image(); i.src = `/api/images/full/${adj.hash}`; }
+      if (adj) { const i = new Image(); i.src = resolveFullImgUrl(adj.hash); }
     });
   }, [idx, images]);
 

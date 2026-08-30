@@ -125,3 +125,19 @@ export function resolveApiUrl(path) {
   if (conn.route === 'cloud') return conn.cloudUrl + path;
   return conn.franUrl + path;
 }
+
+export function resolveThumbUrl(hash) {
+  const conn = getConnection();
+  if (conn.route === 'cloud') return conn.cloudUrl + `/thumbs/${hash}`;
+  return conn.franUrl + `/thumbs/${hash}.webp`;
+}
+
+export function resolveFullImgUrl(hash) {
+  const conn = getConnection();
+  return conn.franUrl + `/images/full/${hash}`;
+}
+
+export function resolveTmpImgUrl(filename) {
+  const conn = getConnection();
+  return conn.franUrl + `/images/.tmp/${filename}`;
+}

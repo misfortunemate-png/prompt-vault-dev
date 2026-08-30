@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import TemplateCardEdit from './TemplateCardEdit';
 import { api } from '../lib/api';
+import { resolveThumbUrl } from '../lib/connection';
 
 const btnStyle = (danger) => ({
   background: 'none',
@@ -20,7 +21,7 @@ function ThumbGrid({ thumbs }) {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', width: '86px', flexShrink: 0 }}>
       {[0, 1, 2, 3].map(i => (
         <div key={i} style={{ width: '42px', height: '42px', background: 'var(--line)', borderRadius: '2px', overflow: 'hidden' }}>
-          {thumbs[i] && <img src={thumbs[i].thumbUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+          {thumbs[i] && <img src={resolveThumbUrl(thumbs[i].hash)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
         </div>
       ))}
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 import ImageViewer from '../components/ImageViewer';
-import { getConnection } from '../lib/connection';
+import { getConnection, resolveThumbUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
 
 function findNextSibling(tree, targetPath) {
@@ -50,7 +50,7 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
     const obs = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting) return;
       obs.disconnect();
-      const fullUrl = conn.cloudUrl + image.thumbUrl;
+      const fullUrl = conn.cloudUrl + `/thumbs/${image.hash}`;
       const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
       fetch(fullUrl, { headers })
         .then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
@@ -70,7 +70,7 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
     };
   }, [isCloud, image.thumbUrl, image.thumb_ok, conn.cloudUrl, conn.token]);
 
-  const imgSrc = isCloud ? blobUrl : image.thumbUrl;
+  const imgSrc = isCloud ? blobUrl : resolveThumbUrl(image.hash);
 
   return (
     <div ref={rootRef} onClick={onClick} style={{ cursor: 'pointer', position: 'relative' }}>
@@ -136,7 +136,7 @@ function FolderCard({ node, onNavigate }) {
           return (
             <div key={i} style={{ width: '60px', height: '60px', overflow: 'hidden', background: 'var(--line)', borderRadius: '2px' }}>
               {hash ? (
-                <img src={`/api/thumbs/${hash}.webp`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+                <img src={resolveThumbUrl(hash)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
               ) : (
                 <Placeholder />
               )}
