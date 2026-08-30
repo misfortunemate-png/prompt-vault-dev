@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node --env-file=.env server.js",
     "build": "vite build",
+    "build:pages": "vite build --mode pages",
+    "deploy:pages": "npm run build:pages && node scripts/deploy-pages.mjs",
     "start": "NODE_ENV=production node --env-file=.env server.js",
     "inspect": "node scripts/inspect.mjs"
   },
