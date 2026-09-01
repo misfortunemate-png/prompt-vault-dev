@@ -219,6 +219,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [scale, setScale] = useState(5);
   const [sampler, setSampler] = useState('k_euler_ancestral');
   const [seed, setSeed] = useState('');
+  const [randomSize, setRandomSize] = useState(false);
 
   const [generating, setGenerating] = useState(false);
 
@@ -640,8 +641,12 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   // ── Queue ──
 
+  const pickResolution = () => randomSize
+    ? RESOLUTIONS[Math.floor(Math.random() * RESOLUTIONS.length)]
+    : (RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0]);
+
   const buildSingleTask = () => {
-    const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
+    const res = pickResolution();
     const allCards = cardsData?.cards || [];
 
     const effectiveMap = {};
@@ -735,8 +740,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   };
 
   const buildCartesianTasks = () => {
-    const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
-    const params = { model, width: res.width, height: res.height, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null };
+    const baseParams = { model, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null };
     const allCards = cardsData?.cards || [];
     const enabledSlots = sortedSlots.filter(s => slotEnabledMap[s.id] !== false);
     const slotOptions = enabledSlots.map(slot => {
@@ -800,6 +804,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       });
       const filenameSegments = enabledSlots.filter(s => s.useInFilename).map(s => getName(s.id)).filter(Boolean);
       const label = enabledSlots.map(s => getName(s.id)).filter(Boolean).join(' × ') || '（選択なし）';
+      const taskRes = pickResolution();
+      const params = { ...baseParams, width: taskRes.width, height: taskRes.height };
       return { positive, negative, params, folderSegments, filenameSegments, preset_id: selectedPresetId || null, label };
     });
   };
@@ -844,7 +850,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const handleGenerate = async () => {
     if (steps > 28 && !window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
     setGenerating(true);
-    const res = RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0];
+    const res = pickResolution();
     const allCards = cardsData?.cards || [];
 
     const effectiveMap = {};
@@ -1193,9 +1199,13 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
             </div>
             <div>
               <label style={labelStyle}>解像度</label>
-              <select value={resolution} onChange={e => setResolution(e.target.value)} style={fieldStyle}>
+              <select value={resolution} onChange={e => setResolution(e.target.value)} disabled={randomSize} style={{ ...fieldStyle, opacity: randomSize ? 0.5 : 1 }}>
                 {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+                <input type="checkbox" checked={randomSize} onChange={e => setRandomSize(e.target.checked)} />
+                ランダムサイズ
+              </label>
             </div>
             <div>
               <label style={labelStyle}>ステップ</label>
