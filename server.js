@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, unl
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
-import { getByHash, listFolders, listByFolder, getRecent, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, deleteImage, getGalleryByCard, getTotalByCard } from './server/db.js';
+import { getByHash, listFolders, listByFolder, getRecent, getRecentByDays, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, deleteImage, getGalleryByCard, getTotalByCard } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
@@ -45,6 +45,8 @@ const DEFAULT_SETTINGS = {
   },
   guard: { intervalMin: 2, intervalMax: 5, maxPerJob: 100 },
   captionStyle: { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true },
+  'sync.recent_days': 30,
+  'sync.r2_limit_gb': 5,
 };
 
 // danbooru tags cache
@@ -463,11 +465,10 @@ async function start() {
 
   api.get('/gallery/recent', (req, res) => {
     try {
+      const days = parseInt(req.query.days) || 0;
       const limit = parseInt(req.query.limit) || 20;
-      const images = getRecent(limit).map(r => ({
-        ...r,
-        thumbUrl: `/api/thumbs/${r.hash}.webp`,
-      }));
+      const rows = days > 0 ? getRecentByDays(days) : getRecent(limit);
+      const images = rows.map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
     } catch (e) {
       res.status(500).json({ error: e.message });
@@ -507,9 +508,9 @@ async function start() {
 
   api.put('/gallery/image/:hash/favorite', (req, res) => {
     try {
-      const { favorite } = req.body;
+      const { favorite, meta_updated_at } = req.body;
       if (favorite !== 0 && favorite !== 1) return res.status(400).json({ error: 'favorite は 0 または 1' });
-      setFavorite(req.params.hash, favorite);
+      setFavorite(req.params.hash, favorite, meta_updated_at || undefined);
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -541,9 +542,9 @@ async function start() {
 
   api.put('/gallery/image/:hash/caption', (req, res) => {
     try {
-      const { caption, captionConfig } = req.body;
+      const { caption, captionConfig, meta_updated_at } = req.body;
       if (typeof caption !== 'string') return res.status(400).json({ error: 'caption は文字列' });
-      setCaption(req.params.hash, caption);
+      setCaption(req.params.hash, caption, meta_updated_at || undefined);
       if (captionConfig !== undefined) setCaptionConfig(req.params.hash, JSON.stringify(captionConfig));
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }

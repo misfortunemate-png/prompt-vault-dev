@@ -43,6 +43,7 @@ function getDb() {
     `);
     try { db.exec('ALTER TABLE images ADD COLUMN caption_config TEXT'); } catch {}
     try { db.exec('ALTER TABLE images ADD COLUMN char_prompts TEXT'); } catch {}
+    try { db.exec('ALTER TABLE images ADD COLUMN meta_updated_at TEXT'); } catch {}
   }
   return db;
 }
@@ -106,8 +107,15 @@ export function listFolders() {
 
 export function getRecent(limit = 20) {
   return getDb().prepare(
-    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images ORDER BY created_at DESC LIMIT ?'
+    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height, meta_updated_at FROM images ORDER BY created_at DESC LIMIT ?'
   ).all(limit);
+}
+
+export function getRecentByDays(days, limit = 500) {
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+  return getDb().prepare(
+    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height, meta_updated_at FROM images WHERE created_at >= ? ORDER BY created_at DESC LIMIT ?'
+  ).all(since, limit);
 }
 
 export function getStats() {
@@ -126,13 +134,14 @@ export function getAllHashes() {
   return getDb().prepare('SELECT hash, rel_path FROM images').all();
 }
 
-export function setFavorite(hash, flag) {
-  getDb().prepare('UPDATE images SET favorite = ? WHERE hash = ?').run(flag, hash);
+export function setFavorite(hash, flag, metaUpdatedAt) {
+  const ts = metaUpdatedAt || new Date().toISOString();
+  getDb().prepare('UPDATE images SET favorite = ?, meta_updated_at = ? WHERE hash = ?').run(flag, ts, hash);
 }
 
 export function getFavorites(limit = 50) {
   return getDb().prepare(
-    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height FROM images WHERE favorite = 1 ORDER BY created_at DESC LIMIT ?'
+    'SELECT hash, filename, folder, thumb_ok, favorite, created_at, width, height, meta_updated_at FROM images WHERE favorite = 1 ORDER BY created_at DESC LIMIT ?'
   ).all(limit);
 }
 
@@ -151,8 +160,9 @@ export function getByPreset(presetId, limit = 50) {
   ).all(presetId, limit);
 }
 
-export function setCaption(hash, text) {
-  getDb().prepare('UPDATE images SET caption = ? WHERE hash = ?').run(text, hash);
+export function setCaption(hash, text, metaUpdatedAt) {
+  const ts = metaUpdatedAt || new Date().toISOString();
+  getDb().prepare('UPDATE images SET caption = ?, meta_updated_at = ? WHERE hash = ?').run(text, ts, hash);
 }
 
 export function setCaptionConfig(hash, configJson) {
