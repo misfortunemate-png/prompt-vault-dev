@@ -9,7 +9,7 @@ function getCurrentHash() {
 
 async function fetchLatestHash() {
   try {
-    const res = await fetch('/index.html?_v=' + Date.now(), { cache: 'no-store' });
+    const res = await fetch(import.meta.env.BASE_URL + 'index.html?_v=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) return null;
     const text = await res.text();
     const m = text.match(/\/assets\/index-([^.]+)\.js/);
