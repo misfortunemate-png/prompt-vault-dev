@@ -939,7 +939,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           }
         } catch {}
         setResults(prev => {
-          const next = [{ ...result.image, folderSegments, filenameSegments, saved: false, blobUrl }, ...prev];
+          const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, saved: false, blobUrl }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
         generateCloudThumbnail(hash, addToast);
@@ -959,8 +959,13 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const handleSave = async (idx) => {
     const item = results[idx];
+    const conn = getConnection();
     try {
-      await api.saveImage({ filename: item.filename, seed: item.seed, folderSegments: item.folderSegments || [], filenameSegments: item.filenameSegments || [] });
+      if (conn.route === 'cloud') {
+        await api.saveImage({ task_id: item.task_id });
+      } else {
+        await api.saveImage({ filename: item.filename, seed: item.seed, folderSegments: item.folderSegments || [], filenameSegments: item.filenameSegments || [] });
+      }
       setResults(prev => prev.map((r, i) => i === idx ? { ...r, saved: true } : r));
     } catch (e) {
       addToast('error', '保存に失敗しました: ' + (e.message || ''));
