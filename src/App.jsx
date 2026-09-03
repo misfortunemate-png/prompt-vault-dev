@@ -8,6 +8,7 @@ import TemplateScreen from './screens/TemplateScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { api } from './lib/api';
 import { getConnection, checkReachability, initVisibilityCheck, destroyVisibilityCheck } from './lib/connection';
+import { startVersionCheck } from './lib/versionCheck';
 
 const DISPLAY_KEY = 'pv-display-settings';
 
@@ -124,6 +125,13 @@ export default function App() {
     });
     return () => destroyVisibilityCheck();
   }, []);
+
+  useEffect(() => {
+    return startVersionCheck(() => {
+      addToast('info', '新しいバージョンがあります。3秒後に更新します…');
+      setTimeout(() => window.location.reload(), 3000);
+    });
+  }, [addToast]);
 
   const addToast = useCallback((type, message) => {
     const id = ++toastId;
