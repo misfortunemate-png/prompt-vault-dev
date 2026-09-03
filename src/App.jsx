@@ -118,6 +118,18 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
+  const addToast = useCallback((type, message) => {
+    const id = ++toastId;
+    setToasts(prev => {
+      const next = [...prev, { id, type, message }];
+      return next.length > 3 ? next.slice(-3) : next;
+    });
+  }, []);
+
+  const removeToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   useEffect(() => {
     checkReachability().then(setConnectionState).catch(() => {});
     initVisibilityCheck(() => {
@@ -132,18 +144,6 @@ export default function App() {
       setTimeout(() => window.location.reload(), 3000);
     });
   }, [addToast]);
-
-  const addToast = useCallback((type, message) => {
-    const id = ++toastId;
-    setToasts(prev => {
-      const next = [...prev, { id, type, message }];
-      return next.length > 3 ? next.slice(-3) : next;
-    });
-  }, []);
-
-  const removeToast = useCallback((id) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
 
   const updateDisplay = useCallback((key, value) => {
     setDisplaySettings(prev => {
