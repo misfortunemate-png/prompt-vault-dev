@@ -925,6 +925,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         negative_prompt: neg,
         model, width: res.width, height: res.height, steps, scale, sampler,
         seed: seed !== '' ? parseInt(seed, 10) : null,
+        folderSegments,
+        filenameSegments,
       });
       const conn = getConnection();
       if (conn.route === 'cloud' && result.image?.hash) {
