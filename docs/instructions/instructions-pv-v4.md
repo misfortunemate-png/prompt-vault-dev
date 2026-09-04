@@ -125,3 +125,14 @@ async function generateAndUploadThumb(plainBuffer, hash, conn) {
 ## 報告先
 
 docs/reports/ に報告書を置く。
+
+
+## PM配置済み（PGは触らない）
+
+- `public/icon.svg` — v2から移植済み（PMがpush）
+- `public/icon-192.png`, `public/icon-512.png` — PNGフォールバック（PMがpush）
+- `public/manifest.json` — SVG優先に更新済み（PMがpush）
+
+## PGが行うアイコン関連作業
+
+- `index.html` に `<link rel="icon" href="icon.svg" type="image/svg+xml">` を追加（既存のfavicon指定があれば差し替え）
