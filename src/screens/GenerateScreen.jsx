@@ -911,9 +911,15 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     sortedSlots.forEach(slot => {
       if (slotEnabledMap[slot.id] === false) return;
       if (slotRandomMap[slot.id]) {
-        const slotCards = allCards.filter(c => c.slotId === slot.id);
-        if (slotCards.length > 0) {
-          randomPicks[slot.id] = slotCards[Math.floor(Math.random() * slotCards.length)];
+        const rootCards = allCards.filter(c => c.slotId === slot.id && !c.parentId);
+        if (rootCards.length > 0) {
+          const parent = rootCards[Math.floor(Math.random() * rootCards.length)];
+          const children = allCards.filter(c => c.parentId === parent.id);
+          if (children.length > 0) {
+            randomPicks[slot.id] = children[Math.floor(Math.random() * children.length)];
+          } else {
+            randomPicks[slot.id] = parent;
+          }
           effectiveMap[slot.id] = randomPicks[slot.id].id;
         }
       } else {
@@ -949,6 +955,11 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       if (slotEnabledMap[slot.id] === false) return;
       const rp = randomPicks[slot.id];
       if (rp) {
+        if (rp.parentId) {
+          const parent = allCards.find(c => c.id === rp.parentId);
+          if (parent?.positive) pos = pos ? pos + ', ' + parent.positive : parent.positive;
+          if (parent?.negative) neg = neg ? neg + ', ' + parent.negative : parent.negative;
+        }
         if (rp.positive) pos = pos ? pos + ', ' + rp.positive : rp.positive;
         if (rp.negative) neg = neg ? neg + ', ' + rp.negative : rp.negative;
         return;
