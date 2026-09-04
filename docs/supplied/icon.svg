@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#1a1410"/>
+  <rect x="48" y="48" width="416" height="416" rx="16" fill="none" stroke="#8b2e2e" stroke-width="6"/>
+  <rect x="72" y="72" width="368" height="368" rx="8" fill="none" stroke="#c8b99a" stroke-width="2"/>
+  <!-- Shield -->
+  <g transform="translate(256,232)">
+    <path d="M0-125 L100-68 L100,40 C100,95 52,138 0,158 C-52,138 -100,95 -100,40 L-100,-68 Z" 
+          fill="none" stroke="#b8860b" stroke-width="4.5"/>
+    <!-- Italic V (skewed) -->
+    <g fill="#f5f0e8" transform="skewX(-6)">
+      <polygon points="-10,28 -55,-78 -38,-78 0,8 38,-78 55,-78 10,28"/>
+      <!-- Serifs -->
+      <rect x="-60" y="-83" width="32" height="5" rx="1"/>
+      <rect x="28" y="-83" width="32" height="5" rx="1"/>
+      <rect x="-16" y="26" width="32" height="5" rx="1"/>
+    </g>
+  </g>
+  <!-- VAULT -->
+  <g fill="#9a8870" font-family="Georgia,'Times New Roman',serif" font-size="36" text-anchor="middle" letter-spacing="2">
+    <text x="160" y="432">V</text>
+    <text x="208" y="432">A</text>
+    <text x="256" y="432">U</text>
+    <text x="304" y="432">L</text>
+    <text x="352" y="432">T</text>
+  </g>
+</svg>
