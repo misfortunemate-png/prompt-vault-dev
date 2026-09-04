@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#1a1410"/>
+  <rect x="48" y="48" width="416" height="416" rx="16" fill="none" stroke="#8b2e2e" stroke-width="6"/>
+  <rect x="72" y="72" width="368" height="368" rx="8" fill="none" stroke="#c8b99a" stroke-width="2"/>
+  <!-- Book/vault shape -->
+  <g transform="translate(256,240)">
+    <!-- Outer shield -->
+    <path d="M0-120 L90-60 L90,70 Q0,130 0,130 Q0,130 -90,70 L-90,-60 Z" 
+          fill="none" stroke="#b8860b" stroke-width="4"/>
+    <!-- Inner V -->
+    <text x="0" y="25" text-anchor="middle" font-family="Georgia,serif" 
+          font-size="120" font-style="italic" fill="#f5f0e8" letter-spacing="-5">V</text>
+  </g>
+  <!-- Bottom text -->
+  <text x="256" y="430" text-anchor="middle" font-family="Georgia,serif" 
+        font-size="36" fill="#9a8870" letter-spacing="8">VAULT</text>
+</svg>
