@@ -236,6 +236,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [previewItem, setPreviewItem] = useState(null);
   const promptApplied = useRef(false);
   const promptEditRef = useRef(null);
+  const addedTaskIdsRef = useRef(new Set());
+  const queueInitializedRef = useRef(false);
 
   const sortedSlots = cardsData ? (() => {
     let slotsArr = [...cardsData.slots];
@@ -407,6 +409,46 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     }, 2000);
     return () => clearInterval(id);
   }, [queueData.state]);
+
+  // キュー完了タスクを results に自動追加
+  useEffect(() => {
+    const tasks = queueData.tasks;
+    if (!queueInitializedRef.current) {
+      tasks.forEach(t => { if (t.status === 'done') addedTaskIdsRef.current.add(t.id); });
+      queueInitializedRef.current = true;
+      return;
+    }
+    const newDone = tasks.filter(t => t.status === 'done' && !addedTaskIdsRef.current.has(t.id));
+    if (newDone.length === 0) return;
+    const conn = getConnection();
+    const isCloud = conn.route === 'cloud';
+    newDone.forEach(async (task) => {
+      addedTaskIdsRef.current.add(task.id);
+      let parsedResult = task.result;
+      if (typeof parsedResult === 'string') {
+        try { parsedResult = JSON.parse(parsedResult); } catch { return; }
+      }
+      if (!parsedResult) return;
+      const entry = {
+        ...parsedResult,
+        task_id: task.id,
+        folderSegments: task.folder_segments || task.folderSegments || [],
+        filenameSegments: task.filename_segments || task.filenameSegments || [],
+        saved: !!task.saved,
+      };
+      if (isCloud && parsedResult.hash) {
+        const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+        try {
+          const r = await fetch(conn.cloudUrl + `/gallery/image/${parsedResult.hash}/data`, { headers });
+          if (r.ok) {
+            const plain = await decrypt(await r.arrayBuffer());
+            entry.blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
+          }
+        } catch {}
+      }
+      setResults(prev => [entry, ...prev].slice(0, maxResults));
+    });
+  }, [queueData.tasks, maxResults]);
 
   useEffect(() => {
     if (queueData.state !== 'running') return;
@@ -654,9 +696,15 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     sortedSlots.forEach(slot => {
       if (slotEnabledMap[slot.id] === false) return;
       if (slotRandomMap[slot.id]) {
-        const slotCards = allCards.filter(c => c.slotId === slot.id);
-        if (slotCards.length > 0) {
-          randomPicks[slot.id] = slotCards[Math.floor(Math.random() * slotCards.length)];
+        const rootCards = allCards.filter(c => c.slotId === slot.id && !c.parentId);
+        if (rootCards.length > 0) {
+          const parent = rootCards[Math.floor(Math.random() * rootCards.length)];
+          const children = allCards.filter(c => c.parentId === parent.id);
+          if (children.length > 0) {
+            randomPicks[slot.id] = children[Math.floor(Math.random() * children.length)];
+          } else {
+            randomPicks[slot.id] = parent;
+          }
           effectiveMap[slot.id] = randomPicks[slot.id].id;
         }
       } else {
@@ -692,6 +740,11 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       if (slotEnabledMap[slot.id] === false) return;
       const rp = randomPicks[slot.id];
       if (rp) {
+        if (rp.parentId) {
+          const parent = allCards.find(c => c.id === rp.parentId);
+          if (parent?.positive) pos = pos ? pos + ', ' + parent.positive : parent.positive;
+          if (parent?.negative) neg = neg ? neg + ', ' + parent.negative : parent.negative;
+        }
         if (rp.positive) pos = pos ? pos + ', ' + rp.positive : rp.positive;
         if (rp.negative) neg = neg ? neg + ', ' + rp.negative : rp.negative;
         return;

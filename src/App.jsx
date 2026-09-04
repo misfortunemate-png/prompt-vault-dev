@@ -154,17 +154,6 @@ export default function App() {
     });
   }, []);
 
-  let mainContent;
-  if (activeTab === 'generate') {
-    mainContent = <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} />;
-  } else if (activeTab === 'album') {
-    mainContent = <AlbumScreen addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />;
-  } else if (activeTab === 'template') {
-    mainContent = <TemplateScreen addToast={addToast} resetKey={resetKey} />;
-  } else {
-    mainContent = <PlaceholderView message="未実装のタブです" />;
-  }
-
   return (
     <>
       <Header
@@ -173,7 +162,12 @@ export default function App() {
         onLampClick={() => { setDebugInitialOpen(true); setSettingsOpen(true); }}
         connectionState={connectionState}
       />
-      {mainContent}
+      <div style={{ display: activeTab === 'generate' ? 'block' : 'none' }}>
+        <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} />
+      </div>
+      {activeTab === 'album' && <AlbumScreen addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
+      {activeTab === 'template' && <TemplateScreen addToast={addToast} resetKey={resetKey} />}
+      {activeTab !== 'generate' && activeTab !== 'album' && activeTab !== 'template' && <PlaceholderView message="未実装のタブです" />}
       <Footer activeTab={activeTab} onTabChange={handleTabChange} />
       <Toast toasts={toasts} removeToast={removeToast} />
       {settingsOpen && (

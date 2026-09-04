@@ -4,6 +4,21 @@ import ImageViewer from '../components/ImageViewer';
 import { getConnection, resolveThumbUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
 
+const thumbCache = new Map();
+let activeDecrypts = 0;
+const MAX_CONCURRENT = 4;
+const waitQueue = [];
+function acquireSlot() {
+  return new Promise(resolve => {
+    if (activeDecrypts < MAX_CONCURRENT) { activeDecrypts++; resolve(); }
+    else waitQueue.push(resolve);
+  });
+}
+function releaseSlot() {
+  activeDecrypts--;
+  if (waitQueue.length > 0) { activeDecrypts++; waitQueue.shift()(); }
+}
+
 function findNextSibling(tree, targetPath) {
   function search(nodes) {
     for (let i = 0; i < nodes.length; i++) {
@@ -45,7 +60,10 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
 
   useEffect(() => {
     if (!isCloud) return;
-    let url = null;
+    if (thumbCache.has(image.hash)) {
+      setBlobUrl(thumbCache.get(image.hash));
+      return;
+    }
     let cancelled = false;
     const obs = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting) return;
@@ -59,21 +77,25 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
         fetchUrl = conn.cloudUrl + `/gallery/image/${image.hash}/data`;
         mimeType = 'image/png';
       }
-      fetch(fetchUrl, { headers })
-        .then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
-        .then(buf => decrypt(buf))
-        .then(plain => {
-          if (cancelled) return;
-          url = URL.createObjectURL(new Blob([plain], { type: mimeType }));
-          setBlobUrl(url);
-        })
-        .catch(() => {});
+      acquireSlot().then(() => {
+        if (cancelled) { releaseSlot(); return; }
+        return fetch(fetchUrl, { headers })
+          .then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
+          .then(buf => decrypt(buf))
+          .then(plain => {
+            releaseSlot();
+            if (cancelled) return;
+            const url = URL.createObjectURL(new Blob([plain], { type: mimeType }));
+            thumbCache.set(image.hash, url);
+            setBlobUrl(url);
+          })
+          .catch(() => { releaseSlot(); });
+      });
     }, { rootMargin: '200px' });
     if (rootRef.current) obs.observe(rootRef.current);
     return () => {
       cancelled = true;
       obs.disconnect();
-      if (url) URL.revokeObjectURL(url);
     };
   }, [isCloud, image.hash, image.thumb_ok, conn.cloudUrl, conn.token]);
 
