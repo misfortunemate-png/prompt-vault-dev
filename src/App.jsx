@@ -163,7 +163,7 @@ export default function App() {
         connectionState={connectionState}
       />
       <div style={{ display: activeTab === 'generate' ? 'block' : 'none' }}>
-        <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} />
+        <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} activeTab={activeTab} />
       </div>
       {activeTab === 'album' && <AlbumScreen addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
       {activeTab === 'template' && <TemplateScreen addToast={addToast} resetKey={resetKey} />}

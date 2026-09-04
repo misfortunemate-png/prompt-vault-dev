@@ -191,7 +191,7 @@ function ResultCard({ item, onSave, onPreview }) {
   );
 }
 
-export default function GenerateScreen({ addToast, results, setResults, maxResults, resetKey, connectionRoute }) {
+export default function GenerateScreen({ addToast, results, setResults, maxResults, resetKey, connectionRoute, activeTab }) {
   const [cardsData, setCardsData] = useState(null);
   const [presetsData, setPresetsData] = useState(null);
   const [vaultReady, setVaultReady] = useState(false);
@@ -344,6 +344,58 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     } catch {}
   }, [selectedCardMap]);
 
+  // slotRandomMap 永続化
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pv3-slot-random'));
+      if (stored && typeof stored === 'object') setSlotRandomMap(stored);
+    } catch {}
+  }, []);
+  const slotRandomMapInitialized = useRef(false);
+  useEffect(() => {
+    if (!slotRandomMapInitialized.current) { slotRandomMapInitialized.current = true; return; }
+    try { localStorage.setItem('pv3-slot-random', JSON.stringify(slotRandomMap)); } catch {}
+  }, [slotRandomMap]);
+
+  // slotEnabledMap 永続化
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pv3-slot-enabled'));
+      if (stored && typeof stored === 'object') setSlotEnabledMap(stored);
+    } catch {}
+  }, []);
+  const slotEnabledMapInitialized = useRef(false);
+  useEffect(() => {
+    if (!slotEnabledMapInitialized.current) { slotEnabledMapInitialized.current = true; return; }
+    try { localStorage.setItem('pv3-slot-enabled', JSON.stringify(slotEnabledMap)); } catch {}
+  }, [slotEnabledMap]);
+
+  // randomChildMode 永続化
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pv3-random-child-mode'));
+      if (stored && typeof stored === 'object') setRandomChildMode(stored);
+    } catch {}
+  }, []);
+  const randomChildModeInitialized = useRef(false);
+  useEffect(() => {
+    if (!randomChildModeInitialized.current) { randomChildModeInitialized.current = true; return; }
+    try { localStorage.setItem('pv3-random-child-mode', JSON.stringify(randomChildMode)); } catch {}
+  }, [randomChildMode]);
+
+  // selectedChildMap 永続化
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('pv3-selected-children'));
+      if (stored && typeof stored === 'object') setSelectedChildMap(stored);
+    } catch {}
+  }, []);
+  const selectedChildMapInitialized = useRef(false);
+  useEffect(() => {
+    if (!selectedChildMapInitialized.current) { selectedChildMapInitialized.current = true; return; }
+    try { localStorage.setItem('pv3-selected-children', JSON.stringify(selectedChildMap)); } catch {}
+  }, [selectedChildMap]);
+
   // #10: resetKey — スクロールトップ
   useEffect(() => {
     if (resetKey > 0) {
@@ -367,6 +419,15 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       addToast('error', e.message);
     }
   }, [addToast]);
+
+  // generateタブに戻ったときにカード・プリセットを再取得
+  const tabRefreshed = useRef(false);
+  useEffect(() => {
+    if (!tabRefreshed.current) { tabRefreshed.current = true; return; }
+    if (activeTab !== 'generate' || !connectionRoute || connectionRoute === 'offline') return;
+    refreshCardsData();
+    api.getPresets().then(pd => setPresetsData(pd)).catch(() => {});
+  }, [activeTab]);
 
   useEffect(() => {
     if (!connectionRoute || connectionRoute === 'offline') return;
