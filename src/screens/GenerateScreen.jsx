@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import TagSuggest from '../components/TagSuggest';
 import { api } from '../lib/api';
 import { getConnection, resolveTmpImgUrl } from '../lib/connection';
-import { decrypt, encrypt } from '../lib/crypto';
+import { decrypt } from '../lib/crypto';
+import { generateAndUploadThumb } from '../lib/thumbGen';
 
 const MODELS = [
   { value: 'nai-diffusion-5-full',       label: 'V5 Full ⚡' },
@@ -116,35 +117,6 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
   );
 }
 
-async function generateCloudThumbnail(hash, addToast) {
-  const conn = getConnection();
-  if (conn.route !== 'cloud') return;
-  const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
-  try {
-    const res = await fetch(conn.cloudUrl + `/gallery/image/${hash}/data`, { headers });
-    if (!res.ok) throw new Error(`fetch ${res.status}`);
-    const plain = await decrypt(await res.arrayBuffer());
-    const imgUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
-    const imgEl = new Image();
-    await new Promise((ok, ng) => { imgEl.onload = ok; imgEl.onerror = ng; imgEl.src = imgUrl; });
-    URL.revokeObjectURL(imgUrl);
-    const MAX_W = 320;
-    const sc = Math.min(1, MAX_W / imgEl.naturalWidth);
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(imgEl.naturalWidth * sc);
-    canvas.height = Math.round(imgEl.naturalHeight * sc);
-    canvas.getContext('2d').drawImage(imgEl, 0, 0, canvas.width, canvas.height);
-    const webpBlob = await new Promise(r => canvas.toBlob(r, 'image/webp', 0.8));
-    const encThumb = await encrypt(new Uint8Array(await webpBlob.arrayBuffer()));
-    await fetch(conn.cloudUrl + `/thumbs/${hash}`, {
-      method: 'PUT',
-      headers: { ...headers, 'Content-Type': 'application/octet-stream' },
-      body: encThumb,
-    });
-  } catch (e) {
-    if (addToast) addToast('error', `サムネイル生成失敗: ${e.message}`);
-  }
-}
 
 function ResultCard({ item, onSave, onPreview }) {
   const label = item.filenameSegments?.filter(Boolean).join(' / ') || '（選択なし）';
@@ -504,6 +476,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           if (r.ok) {
             const plain = await decrypt(await r.arrayBuffer());
             entry.blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
+            generateAndUploadThumb(plain, parsedResult.hash, conn).catch(() => {});
           }
         } catch {}
       }
@@ -1058,18 +1031,19 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         const hash = result.image.hash;
         const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
         let blobUrl = null;
+        let plainBuf = null;
         try {
           const imgRes = await fetch(conn.cloudUrl + `/gallery/image/${hash}/data`, { headers });
           if (imgRes.ok) {
-            const plain = await decrypt(await imgRes.arrayBuffer());
-            blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
+            plainBuf = await decrypt(await imgRes.arrayBuffer());
+            blobUrl = URL.createObjectURL(new Blob([plainBuf], { type: 'image/png' }));
           }
         } catch {}
         setResults(prev => {
           const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, saved: false, blobUrl }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
-        generateCloudThumbnail(hash, addToast);
+        if (plainBuf) generateAndUploadThumb(plainBuf, hash, conn).catch(() => {});
       } else {
         setResults(prev => {
           const next = [{ ...result.image, folderSegments, filenameSegments, saved: false }, ...prev];

@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import ImageViewer from '../components/ImageViewer';
 import { getConnection, resolveThumbUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
+import { generateAndUploadThumb } from '../lib/thumbGen';
 
 const thumbCache = new Map();
 let activeDecrypts = 0;
@@ -88,6 +89,7 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
             const url = URL.createObjectURL(new Blob([plain], { type: mimeType }));
             thumbCache.set(image.hash, url);
             setBlobUrl(url);
+            if (!image.thumb_ok && isCloud) generateAndUploadThumb(plain, image.hash, conn).catch(() => {});
           })
           .catch(() => { releaseSlot(); });
       });
