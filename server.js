@@ -383,6 +383,11 @@ async function start() {
     res.json(preset);
   });
 
+  api.put('/presets', (req, res) => {
+    writePresetsData(req.body);
+    res.json({ ok: true });
+  });
+
   api.put('/presets/:id', (req, res) => {
     const data = readPresetsData();
     const idx = data.presets.findIndex(p => p.id === req.params.id);
