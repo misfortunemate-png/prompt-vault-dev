@@ -299,6 +299,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         promptApplied.current = stored;
       }
     } catch {}
+    try {
+      const rv = localStorage.getItem('pv3-randomSize');
+      if (rv !== null) setRandomSize(rv === 'true');
+    } catch {}
   }, []);
 
   // #7: カード選択の永続化 — 復元
@@ -409,7 +413,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   }, [activeTab]);
 
   useEffect(() => {
-    if (!connectionRoute || connectionRoute === 'offline') return;
+    if (!connectionRoute || connectionRoute === 'offline') {
+      setLoading(false);
+      return;
+    }
     async function loadData() {
       try {
         if (connectionRoute === 'cloud') {
@@ -1326,7 +1333,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                 {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
               <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-                <input type="checkbox" checked={randomSize} onChange={e => setRandomSize(e.target.checked)} />
+                <input type="checkbox" checked={randomSize} onChange={e => { setRandomSize(e.target.checked); try { localStorage.setItem('pv3-randomSize', String(e.target.checked)); } catch {} }} />
                 ランダムサイズ
               </label>
             </div>

@@ -138,6 +138,15 @@ export default function App() {
     return () => destroyVisibilityCheck();
   }, []);
 
+  // offline 時は 30 秒ごとに自動再チェック（manual=false の場合のみ）
+  useEffect(() => {
+    if (connectionState.route !== 'offline' || connectionState.manual) return;
+    const id = setInterval(() => {
+      checkReachability().then(setConnectionState).catch(() => {});
+    }, 30000);
+    return () => clearInterval(id);
+  }, [connectionState.route, connectionState.manual]);
+
   useEffect(() => {
     return startVersionCheck(() => {
       addToast('info', '新しいバージョンがあります。3秒後に更新します…');
