@@ -66,13 +66,19 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
   const isCloud = conn.route === 'cloud';
   const [blobUrl, setBlobUrl] = useState(null);
 
+  const parsedResult = (() => {
+    if (!task.result) return null;
+    if (typeof task.result === 'object') return task.result;
+    try { return JSON.parse(task.result); } catch { return null; }
+  })();
+
   useEffect(() => {
     if (task.status !== 'done') return;
-    if (!isCloud || !task.result?.hash) return;
+    if (!isCloud || !parsedResult?.hash) return;
     let url = null;
     let cancelled = false;
     const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
-    fetch(conn.cloudUrl + `/gallery/image/${task.result.hash}/data`, { headers })
+    fetch(conn.cloudUrl + `/gallery/image/${parsedResult.hash}/data`, { headers })
       .then(r => r.ok ? r.arrayBuffer() : null)
       .then(buf => buf ? decrypt(buf) : null)
       .then(plain => {
@@ -82,11 +88,11 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
       })
       .catch(() => {});
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [task.status, task.result?.hash, isCloud, conn.cloudUrl, conn.token]);
+  }, [task.status, parsedResult?.hash, isCloud, conn.cloudUrl, conn.token]);
 
-  const hasThumb = isCloud ? !!blobUrl : !!(task.result?.filename);
-  const thumbSrc = isCloud ? blobUrl : (task.result?.filename ? resolveTmpImgUrl(task.result.filename) : null);
-  const previewResult = isCloud ? { ...task.result, blobUrl } : task.result;
+  const hasThumb = isCloud ? !!blobUrl : !!(parsedResult?.filename);
+  const thumbSrc = isCloud ? blobUrl : (parsedResult?.filename ? resolveTmpImgUrl(parsedResult.filename) : null);
+  const previewResult = isCloud ? { ...parsedResult, blobUrl } : parsedResult;
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
@@ -408,9 +414,14 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         if (connectionRoute === 'cloud') {
           setVaultReady(true);
           try {
-            const [cd, pd] = await Promise.all([api.getCards(), api.getPresets()]);
+            const [cd, pd, qd] = await Promise.all([api.getCards(), api.getPresets(), api.getQueue()]);
             setCardsData(cd);
             setPresetsData(pd);
+            if (qd?.tasks) {
+              qd.tasks.forEach(t => { if (t.status === 'done') addedTaskIdsRef.current.add(t.id); });
+              queueInitializedRef.current = true;
+              setQueueData(qd);
+            }
           } catch { /* cloud では cards/presets なしでも動作可 */ }
         } else {
           const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
@@ -462,11 +473,16 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         try { parsedResult = JSON.parse(parsedResult); } catch { return; }
       }
       if (!parsedResult) return;
+      const parseSegArr = (raw) => {
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string') { try { return JSON.parse(raw); } catch {} }
+        return [];
+      };
       const entry = {
         ...parsedResult,
         task_id: task.id,
-        folderSegments: task.folder_segments || task.folderSegments || [],
-        filenameSegments: task.filename_segments || task.filenameSegments || [],
+        folderSegments: parseSegArr(task.folder_segments ?? task.folderSegments),
+        filenameSegments: parseSegArr(task.filename_segments ?? task.filenameSegments),
         saved: !!task.saved,
       };
       if (isCloud && parsedResult.hash) {
