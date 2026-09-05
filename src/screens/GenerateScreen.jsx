@@ -295,6 +295,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         if (stored.steps != null) setSteps(stored.steps);
         if (stored.scale != null) setScale(stored.scale);
         if (stored.sampler) setSampler(stored.sampler);
+        if (stored.randomSize != null) setRandomSize(stored.randomSize);
         promptApplied.current = stored;
       }
     } catch {}
@@ -690,10 +691,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       localStorage.setItem('pv3-last-prompt', JSON.stringify({
         positive: editedPositive,
         negative: editedNegative,
-        model, resolution, steps, scale, sampler,
+        model, resolution, steps, scale, sampler, randomSize,
       }));
     } catch {}
-  }, [editedPositive, editedNegative, model, resolution, steps, scale, sampler]);
+  }, [editedPositive, editedNegative, model, resolution, steps, scale, sampler, randomSize]);
 
   const handleClearPrompt = useCallback(() => {
     localStorage.removeItem('pv3-last-prompt');
