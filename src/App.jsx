@@ -138,9 +138,11 @@ export default function App() {
     return () => destroyVisibilityCheck();
   }, []);
 
-  // offline 時は 30 秒ごとに自動再チェック（manual=false の場合のみ）
+  // offline / cloud 時は 30 秒ごとに自動再チェック（manual=false の場合のみ）
+  // → フランが復帰したら自動で fran 経路に切り替わる
   useEffect(() => {
-    if (connectionState.route !== 'offline' || connectionState.manual) return;
+    const { route, manual } = connectionState;
+    if ((route !== 'offline' && route !== 'cloud') || manual) return;
     const id = setInterval(() => {
       checkReachability().then(setConnectionState).catch(() => {});
     }, 30000);
