@@ -8,7 +8,7 @@ async function request(path, opts = {}) {
   } else if (conn.route === 'cloud') {
     base = conn.cloudUrl;
   } else {
-    throw new Error('サーバーに接続できません');
+    throw new Error('オフライン: サーバーに接続できません');
   }
 
   const headers = { 'Content-Type': 'application/json', ...opts.headers };
@@ -16,8 +16,24 @@ async function request(path, opts = {}) {
     headers['Authorization'] = `Bearer ${conn.token}`;
   }
 
-  const res = await fetch(`${base}${path}`, { ...opts, headers });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  let res;
+  try {
+    res = await fetch(`${base}${path}`, { ...opts, headers });
+  } catch (e) {
+    const route = conn.route === 'cloud' ? 'Cloud' : 'Fran';
+    throw new Error(`ネットワークエラー [${route}] ${path}: ${e.message || '到達不能'}`);
+  }
+
+  if (!res.ok) {
+    let body = '';
+    try { const j = await res.json(); body = j.error || j.message || ''; } catch {}
+    const detail = body ? `: ${body}` : '';
+    if (res.status === 401) throw new Error(`認証エラー (401): トークンを設定してください`);
+    if (res.status === 403) throw new Error(`権限エラー (403)${detail}`);
+    if (res.status === 404) throw new Error(`エンドポイント未実装 (404): ${path}`);
+    if (res.status >= 500) throw new Error(`サーバーエラー (${res.status})${detail}`);
+    throw new Error(`API エラー (${res.status})${detail}`);
+  }
   return res.json();
 }
 

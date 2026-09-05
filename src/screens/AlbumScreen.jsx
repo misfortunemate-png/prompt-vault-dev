@@ -2,10 +2,29 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 import ImageViewer from '../components/ImageViewer';
 import { getConnection, resolveThumbUrl } from '../lib/connection';
-import { decrypt } from '../lib/crypto';
+import { decrypt, hasVaultKey } from '../lib/crypto';
 import { generateAndUploadThumb } from '../lib/thumbGen';
+import { getThumb, putThumb } from '../lib/thumbDb';
 
 const thumbCache = new Map();
+
+async function fetchWithRetry(url, options, retries = 3) {
+  let lastErr;
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      if (res.ok) return res;
+      if (res.status === 404) throw new Error('HTTP 404');
+      lastErr = new Error(`HTTP ${res.status}`);
+    } catch (e) {
+      if (e.message === 'HTTP 404') throw e;
+      lastErr = e;
+    }
+    if (i < retries - 1) await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+  }
+  throw lastErr;
+}
+
 let activeDecrypts = 0;
 const MAX_CONCURRENT = 4;
 const waitQueue = [];
@@ -69,30 +88,43 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
     const obs = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting) return;
       obs.disconnect();
-      const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
-      let fetchUrl, mimeType;
-      if (image.thumb_ok) {
-        fetchUrl = conn.cloudUrl + `/thumbs/${image.hash}`;
-        mimeType = 'image/webp';
-      } else {
-        fetchUrl = conn.cloudUrl + `/gallery/image/${image.hash}/data`;
-        mimeType = 'image/png';
-      }
-      acquireSlot().then(() => {
-        if (cancelled) { releaseSlot(); return; }
-        return fetch(fetchUrl, { headers })
-          .then(r => r.ok ? r.arrayBuffer() : Promise.reject(r.status))
-          .then(buf => decrypt(buf))
-          .then(plain => {
-            releaseSlot();
-            if (cancelled) return;
-            const url = URL.createObjectURL(new Blob([plain], { type: mimeType }));
+      (async () => {
+        // 1. IndexedDB キャッシュ確認（thumb_ok=1 の webp のみ保存済み）
+        if (image.thumb_ok) {
+          const cached = await getThumb(image.hash);
+          if (cached && !cancelled) {
+            const url = URL.createObjectURL(new Blob([cached], { type: 'image/webp' }));
             thumbCache.set(image.hash, url);
             setBlobUrl(url);
-            if (!image.thumb_ok && isCloud) generateAndUploadThumb(plain, image.hash, conn).catch(() => {});
-          })
-          .catch(() => { releaseSlot(); });
-      });
+            return;
+          }
+        }
+        if (cancelled) return;
+
+        // 2. ネットワーク取得（リトライ×3、1s/2s/3s バックオフ）
+        const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+        const fetchUrl = image.thumb_ok
+          ? conn.cloudUrl + `/thumbs/${image.hash}`
+          : conn.cloudUrl + `/gallery/image/${image.hash}/data`;
+        const mimeType = image.thumb_ok ? 'image/webp' : 'image/png';
+
+        await acquireSlot();
+        if (cancelled) { releaseSlot(); return; }
+        try {
+          const res = await fetchWithRetry(fetchUrl, { headers });
+          const plain = await decrypt(await res.arrayBuffer());
+          releaseSlot();
+          if (cancelled) return;
+          const url = URL.createObjectURL(new Blob([plain], { type: mimeType }));
+          thumbCache.set(image.hash, url);
+          setBlobUrl(url);
+          // thumb_ok=1 の webp だけ IndexedDB に保存（フルPNGは保存しない）
+          if (image.thumb_ok) putThumb(image.hash, plain).catch(() => {});
+          if (!image.thumb_ok && isCloud) generateAndUploadThumb(plain, image.hash, conn).catch(() => {});
+        } catch {
+          releaseSlot();
+        }
+      })();
     }, { rootMargin: '200px' });
     if (rootRef.current) obs.observe(rootRef.current);
     return () => {
@@ -246,7 +278,7 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
       setRecentImages(recent.images || []);
       setPresets(presetsData.presets || []);
     } catch (e) {
-      if (!e.message?.includes('400')) addToast('error', 'ギャラリーの読み込みに失敗しました');
+      if (!e.message?.includes('400')) addToast('error', `ギャラリーの読み込みに失敗しました: ${e.message}`);
       setGalleryData({ tree: [], totalImages: 0, totalFolders: 0 });
       setRecentImages([]);
       setPresets([]);
@@ -257,10 +289,17 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
     try {
       const data = await api.getGalleryFolder(folderPath);
       setFolderData(data);
-    } catch {
-      addToast('error', 'フォルダの読み込みに失敗しました');
+    } catch (e) {
+      addToast('error', `フォルダの読み込みに失敗しました: ${e.message}`);
     }
   }, [addToast]);
+
+  // cloud モードで vault key が未設定なら早期警告
+  useEffect(() => {
+    if (connectionRoute === 'cloud' && !hasVaultKey()) {
+      addToast('error', 'vault鍵が未設定: 設定 → 接続設定でインポートしてください');
+    }
+  }, [connectionRoute, addToast]);
 
   useEffect(() => {
     if (!connectionRoute || connectionRoute === 'offline') return;

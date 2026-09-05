@@ -8,6 +8,7 @@ import TemplateScreen from './screens/TemplateScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { api } from './lib/api';
 import { getConnection, checkReachability, initVisibilityCheck, destroyVisibilityCheck } from './lib/connection';
+import { hasVaultKey } from './lib/crypto';
 import { startVersionCheck } from './lib/versionCheck';
 
 const DISPLAY_KEY = 'pv-display-settings';
@@ -149,10 +150,14 @@ export default function App() {
     return () => clearInterval(id);
   }, [connectionState.route, connectionState.manual]);
 
-  // cloud モードでトークン未設定なら警告
+  // cloud モードで認証トークン or vault key が未設定なら警告
   useEffect(() => {
-    if (connectionState.route === 'cloud' && !connectionState.token) {
-      addToast('error', '設定 → 認証トークンを入力してください（クラウドモード）');
+    if (connectionState.route !== 'cloud') return;
+    const missing = [];
+    if (!connectionState.token) missing.push('認証トークン');
+    if (!hasVaultKey()) missing.push('vault鍵');
+    if (missing.length > 0) {
+      addToast('error', `クラウドモード: ${missing.join('・')}が未設定 → 設定 → 接続設定`);
     }
   }, [connectionState.route, connectionState.token, addToast]);
 

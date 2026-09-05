@@ -430,7 +430,9 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               queueInitializedRef.current = true;
               setQueueData(qd);
             }
-          } catch { /* cloud では cards/presets なしでも動作可 */ }
+          } catch (e) {
+            if (e.message?.includes('認証エラー')) addToast('error', e.message);
+          }
         } else {
           const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
           if (settings.generation?.model && !promptApplied.current) setModel(settings.generation.model);
@@ -445,8 +447,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
             setCardsData(cd);
           }
         }
-      } catch {
-        addToast('error', 'データの読み込みに失敗しました');
+      } catch (e) {
+        addToast('error', `データの読み込みに失敗しました: ${e.message}`);
       } finally {
         setLoading(false);
       }
