@@ -147,6 +147,13 @@ export default function App() {
     return () => clearInterval(id);
   }, [connectionState.route, connectionState.manual]);
 
+  // cloud モードでトークン未設定なら警告
+  useEffect(() => {
+    if (connectionState.route === 'cloud' && !connectionState.token) {
+      addToast('error', '設定 → 認証トークンを入力してください（クラウドモード）');
+    }
+  }, [connectionState.route, connectionState.token, addToast]);
+
   useEffect(() => {
     return startVersionCheck(() => {
       addToast('info', '新しいバージョンがあります。3秒後に更新します…');

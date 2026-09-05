@@ -6,7 +6,7 @@ const DEFAULTS = {
   manual: false,
   lastCheck: null,
   franUrl: 'https://fraine.tail204746.ts.net:8445/api',
-  cloudUrl: '',
+  cloudUrl: 'https://ai-family-foundation.shogosakamoto.workers.dev/api/prompt-vault',
   token: '',
 };
 

@@ -202,7 +202,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
   }, [onConnectionChange]);
 
   const handleFranUrlReset = useCallback(() => {
-    handleConnSettingChange({ franUrl: 'https://fraine.tail204746.ts.net/api' });
+    handleConnSettingChange({ franUrl: 'https://fraine.tail204746.ts.net:8445/api' });
   }, [handleConnSettingChange]);
 
   // vault鍵ハンドラー
