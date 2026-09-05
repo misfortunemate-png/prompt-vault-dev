@@ -1,4 +1,4 @@
-const CACHE_NAME = 'prompt-vault-v3.0.0';
+const CACHE_NAME = 'prompt-vault-v4.0.0';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -14,6 +14,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // クロスオリジンリクエスト（フランサーバー等）は傍受しない
+  if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
