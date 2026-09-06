@@ -197,8 +197,6 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [scale, setScale] = useState(5);
   const [sampler, setSampler] = useState('k_euler_ancestral');
   const [seed, setSeed] = useState('');
-  const [randomSize, setRandomSize] = useState(false);
-
   const [generating, setGenerating] = useState(false);
 
   const [queueData, setQueueData] = useState({ state: 'idle', tasks: [], currentIndex: null, startedAt: null });
@@ -295,13 +293,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         if (stored.steps != null) setSteps(stored.steps);
         if (stored.scale != null) setScale(stored.scale);
         if (stored.sampler) setSampler(stored.sampler);
-        if (stored.randomSize != null) setRandomSize(stored.randomSize);
         promptApplied.current = stored;
       }
-    } catch {}
-    try {
-      const rv = localStorage.getItem('pv3-randomSize');
-      if (rv !== null) setRandomSize(rv === 'true');
     } catch {}
   }, []);
 
@@ -700,10 +693,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       localStorage.setItem('pv3-last-prompt', JSON.stringify({
         positive: editedPositive,
         negative: editedNegative,
-        model, resolution, steps, scale, sampler, randomSize,
+        model, resolution, steps, scale, sampler,
       }));
     } catch {}
-  }, [editedPositive, editedNegative, model, resolution, steps, scale, sampler, randomSize]);
+  }, [editedPositive, editedNegative, model, resolution, steps, scale, sampler]);
 
   const handleClearPrompt = useCallback(() => {
     localStorage.removeItem('pv3-last-prompt');
@@ -743,7 +736,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   // ── Queue ──
 
-  const pickResolution = () => randomSize
+  const pickResolution = () => resolution === 'random'
     ? RESOLUTIONS[Math.floor(Math.random() * RESOLUTIONS.length)]
     : (RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0]);
 
@@ -1331,13 +1324,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
             </div>
             <div>
               <label style={labelStyle}>解像度</label>
-              <select value={resolution} onChange={e => setResolution(e.target.value)} disabled={randomSize} style={{ ...fieldStyle, opacity: randomSize ? 0.5 : 1 }}>
+              <select value={resolution} onChange={e => setResolution(e.target.value)} style={fieldStyle}>
                 {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                <option value="random">ランダム</option>
               </select>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-                <input type="checkbox" checked={randomSize} onChange={e => { setRandomSize(e.target.checked); try { localStorage.setItem('pv3-randomSize', String(e.target.checked)); } catch {} }} />
-                ランダムサイズ
-              </label>
             </div>
             <div>
               <label style={labelStyle}>ステップ</label>
