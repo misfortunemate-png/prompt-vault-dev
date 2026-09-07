@@ -761,7 +761,7 @@ async function start() {
     const apiKey = process.env.NOVELAI_API_KEY;
     if (!apiKey) return res.json({ ok: false, error: 'APIキーが未設定です' });
     try {
-      const resp = await fetch('https://image.api.novelai.net/ai/generate-image', {
+      const resp = await fetch('https://image.novelai.net/ai/generate-image', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ input: 'test', model: 'nai-diffusion-4-curated-preview', action: 'generate', parameters: { width: 64, height: 64, steps: 1, sampler: 'k_euler', scale: 5.0, n_samples: 1, seed: 0 } }),

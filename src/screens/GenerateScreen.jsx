@@ -1044,6 +1044,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         seed: seed !== '' ? parseInt(seed, 10) : null,
         folderSegments,
         filenameSegments,
+        preset_id: selectedPresetId || null,
       });
       const conn = getConnection();
       if (conn.route === 'cloud' && result.image?.hash) {
