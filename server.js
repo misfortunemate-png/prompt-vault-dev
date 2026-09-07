@@ -264,7 +264,11 @@ async function start() {
   api.get('/cards', (_req, res) => res.json(readCardsData()));
 
   api.put('/cards', (req, res) => {
-    writeCardsData(req.body);
+    const data = req.body;
+    const now = new Date().toISOString();
+    if (Array.isArray(data.slots)) for (const s of data.slots) { if (!s.updated_at) s.updated_at = now; }
+    if (Array.isArray(data.cards)) for (const c of data.cards) { if (!c.updated_at) c.updated_at = now; }
+    writeCardsData(data);
     res.json({ ok: true });
   });
 
@@ -279,6 +283,7 @@ async function start() {
       order: data.slots.length,
       useAsFolder: false,
       useInFilename: false,
+      updated_at: new Date().toISOString(),
     };
     data.slots.push(slot);
     writeCardsData(data);
@@ -294,7 +299,7 @@ async function start() {
     if (name && name.trim() !== data.slots[idx].name && data.slots.some(s => s.name === name.trim())) {
       return res.status(400).json({ error: '同名のスロットが既に存在します' });
     }
-    data.slots[idx] = { ...data.slots[idx], ...req.body };
+    data.slots[idx] = { ...data.slots[idx], ...req.body, updated_at: new Date().toISOString() };
     writeCardsData(data);
     res.json(data.slots[idx]);
   });
@@ -322,7 +327,7 @@ async function start() {
       if (!parent) return res.status(400).json({ error: '親カードが見つかりません' });
       if (parent.slotId !== slotId) return res.status(400).json({ error: '親カードは同じスロット内である必要があります' });
     }
-    const card = { id: generateId('c_'), slotId, name: name.trim(), positive, negative };
+    const card = { id: generateId('c_'), slotId, name: name.trim(), positive, negative, updated_at: new Date().toISOString() };
     if (parentId) card.parentId = parentId;
     data.cards.push(card);
     writeCardsData(data);
@@ -346,7 +351,7 @@ async function start() {
       if (!parent) return res.status(400).json({ error: '親カードが見つかりません' });
       if (parent.slotId !== targetSlotId) return res.status(400).json({ error: '親カードは同じスロット内である必要があります' });
     }
-    data.cards[idx] = { ...data.cards[idx], ...req.body, name: targetName };
+    data.cards[idx] = { ...data.cards[idx], ...req.body, name: targetName, updated_at: new Date().toISOString() };
     writeCardsData(data);
     res.json(data.cards[idx]);
   });
@@ -365,7 +370,7 @@ async function start() {
     const data = readCardsData();
     const src = data.cards.find(c => c.id === req.params.id);
     if (!src) return res.status(404).json({ error: 'カードが見つかりません' });
-    const newCard = { ...src, id: generateId('c_'), name: src.name + ' のコピー' };
+    const newCard = { ...src, id: generateId('c_'), name: src.name + ' のコピー', updated_at: new Date().toISOString() };
     data.cards.push(newCard);
     writeCardsData(data);
     res.json(newCard);
@@ -386,14 +391,17 @@ async function start() {
     const data = readPresetsData();
     const { name, tags = [], cards = {} } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'プリセット名は必須です' });
-    const preset = { id: generateId('p_'), name: name.trim(), tags, cards };
+    const preset = { id: generateId('p_'), name: name.trim(), tags, cards, updated_at: new Date().toISOString() };
     data.presets.push(preset);
     writePresetsData(data);
     res.json(preset);
   });
 
   api.put('/presets', (req, res) => {
-    writePresetsData(req.body);
+    const data = req.body;
+    const now = new Date().toISOString();
+    if (Array.isArray(data.presets)) for (const p of data.presets) { if (!p.updated_at) p.updated_at = now; }
+    writePresetsData(data);
     res.json({ ok: true });
   });
 
@@ -401,7 +409,7 @@ async function start() {
     const data = readPresetsData();
     const idx = data.presets.findIndex(p => p.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'プリセットが見つかりません' });
-    data.presets[idx] = { ...data.presets[idx], ...req.body };
+    data.presets[idx] = { ...data.presets[idx], ...req.body, updated_at: new Date().toISOString() };
     writePresetsData(data);
     res.json(data.presets[idx]);
   });
@@ -419,7 +427,7 @@ async function start() {
     const data = readPresetsData();
     const src = data.presets.find(p => p.id === req.params.id);
     if (!src) return res.status(404).json({ error: 'プリセットが見つかりません' });
-    const newPreset = { ...src, id: generateId('p_'), name: src.name + ' のコピー' };
+    const newPreset = { ...src, id: generateId('p_'), name: src.name + ' のコピー', updated_at: new Date().toISOString() };
     data.presets.push(newPreset);
     writePresetsData(data);
     res.json(newPreset);
