@@ -303,6 +303,12 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
 
   useEffect(() => {
     if (!connectionRoute || connectionRoute === 'offline') return;
+    setPath(null);
+    setFlatMode(null);
+    setFolderData(null);
+    setViewer(null);
+    setFavUpdates({});
+    setRecentImages([]);
     setLoading(true);
     loadRoot().finally(() => setLoading(false));
   }, [connectionRoute, loadRoot]);
@@ -429,6 +435,12 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
 
   const handleFavoriteToggle = useCallback((hash, val) => {
     setFavUpdates(m => ({ ...m, [hash]: val === 1 }));
+    if (!val || val === 0) {
+      setFlatMode(prev => {
+        if (!prev || prev.type !== 'favorites') return prev;
+        return { ...prev, images: prev.images.filter(img => img.hash !== hash) };
+      });
+    }
   }, []);
 
   const handleCaptionSave = useCallback(() => {}, []);

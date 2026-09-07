@@ -150,6 +150,10 @@ export default function App() {
     return () => clearInterval(id);
   }, [connectionState.route, connectionState.manual]);
 
+  useEffect(() => {
+    setResults([]);
+  }, [connectionState.route]);
+
   // cloud モードで認証トークン or vault key が未設定なら警告
   useEffect(() => {
     if (connectionState.route !== 'cloud') return;
