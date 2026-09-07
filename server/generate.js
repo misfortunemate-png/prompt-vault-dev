@@ -45,23 +45,34 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
   const destDir = join(vaultRoot, ...folderPath.split('/'));
   mkdirSync(destDir, { recursive: true });
   const destPath = join(destDir, newFilename);
-  copyFileSync(srcPath, destPath);
+
+  let finalPath = destPath;
+  let finalFilename = newFilename;
+  if (existsSync(destPath)) {
+    let counter = 1;
+    while (existsSync(finalPath)) {
+      finalFilename = `${prefix}_${seedStr}_${String(counter).padStart(3, '0')}.png`;
+      finalPath = join(destDir, finalFilename);
+      counter++;
+    }
+  }
+  copyFileSync(srcPath, finalPath);
 
   let hash = null;
   try {
-    const buf = readFileSync(destPath);
+    const buf = readFileSync(finalPath);
     hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
     const meta = parsePngMeta(buf);
     const charJson = meta.char_prompts ? JSON.stringify({ base_positive: meta.prompt || '', base_negative: meta.negative || '', chars: meta.char_prompts }) : null;
     const searchPrompt = meta.char_prompts
       ? [meta.prompt, ...meta.char_prompts.map(c => c.positive)].filter(Boolean).join(', ')
       : meta.prompt;
-    const st = statSync(destPath);
+    const st = statSync(finalPath);
     const now = new Date().toISOString();
     upsertImage({
       hash,
-      rel_path: `${folderPath}/${newFilename}`,
-      filename: newFilename,
+      rel_path: `${folderPath}/${finalFilename}`,
+      filename: finalFilename,
       folder: folderPath,
       size_bytes: buf.length,
       created_at: st.birthtimeMs ? new Date(st.birthtimeMs).toISOString() : now,
@@ -82,10 +93,10 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
       thumb_ok: 0,
       indexed_at: now,
     });
-    generateThumb(hash, destPath).catch(() => {});
+    generateThumb(hash, finalPath).catch(() => {});
   } catch (dbErr) {
     console.warn('[Save] DB登録失敗:', dbErr.message);
   }
 
-  return { saved_path: `${folderPath}/${newFilename}`, filename: newFilename, folder: folderPath, hash };
+  return { saved_path: `${folderPath}/${finalFilename}`, filename: finalFilename, folder: folderPath, hash };
 }

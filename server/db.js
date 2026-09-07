@@ -86,11 +86,13 @@ export function deleteByHash(hash) {
   getDb().prepare('DELETE FROM images WHERE hash = ?').run(hash);
 }
 
-export function deleteImage(hash) {
+export function getImagePath(hash) {
   const row = getDb().prepare('SELECT rel_path FROM images WHERE hash = ?').get(hash);
-  if (!row) return null;
+  return row ? row.rel_path : null;
+}
+
+export function removeImageRow(hash) {
   getDb().prepare('DELETE FROM images WHERE hash = ?').run(hash);
-  return row.rel_path;
 }
 
 export function listByFolder(folder) {
