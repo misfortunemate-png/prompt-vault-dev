@@ -215,8 +215,8 @@ async function start() {
 
   // M-4: CORS for cross-origin web front (GitHub Pages → Tailscale Express)
   const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
-  // Cloudflare Pages プレビューURL（ハッシュ付き）も許可
-  const ALLOWED_ORIGIN_PATTERNS = [/^https:\/\/[a-z0-9]+-prompt-vault-6gr\.pages\.dev$/];
+  // Cloudflare Pages 本番URL・プレビューURL（ハッシュ付き）を許可
+  const ALLOWED_ORIGIN_PATTERNS = [/^https:\/\/([a-z0-9]+-)?prompt-vault-6gr\.pages\.dev$/];
   function isAllowedOrigin(origin) {
     if (ALLOWED_ORIGINS.includes(origin)) return true;
     return ALLOWED_ORIGIN_PATTERNS.some(re => re.test(origin));
