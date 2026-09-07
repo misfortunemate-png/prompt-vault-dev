@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
+import { clearAll as clearThumbDb } from '../lib/thumbDb';
 import { FONT_REGISTRY, DISPLAY_DEFAULTS } from '../App';
 import {
   getConnection, checkReachability, switchRoute, clearManual, updateSettings, getTimeoutSetting,
@@ -263,6 +264,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     }
     const keys = await caches.keys();
     await Promise.all(keys.map(k => caches.delete(k)));
+    await clearThumbDb();
     location.reload();
   };
 

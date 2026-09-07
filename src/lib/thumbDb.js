@@ -35,3 +35,17 @@ export async function putThumb(hash, data) {
     });
   } catch {}
 }
+
+export async function clearAll() {
+  try {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    try { indexedDB.deleteDatabase(DB_NAME); } catch {}
+  }
+}

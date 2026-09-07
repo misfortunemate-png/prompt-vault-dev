@@ -191,6 +191,14 @@ function initVaultStructure() {
     } catch (e) {
       console.error('VAULT_ROOT .tmp 初期化エラー:', e.message);
     }
+    try {
+      const tmpDir = join(vaultRoot, '.tmp');
+      const cutoff = Date.now() - 60 * 60 * 1000;
+      for (const f of readdirSync(tmpDir)) {
+        const fp = join(tmpDir, f);
+        try { if (statSync(fp).mtimeMs < cutoff) unlinkSync(fp); } catch {}
+      }
+    } catch {}
     runMigration(vaultRoot);
     setImmediate(() => startScan(vaultRoot));
   }
@@ -216,7 +224,7 @@ async function start() {
   // M-4: CORS for cross-origin web front (GitHub Pages → Tailscale Express)
   const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
   // Cloudflare Pages 本番URL・プレビューURL（ハッシュ付き）を許可
-  const ALLOWED_ORIGIN_PATTERNS = [/^https:\/\/([a-z0-9]+-)?prompt-vault-6gr\.pages\.dev$/];
+  const ALLOWED_ORIGIN_PATTERNS = [/^https:\/\/([a-z0-9]+\.)?prompt-vault-6gr\.pages\.dev$/];
   function isAllowedOrigin(origin) {
     if (ALLOWED_ORIGINS.includes(origin)) return true;
     return ALLOWED_ORIGIN_PATTERNS.some(re => re.test(origin));
@@ -649,7 +657,7 @@ async function start() {
     const { filename, seed, folderSegments = [], filenameSegments = [], preset_id } = req.body;
     try {
       const saved = executeSave(process.env.VAULT_ROOT, { filename, seed, folderSegments, filenameSegments, preset_id });
-      res.json({ success: true, saved_path: saved.saved_path });
+      res.json({ success: true, saved_path: saved.saved_path, warning: saved.warning ?? null });
     } catch (e) {
       writeLog('error', 'SAVE_FAILED', e.message, '');
       res.status(500).json({ error: e.message });

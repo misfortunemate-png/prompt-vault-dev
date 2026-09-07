@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { readFileSync, mkdirSync, copyFileSync, existsSync, statSync } from 'fs';
+import { readFileSync, mkdirSync, copyFileSync, existsSync, statSync, unlinkSync } from 'fs';
 import { createHash } from 'crypto';
 import { generate as novelaiGenerate } from './providers/novelai.js';
 import { upsertImage } from './db.js';
@@ -57,8 +57,10 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
     }
   }
   copyFileSync(srcPath, finalPath);
+  try { unlinkSync(srcPath); } catch {}
 
   let hash = null;
+  let dbWarning = null;
   try {
     const buf = readFileSync(finalPath);
     hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
@@ -96,7 +98,8 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
     generateThumb(hash, finalPath).catch(() => {});
   } catch (dbErr) {
     console.warn('[Save] DB登録失敗:', dbErr.message);
+    dbWarning = dbErr.message;
   }
 
-  return { saved_path: `${folderPath}/${finalFilename}`, filename: finalFilename, folder: folderPath, hash };
+  return { saved_path: `${folderPath}/${finalFilename}`, filename: finalFilename, folder: folderPath, hash, warning: dbWarning };
 }

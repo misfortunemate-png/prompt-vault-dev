@@ -1059,6 +1059,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
             blobUrl = URL.createObjectURL(new Blob([plainBuf], { type: 'image/png' }));
           }
         } catch {}
+        if (result.task_id) addedTaskIdsRef.current.add(result.task_id);
         setResults(prev => {
           const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, saved: false, blobUrl }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
@@ -1085,7 +1086,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       if (conn.route === 'cloud') {
         await api.saveImage({ task_id: item.task_id });
       } else {
-        await api.saveImage({ filename: item.filename, seed: item.seed, folderSegments: item.folderSegments || [], filenameSegments: item.filenameSegments || [] });
+        const r = await api.saveImage({ filename: item.filename, seed: item.seed, folderSegments: item.folderSegments || [], filenameSegments: item.filenameSegments || [], preset_id: item.preset_id || null });
+        if (r?.warning) addToast('warning', `保存しましたがDB登録に問題があります: ${r.warning}`);
       }
       setResults(prev => prev.map((r, i) => i === idx ? { ...r, saved: true } : r));
     } catch (e) {
