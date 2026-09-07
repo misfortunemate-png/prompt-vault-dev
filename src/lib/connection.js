@@ -16,7 +16,7 @@ function migrateState(state) {
   if (s.franUrl === 'https://fraine.tail204746.ts.net/api') {
     s = { ...s, franUrl: 'https://fraine.tail204746.ts.net:8445/api' };
   }
-  if (s.cloudUrl === 'https://ai-family-foundation.shogosakamoto.workers.dev/api/prompt-vault') {
+  if (!s.cloudUrl || s.cloudUrl === 'https://ai-family-foundation.shogosakamoto.workers.dev/api/prompt-vault') {
     s = { ...s, cloudUrl: 'https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault' };
   }
   return s;
