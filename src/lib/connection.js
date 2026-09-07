@@ -6,16 +6,20 @@ const DEFAULTS = {
   manual: false,
   lastCheck: null,
   franUrl: 'https://fraine.tail204746.ts.net:8445/api',
-  cloudUrl: 'https://ai-family-foundation.shogosakamoto.workers.dev/api/prompt-vault',
+  cloudUrl: 'https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault',
   token: '',
 };
 
 // 旧デフォルト URL（ポート未指定→443→別サービス）を自動修正
 function migrateState(state) {
-  if (state.franUrl === 'https://fraine.tail204746.ts.net/api') {
-    return { ...state, franUrl: 'https://fraine.tail204746.ts.net:8445/api' };
+  let s = state;
+  if (s.franUrl === 'https://fraine.tail204746.ts.net/api') {
+    s = { ...s, franUrl: 'https://fraine.tail204746.ts.net:8445/api' };
   }
-  return state;
+  if (s.cloudUrl === 'https://ai-family-foundation.shogosakamoto.workers.dev/api/prompt-vault') {
+    s = { ...s, cloudUrl: 'https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault' };
+  }
+  return s;
 }
 
 export function getConnection() {
