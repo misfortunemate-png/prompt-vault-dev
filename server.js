@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
@@ -11,9 +11,9 @@ import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeT
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// --env-file 未使用時のフォールバック（node server.js 直接起動対策）
+// --env-file で読まれていなければ .env から不足変数を補完
 const _envPath = join(__dirname, '.env');
-if (!process.env.VAULT_ROOT && existsSync(_envPath)) {
+if (existsSync(_envPath)) {
   for (const line of readFileSync(_envPath, 'utf8').split('\n')) {
     const t = line.trim();
     if (!t || t.startsWith('#')) continue;
@@ -794,7 +794,16 @@ async function start() {
 
   api.post('/debug/reset', (_req, res) => {
     try {
-      for (const f of readdirSync(join(__dirname, 'data'))) unlinkSync(join(__dirname, 'data', f));
+      const dataDir = join(__dirname, 'data');
+      for (const f of readdirSync(dataDir)) {
+        const fullPath = join(dataDir, f);
+        if (statSync(fullPath).isDirectory()) {
+          rmSync(fullPath, { recursive: true, force: true });
+        } else {
+          unlinkSync(fullPath);
+        }
+      }
+      mkdirSync(join(dataDir, 'thumbs'), { recursive: true });
       writeFileSync(SETTINGS_PATH, JSON.stringify(DEFAULT_SETTINGS, null, 2));
       res.json({ ok: true });
     } catch (e) {

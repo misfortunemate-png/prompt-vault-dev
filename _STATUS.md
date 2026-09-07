@@ -1,9 +1,9 @@
 ---
 project: prompt-vault
-version: 3.13.0
-milestone: ランダムサイズ生成
+version: 4.0.0
+milestone: 外部レビュー修正
 status: done
-updated: 2026-09-01
+updated: 2026-09-08
 next: Worker統合待ち
 ---
 

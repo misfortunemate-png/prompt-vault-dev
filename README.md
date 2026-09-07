@@ -54,7 +54,7 @@ ALLOWED_ORIGINS=https://misfortunemate-png.github.io,https://prompt-vault-6gr.pa
 
 | 設定項目 | 値 |
 |----------|-----|
-| Cloud URL | `https://ai-family-foundation.shogosakamoto.workers.dev` |
+| Cloud URL | `https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault` |
 | Token | （管理者に確認） |
 | Vault Key | （管理者に確認） |
 
