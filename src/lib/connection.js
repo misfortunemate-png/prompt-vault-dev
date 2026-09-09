@@ -48,11 +48,12 @@ function getTimeoutMs() {
   } catch { return 8000; }
 }
 
-async function fetchReachable(url, timeoutMs) {
+async function fetchReachable(url, timeoutMs, token = null) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const res = await fetch(url, { signal: ctrl.signal, headers });
     return res.ok;
   } catch {
     return false;
@@ -75,11 +76,16 @@ export async function checkReachability() {
   }
 
   if (state.cloudUrl) {
-    const cloudOk = await fetchReachable(state.cloudUrl + '/healthz', timeoutMs);
-    if (cloudOk) {
-      const next = { ...state, route: 'cloud', lastCheck };
-      saveConnection(next);
-      return next;
+    const cloudHealthOk = await fetchReachable(state.cloudUrl + '/healthz', timeoutMs);
+    if (cloudHealthOk) {
+      const authOk = state.token
+        ? await fetchReachable(state.cloudUrl + '/settings', timeoutMs, state.token)
+        : false;
+      if (authOk) {
+        const next = { ...state, route: 'cloud', lastCheck };
+        saveConnection(next);
+        return next;
+      }
     }
   }
 
