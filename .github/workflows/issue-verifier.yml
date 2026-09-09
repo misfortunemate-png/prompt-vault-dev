@@ -5,8 +5,11 @@ on:
     paths:
       - 'scripts/verify-issues.mjs'
       - 'tests/issues/**'
+      - 'src/**'
+      - 'server/**'
       - 'server.js'
       - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/issue-verifier.yml'
   workflow_dispatch:
 
@@ -17,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
       - run: npm ci
       - run: npm run verify:issues -- --json
