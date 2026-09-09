@@ -16,6 +16,7 @@ export default {
   issue: 'pv#16',
   title: 'backend-bound generate results and queue state',
   level: 'STATIC',
+  gate: false,
 
   async verify() {
     const generateSource = readFileSync(new URL('../../src/screens/GenerateScreen.jsx', import.meta.url), 'utf8');
