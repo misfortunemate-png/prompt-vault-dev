@@ -1,4 +1,5 @@
-import { getConnection } from './connection.js';
+import { getConnection, resolveThumbUrl } from './connection.js';
+import { decrypt } from './crypto.js';
 
 async function request(path, opts = {}) {
   const conn = getConnection();
@@ -99,6 +100,21 @@ export const api = {
   }),
   deleteGalleryImage: (hash) => request(`/gallery/image/${encodeURIComponent(hash)}`, { method: 'DELETE' }),
   getGalleryByCard: (positive, limit = 4) => request(`/gallery/by-card?positive=${encodeURIComponent(positive)}&limit=${limit}`),
+
+  // Thumbnail (unified Cloud/Fran path)
+  // Cloud: fetches with auth, decrypts, returns blob URL (caller must revoke when done)
+  // Fran: returns direct URL string
+  async getThumb(hash) {
+    const conn = getConnection();
+    if (conn.route !== 'cloud') return resolveThumbUrl(hash);
+    const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+    try {
+      const res = await fetch(conn.cloudUrl + `/thumbs/${hash}`, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const plain = await decrypt(await res.arrayBuffer());
+      return URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
+    } catch { return null; }
+  },
 
   // Queue M5
   getQueue: () => request('/queue'),
