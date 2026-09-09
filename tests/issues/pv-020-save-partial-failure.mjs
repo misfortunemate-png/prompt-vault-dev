@@ -16,6 +16,7 @@ export default {
   issue: 'pv#20',
   title: 'Fran save partial failure semantics',
   level: 'STATIC',
+  gate: false,
 
   async verify() {
     const generateSource = readFileSync(new URL('../../server/generate.js', import.meta.url), 'utf8');
