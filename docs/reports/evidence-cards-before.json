@@ -1,0 +1,330 @@
+﻿{
+  "tool": {
+    "name": "prompt-vault-review-doctor",
+    "version": "1.0.1",
+    "readOnly": true
+  },
+  "checkedAt": "2026-09-09T18:27:04.806Z",
+  "verdict": "REPAIR_REQUIRED",
+  "repository": {
+    "root": ".",
+    "branch": "chatgpt/review-doctor-20260909",
+    "head": "56ef5fcdcfe11e3639c8dd25fc4b46c34ed8e42c",
+    "dirty": true,
+    "packageVersion": "4.0.0",
+    "node": "v24.15.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "fran": {
+    "vaultRootConfigured": true,
+    "sqlite": {
+      "verdict": "COMPATIBLE",
+      "database": {
+        "exists": true,
+        "sizeBytes": 11632640,
+        "modifiedAt": "2026-09-09T06:16:58.595Z"
+      },
+      "wal": {
+        "exists": true,
+        "sizeBytes": 4157112,
+        "modifiedAt": "2026-09-09T06:17:08.142Z"
+      },
+      "shm": {
+        "exists": true,
+        "sizeBytes": 32768,
+        "modifiedAt": "2026-09-08T13:44:30.825Z"
+      },
+      "check": {
+        "kind": "quick_check",
+        "ok": true,
+        "messages": [
+          "ok"
+        ]
+      },
+      "journalMode": "wal",
+      "userVersion": 0,
+      "rowCount": 3743,
+      "tables": [
+        "images"
+      ],
+      "imageSchema": {
+        "missingColumns": [],
+        "typeMismatches": [],
+        "missingIndexes": [],
+        "indexes": [
+          "idx_favorite",
+          "idx_created",
+          "idx_folder",
+          "sqlite_autoindex_images_1"
+        ],
+        "columns": [
+          {
+            "name": "hash",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": true
+          },
+          {
+            "name": "rel_path",
+            "type": "TEXT",
+            "notNull": true,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "filename",
+            "type": "TEXT",
+            "notNull": true,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "folder",
+            "type": "TEXT",
+            "notNull": true,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "size_bytes",
+            "type": "INTEGER",
+            "notNull": true,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "created_at",
+            "type": "TEXT",
+            "notNull": true,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "modified_at",
+            "type": "TEXT",
+            "notNull": true,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "width",
+            "type": "INTEGER",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "height",
+            "type": "INTEGER",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "prompt",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "negative",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "seed",
+            "type": "INTEGER",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "model",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "steps",
+            "type": "INTEGER",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "scale",
+            "type": "REAL",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "sampler",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "preset_id",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "favorite",
+            "type": "INTEGER",
+            "notNull": false,
+            "defaultValue": "0",
+            "primaryKey": false
+          },
+          {
+            "name": "caption",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "thumb_ok",
+            "type": "INTEGER",
+            "notNull": false,
+            "defaultValue": "0",
+            "primaryKey": false
+          },
+          {
+            "name": "indexed_at",
+            "type": "TEXT",
+            "notNull": true,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "caption_config",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "char_prompts",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          },
+          {
+            "name": "meta_updated_at",
+            "type": "TEXT",
+            "notNull": false,
+            "defaultValue": null,
+            "primaryKey": false
+          }
+        ]
+      },
+      "migrationTracking": {
+        "schemaMigrationsPresent": false,
+        "note": "schema_migrations table absent; current main uses ad-hoc ALTER TABLE upgrades"
+      }
+    },
+    "json": {
+      "cards": {
+        "name": "cards.json",
+        "verdict": "REPAIR_REQUIRED",
+        "exists": true,
+        "sizeBytes": 12359,
+        "modifiedAt": "2026-09-09T06:14:41.887Z",
+        "sha256": "d43e6beeb8feee1c8cabb2ded20178028344d821dd872d7cf51e9ab85fc0068f",
+        "validJson": true,
+        "version": 1,
+        "errors": [
+          "cards using noncanonical slot_id instead of slotId: 38 (see ai-family-foundation #3)",
+          "cards using noncanonical parent_id instead of parentId: 19 (see ai-family-foundation #3)"
+        ],
+        "warnings": []
+      },
+      "presets": {
+        "name": "presets.json",
+        "verdict": "COMPATIBLE",
+        "exists": true,
+        "sizeBytes": 404,
+        "modifiedAt": "2026-09-04T22:27:13.897Z",
+        "sha256": "918742828da29fcd8c27eca3d9cc60e68e2c360626cb239cfcf5c265c60c005b",
+        "validJson": true,
+        "version": 1,
+        "errors": [],
+        "warnings": []
+      },
+      "settings": {
+        "name": "settings.json",
+        "verdict": "COMPATIBLE",
+        "exists": true,
+        "sizeBytes": 407,
+        "modifiedAt": "2026-09-04T10:00:24.441Z",
+        "sha256": "e6c2b4bdbc75c626e09040fae0711cc4a2dbb694cd7d363d8fa8479a6c61fe0e",
+        "validJson": true,
+        "version": null,
+        "errors": [],
+        "warnings": []
+      }
+    },
+    "m2m3": {
+      "verdict": "UNKNOWN",
+      "state": "UNCLASSIFIED",
+      "source": {
+        "exists": false
+      },
+      "backup": {
+        "exists": false
+      }
+    },
+    "runtime": {
+      "state": "REACHABLE",
+      "port": 8789,
+      "health": {
+        "reachable": true,
+        "statusCode": 200,
+        "body": {
+          "status": "ok",
+          "version": "4.0.0"
+        }
+      },
+      "versionMatchesRepository": true
+    }
+  },
+  "implementationRisks": [
+    {
+      "issue": "prompt-vault-dev#33",
+      "present": true,
+      "detail": "silent ALTER TABLE catch remains for: caption_config, char_prompts, meta_updated_at"
+    },
+    {
+      "issue": "prompt-vault-dev#34",
+      "present": true,
+      "detail": {
+        "cards": true,
+        "presets": true,
+        "settings": true
+      }
+    },
+    {
+      "issue": "prompt-vault-dev#35 Phase 4",
+      "present": true,
+      "detail": "M2→M3 migration is still invoked from normal startup path"
+    }
+  ],
+  "limitations": [
+    "Cloudflare D1/R2/DO are not queried by this script.",
+    "No SQLite WAL checkpoint or migration is executed.",
+    "No JSON file is repaired or rewritten.",
+    "A reachable healthz only proves the local HTTP process responded; it is not a full API smoke test.",
+    "cards.json validation treats slot_id/parent_id as noncanonical schema pollution from the known cross-repo contract bug (#3), while true orphan detection uses slotId ?? slot_id."
+  ]
+}

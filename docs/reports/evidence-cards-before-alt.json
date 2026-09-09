@@ -1,0 +1,19 @@
+{
+  "capturedAt": "2026-09-09T18:27:55.508Z",
+  "totalSlots": 8,
+  "totalCards": 38,
+  "orphans": 0,
+  "snakeContaminatedCards": 38,
+  "snakeSlots": 8,
+  "parentIdSnake": 38,
+  "orphanIds": [],
+  "snakeFields": [
+    "slot_id",
+    "parent_id"
+  ],
+  "slotSnakeFields": [
+    "slot_order",
+    "use_as_folder",
+    "use_in_filename"
+  ]
+}
