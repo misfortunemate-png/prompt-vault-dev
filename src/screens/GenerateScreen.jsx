@@ -427,6 +427,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
             if (e.message?.includes('認証エラー')) addToast('error', e.message);
           }
         } else {
+          setQueueData({ state: 'idle', tasks: [], currentIndex: null, startedAt: null });
           const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
           if (settings.generation?.model && !promptApplied.current) setModel(settings.generation.model);
           const ready = !!info.vaultRoot;
@@ -448,6 +449,11 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     }
     loadData();
   }, [addToast, connectionRoute]);
+
+  useEffect(() => {
+    setQueueData({ state: 'idle', tasks: [], currentIndex: null, startedAt: null });
+    setQueueExpanded(false);
+  }, [connectionRoute]);
 
   useEffect(() => {
     if (queueData.state !== 'running') return;
@@ -956,6 +962,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const handleGenerate = async () => {
     if (steps > 28 && !window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
     setGenerating(true);
+    const routeAtFetch = connectionRoute;
     const res = pickResolution();
     const allCards = cardsData?.cards || [];
 
@@ -1059,6 +1066,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
             blobUrl = URL.createObjectURL(new Blob([plainBuf], { type: 'image/png' }));
           }
         } catch {}
+        if (connectionRoute !== routeAtFetch) return;
         if (result.task_id) addedTaskIdsRef.current.add(result.task_id);
         setResults(prev => {
           const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, saved: false, blobUrl }, ...prev];
@@ -1066,6 +1074,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         });
         if (plainBuf) generateAndUploadThumb(plainBuf, hash, conn).catch(() => {});
       } else {
+        if (connectionRoute !== routeAtFetch) return;
         setResults(prev => {
           const next = [{ ...result.image, folderSegments, filenameSegments, saved: false }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
@@ -1082,6 +1091,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const handleSave = async (idx) => {
     const item = results[idx];
     const conn = getConnection();
+    const routeAtFetch = connectionRoute;
     try {
       if (conn.route === 'cloud') {
         await api.saveImage({ task_id: item.task_id });
@@ -1089,6 +1099,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         const r = await api.saveImage({ filename: item.filename, seed: item.seed, folderSegments: item.folderSegments || [], filenameSegments: item.filenameSegments || [], preset_id: item.preset_id || null });
         if (r?.warning) addToast('warning', `保存しましたがDB登録に問題があります: ${r.warning}`);
       }
+      if (connectionRoute !== routeAtFetch) return;
       setResults(prev => prev.map((r, i) => i === idx ? { ...r, saved: true } : r));
     } catch (e) {
       addToast('error', '保存に失敗しました: ' + (e.message || ''));
