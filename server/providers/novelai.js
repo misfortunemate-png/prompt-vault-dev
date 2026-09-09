@@ -4,6 +4,7 @@ import { randomInt, randomBytes } from 'crypto';
 import { inflateRawSync } from 'zlib';
 
 const API_URL = 'https://image.novelai.net/ai/generate-image';
+const GENERATE_TIMEOUT_MS = 120_000;
 
 // ZIPローカルファイルヘッダー (PK\x03\x04) を走査してPNGを取得
 // 対応圧縮: 0=store, 8=deflate
@@ -92,6 +93,7 @@ export async function generate({ prompt, negativePrompt, model, width, height, s
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ input: prompt, model, action: 'generate', parameters }),
+    signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS),
   });
 
   if (!resp.ok) {
