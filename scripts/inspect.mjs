@@ -11,7 +11,11 @@ const results = [];
 function check(name, fn) {
   try {
     const ok = fn();
-    results.push({ name, ok, msg: ok ? '' : 'FAILED' });
+    if (ok === null) {
+      results.push({ name, ok: null, msg: 'NOT_RUN' });
+    } else {
+      results.push({ name, ok, msg: ok ? '' : 'FAILED' });
+    }
   } catch (e) {
     results.push({ name, ok: false, msg: e.message });
   }
@@ -87,7 +91,8 @@ check('版確認', () => {
       return false;
     }
   } catch {
-    console.log('  ⚠ Server not running, skipping healthz check');
+    console.log('  ⚠ Server not running — healthz check NOT_RUN');
+    return null;
   }
   return true;
 });
@@ -144,14 +149,20 @@ check('ビルド確認', () => {
 // Summary
 console.log('\n=== Inspect Results ===\n');
 let allGreen = true;
+let hasNotRun = false;
 for (const r of results) {
-  const icon = r.ok ? '✅' : '❌';
+  const icon = r.ok === true ? '✅' : r.ok === null ? '⚠' : '❌';
   console.log(`${icon} ${r.name}${r.msg ? ': ' + r.msg : ''}`);
-  if (!r.ok) allGreen = false;
+  if (r.ok === false) allGreen = false;
+  if (r.ok === null) hasNotRun = true;
 }
 console.log('');
 if (allGreen) {
-  console.log('=== ALL GREEN ===');
+  if (hasNotRun) {
+    console.log('=== PASS (一部 NOT_RUN) ===');
+  } else {
+    console.log('=== ALL GREEN ===');
+  }
 } else {
   console.log('=== SOME CHECKS FAILED ===');
   process.exit(1);

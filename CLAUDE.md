@@ -2,7 +2,7 @@
 
 ## 文書階層
 
-- 発注文書: ai-family-ops docs/20260817_prompt-vault_requirements_v1.1.md
+- 発注文書: ai-family-ops docs/20260817_prompt-vault_requirements_v1.3.md
 - 権威文書:
   - docs/20260817_prompt-vault_spec_m1.md（M1実装仕様書）
   - docs/instructions/20260817_prompt-vault_m1_instructions.md（M1作業指示書）
@@ -89,7 +89,7 @@
 
 ## 保存API（M3形式）
 
-リクエスト: `{ filename, seed, folderSegments: string[], filenameSegments: string[] }`
+リクエスト: `{ filename, seed, folderSegments: string[], filenameSegments: string[], preset_id?: string }`
 - folderSegments: useAsFolder=trueのスロットで選択されたカード名
 - filenameSegments: useInFilename=trueのスロットで選択されたカード名
 - ファイル名: `{filenameSegments連結}_{seed10桁}.png`

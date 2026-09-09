@@ -41,9 +41,14 @@ function getDb() {
       CREATE INDEX IF NOT EXISTS idx_created ON images(created_at);
       CREATE INDEX IF NOT EXISTS idx_favorite ON images(favorite);
     `);
-    try { db.exec('ALTER TABLE images ADD COLUMN caption_config TEXT'); } catch {}
-    try { db.exec('ALTER TABLE images ADD COLUMN char_prompts TEXT'); } catch {}
-    try { db.exec('ALTER TABLE images ADD COLUMN meta_updated_at TEXT'); } catch {}
+    const existingCols = new Set(db.pragma('table_info(images)').map(c => c.name));
+    const addIfMissing = (colDef) => {
+      const colName = colDef.split(' ')[0];
+      if (!existingCols.has(colName)) db.exec(`ALTER TABLE images ADD COLUMN ${colDef}`);
+    };
+    addIfMissing('caption_config TEXT');
+    addIfMissing('char_prompts TEXT');
+    addIfMissing('meta_updated_at TEXT');
   }
   return db;
 }
