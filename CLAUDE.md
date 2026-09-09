@@ -239,3 +239,7 @@
 - `GET /api/images/.tmp/:filename`
 - Content-Type: image/png
 - 生成直後の一時ファイル。保存（POST /api/save）前に取得可能
+
+## Issue Verifier
+
+Issue対応時は docs/issue-verifier.md のIssue Verifierを利用すること。
