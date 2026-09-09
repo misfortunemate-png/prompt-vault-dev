@@ -737,9 +737,11 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
                 <button onClick={handleTestApi} style={debugBtnStyle}>
                   NovelAI疎通テスト
                 </button>
-                <button onClick={handleTestFs} style={debugBtnStyle}>
-                  FS書込テスト
-                </button>
+                {connectionState.route !== 'cloud' && (
+                  <button onClick={handleTestFs} style={debugBtnStyle}>
+                    FS書込テスト
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     try {

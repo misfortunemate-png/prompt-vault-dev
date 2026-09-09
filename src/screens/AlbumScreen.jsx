@@ -182,6 +182,32 @@ function FolderRow({ node, depth, onNavigate }) {
   );
 }
 
+function PreviewThumb({ hash }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    const conn = getConnection();
+    if (conn.route !== 'cloud') {
+      setSrc(resolveThumbUrl(hash));
+      return;
+    }
+    const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+    let blobUrl = null;
+    let cancelled = false;
+    fetch(conn.cloudUrl + `/thumbs/${hash}`, { headers })
+      .then(r => r.ok ? r.arrayBuffer() : null)
+      .then(buf => buf ? decrypt(buf) : null)
+      .then(plain => {
+        if (cancelled || !plain) return;
+        blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
+        setSrc(blobUrl);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [hash]);
+  if (!src) return <Placeholder />;
+  return <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />;
+}
+
 function FolderCard({ node, onNavigate }) {
   return (
     <button
@@ -198,11 +224,7 @@ function FolderCard({ node, onNavigate }) {
           const hash = node.previewHashes?.[i];
           return (
             <div key={i} style={{ width: '60px', height: '60px', overflow: 'hidden', background: 'var(--line)', borderRadius: '2px' }}>
-              {hash ? (
-                <img src={resolveThumbUrl(hash)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
-              ) : (
-                <Placeholder />
-              )}
+              {hash ? <PreviewThumb hash={hash} /> : <Placeholder />}
             </div>
           );
         })}
@@ -525,13 +547,15 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
           style={{ background: searchOpen ? 'var(--accent)' : 'none', color: searchOpen ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--line)', borderRadius: '4px', cursor: 'pointer', padding: '4px 7px', minHeight: '32px', fontSize: '16px', flexShrink: 0 }}
           title="検索"
         >🔍</button>
-        {/* 🔄 リスキャン */}
-        <button
-          onClick={handleRescan}
-          disabled={scanning}
-          style={{ background: 'none', border: 'none', cursor: scanning ? 'default' : 'pointer', padding: '4px 6px', minHeight: '44px', fontSize: '18px', opacity: scanning ? 0.5 : 1, flexShrink: 0 }}
-          title="リスキャン"
-        >{scanning ? '⟳' : '🔄'}</button>
+        {/* 🔄 リスキャン（Cloud接続時は非表示） */}
+        {connectionRoute !== 'cloud' && (
+          <button
+            onClick={handleRescan}
+            disabled={scanning}
+            style={{ background: 'none', border: 'none', cursor: scanning ? 'default' : 'pointer', padding: '4px 6px', minHeight: '44px', fontSize: '18px', opacity: scanning ? 0.5 : 1, flexShrink: 0 }}
+            title="リスキャン"
+          >{scanning ? '⟳' : '🔄'}</button>
+        )}
       </div>
 
       {/* 検索バー */}
