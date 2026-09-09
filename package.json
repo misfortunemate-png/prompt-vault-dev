@@ -9,7 +9,8 @@
     "build:pages": "vite build --mode pages",
     "deploy:pages": "npm run build:pages && node scripts/deploy-pages.mjs",
     "start": "NODE_ENV=production node --env-file=.env server.js",
-    "inspect": "node scripts/inspect.mjs"
+    "inspect": "node scripts/inspect.mjs",
+    "verify:issues": "node scripts/verify-issues.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
