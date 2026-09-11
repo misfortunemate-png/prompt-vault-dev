@@ -144,6 +144,9 @@ function loadDanbooruTags() {
 function runMigration(vaultRoot) {
   const m2Path = join(vaultRoot, 'presets.json');
   const bakPath = join(vaultRoot, 'presets.json.bak');
+  const markerPath = join(vaultRoot, '.m3-migrated');
+
+  if (existsSync(markerPath)) return;
   if (!existsSync(m2Path) || existsSync(CARDS_PATH)) return;
 
   console.log('[Migration] M2 presets.json → M3 cards.json を開始');
@@ -187,9 +190,15 @@ function runMigration(vaultRoot) {
     }
   }
 
-  writeCardsData(cards);
-  if (!existsSync(PRESETS_DATA_PATH)) writePresetsData({ version: 1, presets: [] });
+  atomicWriteJson(CARDS_PATH, cards);
+  if (!existsSync(PRESETS_DATA_PATH)) atomicWriteJson(PRESETS_DATA_PATH, { version: 1, presets: [] });
   renameSync(m2Path, bakPath);
+
+  writeFileSync(markerPath, JSON.stringify({
+    migrated_at: new Date().toISOString(),
+    slots: cards.slots.length,
+    cards: cards.cards.length,
+  }));
 
   console.log(`[Migration] 完了: スロット${cards.slots.length}件, カード${cards.cards.length}件。${m2Path} → .bak`);
 }
