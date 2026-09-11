@@ -176,6 +176,16 @@ export function setCaptionConfig(hash, configJson) {
   getDb().prepare('UPDATE images SET caption_config = ? WHERE hash = ?').run(configJson, hash);
 }
 
+export function updateSyncMeta(hash, { preset_id, created_at }) {
+  const sets = [];
+  const vals = [];
+  if (preset_id !== undefined && preset_id !== null) { sets.push('preset_id = ?'); vals.push(preset_id); }
+  if (created_at !== undefined && created_at !== null) { sets.push('created_at = ?'); vals.push(created_at); }
+  if (sets.length === 0) return;
+  vals.push(hash);
+  getDb().prepare(`UPDATE images SET ${sets.join(', ')} WHERE hash = ?`).run(...vals);
+}
+
 export function getGalleryByCard(positive, limit = 4) {
   const like = `%${positive.slice(0, 100)}%`;
   return getDb().prepare(
