@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync, rmSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
@@ -72,8 +72,19 @@ function readCardsData() {
   return JSON.parse(readFileSync(CARDS_PATH, 'utf8'));
 }
 
+function atomicWriteJson(filePath, data) {
+  const json = JSON.stringify(data, null, 2);
+  const tmpPath = filePath + '.tmp';
+  const bakPath = filePath + '.bak';
+  writeFileSync(tmpPath, json);
+  if (existsSync(filePath)) {
+    try { copyFileSync(filePath, bakPath); } catch {}
+  }
+  renameSync(tmpPath, filePath);
+}
+
 function writeCardsData(data) {
-  writeFileSync(CARDS_PATH, JSON.stringify(data, null, 2));
+  atomicWriteJson(CARDS_PATH, data);
 }
 
 function readPresetsData() {
@@ -86,7 +97,7 @@ function readPresetsData() {
 }
 
 function writePresetsData(data) {
-  writeFileSync(PRESETS_DATA_PATH, JSON.stringify(data, null, 2));
+  atomicWriteJson(PRESETS_DATA_PATH, data);
 }
 
 function createInitialCards() {
@@ -251,7 +262,7 @@ async function start() {
 
   api.get('/settings', (_req, res) => res.json(readSettings()));
   api.put('/settings', (req, res) => {
-    writeFileSync(SETTINGS_PATH, JSON.stringify(req.body, null, 2));
+    atomicWriteJson(SETTINGS_PATH, req.body);
     res.json({ ok: true });
   });
 
@@ -812,7 +823,7 @@ async function start() {
         }
       }
       mkdirSync(join(dataDir, 'thumbs'), { recursive: true });
-      writeFileSync(SETTINGS_PATH, JSON.stringify(DEFAULT_SETTINGS, null, 2));
+      atomicWriteJson(SETTINGS_PATH, DEFAULT_SETTINGS);
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message });
