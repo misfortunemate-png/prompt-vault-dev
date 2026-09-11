@@ -10,7 +10,11 @@
     "deploy:pages": "npm run build:pages && node scripts/deploy-pages.mjs",
     "start": "NODE_ENV=production node --env-file=.env server.js",
     "inspect": "node scripts/inspect.mjs",
-    "verify:issues": "node scripts/verify-issues.mjs"
+    "verify:issues": "node scripts/verify-issues.mjs",
+    "doctor": "node scripts/review-doctor.mjs",
+    "doctor:json": "node scripts/review-doctor.mjs --json",
+    "doctor:cards": "node scripts/orphan-cards-report.mjs",
+    "doctor:cards:json": "node scripts/orphan-cards-report.mjs --json"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
