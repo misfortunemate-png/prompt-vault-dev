@@ -1,0 +1,1766 @@
+{
+  "tool": {
+    "name": "d1-review-doctor",
+    "version": "1.0.3",
+    "readOnly": true
+  },
+  "checkedAt": "2026-09-11T17:32:36.821Z",
+  "verdict": "REPAIR_REQUIRED",
+  "repository": {
+    "root": ".",
+    "branch": "chatgpt/review-doctor-20260909",
+    "head": "2a27244692be811903ef0e3e1b16d9a5b22b26a7",
+    "dirty": true,
+    "packageVersion": "0.15.0",
+    "node": "v24.15.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "config": {
+    "verdict": "COMPATIBLE",
+    "binding": "DB",
+    "databaseName": "foundation-db",
+    "databaseId": "48f6daff-bd39-4cfd-9afa-fb39872bb15b",
+    "migrationsDir": "migrations",
+    "migrationsTable": "d1_migrations"
+  },
+  "requiredSchema": {
+    "chatpwa_conversations": [
+      "summary",
+      "summary_source",
+      "distilled_at",
+      "distill_msg_count"
+    ],
+    "mm_models": [
+      "chat_selectable",
+      "release_date"
+    ],
+    "pv_images": [
+      "meta_updated_at",
+      "deleted_at"
+    ]
+  },
+  "repositoryMigrations": {
+    "verdict": "REPAIR_REQUIRED",
+    "directory": "migrations",
+    "files": [
+      {
+        "file": "0001_init.sql",
+        "version": 1
+      },
+      {
+        "file": "0002_gallery.sql",
+        "version": 2
+      },
+      {
+        "file": "0003_chat.sql",
+        "version": 3
+      },
+      {
+        "file": "0004_archive.sql",
+        "version": 4
+      },
+      {
+        "file": "0005_search.sql",
+        "version": 5
+      },
+      {
+        "file": "0006_search_texts.sql",
+        "version": 6
+      },
+      {
+        "file": "0007_chatpwa.sql",
+        "version": 7
+      },
+      {
+        "file": "0008_chatpwa_crypto.sql",
+        "version": 8
+      },
+      {
+        "file": "0009_context.sql",
+        "version": 9
+      },
+      {
+        "file": "0010_prompt_vault.sql",
+        "version": 10
+      },
+      {
+        "file": "0011_inbox.sql",
+        "version": 11
+      },
+      {
+        "file": "0012_conv_annotations.sql",
+        "version": 12
+      },
+      {
+        "file": "0013_sync_foundation.sql",
+        "version": 13
+      },
+      {
+        "file": "0014_workplace.sql",
+        "version": 14
+      },
+      {
+        "file": "0015_fire_rules.sql",
+        "version": 15
+      },
+      {
+        "file": "0016_error_log.sql",
+        "version": 16
+      },
+      {
+        "file": "0017_model_management.sql",
+        "version": 17
+      },
+      {
+        "file": "0018_pv_soft_delete.sql",
+        "version": 18
+      },
+      {
+        "file": "0019_cost_config.sql",
+        "version": 19
+      },
+      {
+        "file": "0020_model_enrichment.sql",
+        "version": 20
+      },
+      {
+        "file": "0021_model_assignments.sql",
+        "version": 21
+      },
+      {
+        "file": "0022_openrouter_free_models.sql",
+        "version": 22
+      },
+      {
+        "file": "0023_openrouter_free_models_2.sql",
+        "version": 23
+      },
+      {
+        "file": "0024_app_settings.sql",
+        "version": 24
+      },
+      {
+        "file": "0025_distill.sql",
+        "version": 25
+      },
+      {
+        "file": "0026_model_chat_selectable.sql",
+        "version": 26
+      },
+      {
+        "file": "0027_distill_tracking.sql",
+        "version": 27
+      }
+    ],
+    "addColumns": [
+      {
+        "table": "chatpwa_conversations",
+        "column": "key_id",
+        "file": "0008_chatpwa_crypto.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "iv_crypto",
+        "file": "0008_chatpwa_crypto.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "ciphertext",
+        "file": "0008_chatpwa_crypto.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "encrypted",
+        "file": "0008_chatpwa_crypto.sql"
+      },
+      {
+        "table": "chatpwa_private_memory",
+        "column": "key_id",
+        "file": "0008_chatpwa_crypto.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "mode",
+        "file": "0009_context.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "divide_at",
+        "file": "0009_context.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "divided_at",
+        "file": "0009_context.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "last_reflection_at",
+        "file": "0011_inbox.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "tags",
+        "file": "0012_conv_annotations.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "summary",
+        "file": "0012_conv_annotations.sql"
+      },
+      {
+        "table": "pv_images",
+        "column": "meta_updated_at",
+        "file": "0013_sync_foundation.sql"
+      },
+      {
+        "table": "pv_images",
+        "column": "deleted_at",
+        "file": "0018_pv_soft_delete.sql"
+      },
+      {
+        "table": "mm_models",
+        "column": "company",
+        "file": "0020_model_enrichment.sql"
+      },
+      {
+        "table": "mm_models",
+        "column": "country",
+        "file": "0020_model_enrichment.sql"
+      },
+      {
+        "table": "mm_models",
+        "column": "vision_capability",
+        "file": "0020_model_enrichment.sql"
+      },
+      {
+        "table": "mm_models",
+        "column": "japanese_capability",
+        "file": "0020_model_enrichment.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "summary",
+        "file": "0025_distill.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "summary_source",
+        "file": "0025_distill.sql"
+      },
+      {
+        "table": "mm_models",
+        "column": "chat_selectable",
+        "file": "0026_model_chat_selectable.sql"
+      },
+      {
+        "table": "mm_models",
+        "column": "release_date",
+        "file": "0026_model_chat_selectable.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "distilled_at",
+        "file": "0027_distill_tracking.sql"
+      },
+      {
+        "table": "chatpwa_conversations",
+        "column": "distill_msg_count",
+        "file": "0027_distill_tracking.sql"
+      }
+    ],
+    "duplicateAddColumns": [
+      {
+        "column": "chatpwa_conversations.summary",
+        "files": [
+          "0012_conv_annotations.sql",
+          "0025_distill.sql"
+        ]
+      }
+    ],
+    "duplicateVersions": [],
+    "customMigrationInserts": [
+      {
+        "version": 1,
+        "file": "0001_init.sql"
+      },
+      {
+        "version": 2,
+        "file": "0002_gallery.sql"
+      },
+      {
+        "version": 3,
+        "file": "0003_chat.sql"
+      },
+      {
+        "version": 4,
+        "file": "0004_archive.sql"
+      },
+      {
+        "version": 5,
+        "file": "0005_search.sql"
+      },
+      {
+        "version": 6,
+        "file": "0006_search_texts.sql"
+      },
+      {
+        "version": 7,
+        "file": "0007_chatpwa.sql"
+      },
+      {
+        "version": 8,
+        "file": "0008_chatpwa_crypto.sql"
+      }
+    ]
+  },
+  "remote": {
+    "enabled": true,
+    "result": {
+      "verdict": "REPAIR_REQUIRED",
+      "databaseName": "foundation-db",
+      "databaseId": "48f6daff-bd39-4cfd-9afa-fb39872bb15b",
+      "master": {
+        "tables": [
+          {
+            "name": "_cf_KV",
+            "sql": "CREATE TABLE _cf_KV (\n        key TEXT PRIMARY KEY,\n        value BLOB\n      ) WITHOUT ROWID"
+          },
+          {
+            "name": "_changelog",
+            "sql": "CREATE TABLE _changelog (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  table_name TEXT NOT NULL,\n  operation TEXT NOT NULL,\n  changed_at TEXT NOT NULL DEFAULT (datetime('now')),\n  details TEXT\n)"
+          },
+          {
+            "name": "_migrations",
+            "sql": "CREATE TABLE _migrations (\n  version INTEGER PRIMARY KEY,\n  name TEXT NOT NULL,\n  applied_at TEXT NOT NULL DEFAULT (datetime('now'))\n)"
+          },
+          {
+            "name": "archive_files",
+            "sql": "CREATE TABLE archive_files (path TEXT PRIMARY KEY, kind TEXT NOT NULL, title TEXT NOT NULL, size_bytes INTEGER NOT NULL, mtime TEXT NOT NULL, meta TEXT, indexed_at TEXT NOT NULL DEFAULT (datetime('now')))"
+          },
+          {
+            "name": "chatpwa_app_settings",
+            "sql": "CREATE TABLE chatpwa_app_settings (\n  key        TEXT PRIMARY KEY,\n  value      TEXT NOT NULL,\n  updated_at TEXT DEFAULT (datetime('now'))\n)"
+          },
+          {
+            "name": "chatpwa_attachments",
+            "sql": "CREATE TABLE chatpwa_attachments (\n  id TEXT PRIMARY KEY,\n  conv_id TEXT,\n  filename TEXT NOT NULL,\n  mime TEXT NOT NULL,\n  r2_key TEXT NOT NULL,\n  created_at TEXT NOT NULL\n)"
+          },
+          {
+            "name": "chatpwa_conversations",
+            "sql": "CREATE TABLE chatpwa_conversations (\n  id TEXT PRIMARY KEY,\n  persona_id TEXT NOT NULL,\n  title TEXT NOT NULL DEFAULT '新しい会話',\n  state TEXT NOT NULL DEFAULT 'active',\n  created_at TEXT NOT NULL,\n  updated_at TEXT NOT NULL,\n  data TEXT NOT NULL\n, key_id TEXT, iv_crypto TEXT, ciphertext TEXT, encrypted INTEGER DEFAULT 0, mode TEXT DEFAULT 'default', divide_at TEXT, divided_at TEXT, last_reflection_at TEXT, tags TEXT DEFAULT '[]', summary TEXT DEFAULT '', summary_source TEXT DEFAULT NULL, distilled_at TEXT, distill_msg_count INTEGER DEFAULT 0)"
+          },
+          {
+            "name": "chatpwa_evidence",
+            "sql": "CREATE TABLE chatpwa_evidence (\n  scenario_id TEXT NOT NULL,\n  executed_at TEXT NOT NULL,\n  deployed_sha TEXT NOT NULL,\n  result_json TEXT NOT NULL,\n  path TEXT NOT NULL,\n  PRIMARY KEY (scenario_id, executed_at)\n)"
+          },
+          {
+            "name": "chatpwa_inbox",
+            "sql": "CREATE TABLE chatpwa_inbox (id TEXT PRIMARY KEY, persona_id TEXT NOT NULL, conv_id TEXT, category TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL)"
+          },
+          {
+            "name": "chatpwa_kv",
+            "sql": "CREATE TABLE chatpwa_kv (\n  persona_id TEXT NOT NULL,\n  ns TEXT NOT NULL,\n  key TEXT NOT NULL,\n  content TEXT NOT NULL,\n  updated_at TEXT NOT NULL,\n  PRIMARY KEY (persona_id, ns, key)\n)"
+          },
+          {
+            "name": "chatpwa_ledger_items",
+            "sql": "CREATE TABLE chatpwa_ledger_items (\n  id TEXT PRIMARY KEY,\n  type TEXT NOT NULL,\n  subtype TEXT,\n  status TEXT NOT NULL DEFAULT 'pending',\n  payload TEXT NOT NULL,\n  created_at TEXT NOT NULL,\n  delivered_at TEXT,\n  acked_at TEXT\n)"
+          },
+          {
+            "name": "chatpwa_ledger_state",
+            "sql": "CREATE TABLE chatpwa_ledger_state (\n  key TEXT PRIMARY KEY,\n  value TEXT NOT NULL,\n  updated_at TEXT NOT NULL\n)"
+          },
+          {
+            "name": "chatpwa_logs",
+            "sql": "CREATE TABLE chatpwa_logs (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  log_date TEXT NOT NULL,\n  entry TEXT NOT NULL,\n  created_at TEXT NOT NULL\n)"
+          },
+          {
+            "name": "chatpwa_personas",
+            "sql": "CREATE TABLE chatpwa_personas (\n  id TEXT PRIMARY KEY,\n  profile TEXT NOT NULL,\n  soul_r2_key TEXT,\n  updated_at TEXT NOT NULL\n)"
+          },
+          {
+            "name": "chatpwa_presets",
+            "sql": "CREATE TABLE chatpwa_presets (\n  persona_id TEXT NOT NULL,\n  name TEXT NOT NULL,\n  content TEXT NOT NULL,\n  PRIMARY KEY (persona_id, name)\n)"
+          },
+          {
+            "name": "chatpwa_private_memory",
+            "sql": "CREATE TABLE chatpwa_private_memory (\n  persona_id TEXT NOT NULL,\n  title TEXT NOT NULL,\n  ciphertext TEXT NOT NULL,\n  iv TEXT NOT NULL,\n  updated_at TEXT NOT NULL, key_id TEXT,\n  PRIMARY KEY (persona_id, title)\n)"
+          },
+          {
+            "name": "chatpwa_private_topics",
+            "sql": "CREATE TABLE chatpwa_private_topics (\n  persona_id TEXT NOT NULL,\n  topic_name TEXT NOT NULL,\n  ciphertext TEXT NOT NULL,\n  iv_crypto TEXT NOT NULL,\n  key_id TEXT NOT NULL,\n  updated_at TEXT NOT NULL,\n  PRIMARY KEY (persona_id, topic_name)\n)"
+          },
+          {
+            "name": "chatpwa_references",
+            "sql": "CREATE TABLE chatpwa_references (\n  conv_id TEXT NOT NULL,\n  name TEXT NOT NULL,\n  content TEXT NOT NULL,\n  disabled INTEGER DEFAULT 0,\n  PRIMARY KEY (conv_id, name)\n)"
+          },
+          {
+            "name": "chatpwa_soul_edits",
+            "sql": "CREATE TABLE chatpwa_soul_edits (\n  persona_id TEXT NOT NULL,\n  edit_id TEXT NOT NULL,\n  content TEXT NOT NULL,\n  created_at TEXT NOT NULL,\n  PRIMARY KEY (persona_id, edit_id)\n)"
+          },
+          {
+            "name": "chatpwa_usage_daily",
+            "sql": "CREATE TABLE chatpwa_usage_daily (\n  date TEXT NOT NULL,\n  resource TEXT NOT NULL,\n  count INTEGER NOT NULL DEFAULT 0,\n  updated_at TEXT NOT NULL,\n  PRIMARY KEY (date, resource)\n)"
+          },
+          {
+            "name": "chunks",
+            "sql": "CREATE TABLE chunks (chunk_id TEXT PRIMARY KEY, doc_type TEXT NOT NULL, domain TEXT NOT NULL, hierarchy TEXT, heading TEXT NOT NULL, body TEXT NOT NULL, pages TEXT, char_count INTEGER, context TEXT, embedding BLOB)"
+          },
+          {
+            "name": "conversations",
+            "sql": "CREATE TABLE conversations (\r\n  id          TEXT PRIMARY KEY,\r\n  title       TEXT NOT NULL DEFAULT '新しい会話',\r\n  model       TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',\r\n  created_at  TEXT NOT NULL DEFAULT (datetime('now')),\r\n  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))\r\n)"
+          },
+          {
+            "name": "d1_migrations",
+            "sql": "CREATE TABLE \"d1_migrations\"(\n\t\tid         INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tname       TEXT UNIQUE,\n\t\tapplied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n)"
+          },
+          {
+            "name": "images",
+            "sql": "CREATE TABLE images (\n  hash        TEXT PRIMARY KEY,\n  rel_path    TEXT NOT NULL,\n  filename    TEXT NOT NULL,\n  folder      TEXT NOT NULL,\n  size_bytes  INTEGER NOT NULL,\n  created_at  TEXT NOT NULL,\n  modified_at TEXT NOT NULL,\n  width       INTEGER,\n  height      INTEGER,\n  prompt      TEXT,\n  negative    TEXT,\n  seed        INTEGER,\n  model       TEXT,\n  steps       INTEGER,\n  scale       REAL,\n  sampler     TEXT,\n  preset_id   TEXT,\n  favorite    INTEGER DEFAULT 0,\n  caption     TEXT,\n  caption_config TEXT,\n  thumb_ok    INTEGER DEFAULT 0,\n  indexed_at  TEXT NOT NULL\n)"
+          },
+          {
+            "name": "messages",
+            "sql": "CREATE TABLE messages (\r\n  id              TEXT PRIMARY KEY,\r\n  conversation_id TEXT NOT NULL,\r\n  role            TEXT NOT NULL CHECK (role IN ('user', 'assistant')),\r\n  content         TEXT NOT NULL,\r\n  metadata        TEXT,\r\n  created_at      TEXT NOT NULL DEFAULT (datetime('now')),\r\n  FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE\r\n)"
+          },
+          {
+            "name": "mm_cost_snapshots",
+            "sql": "CREATE TABLE mm_cost_snapshots (\n  id TEXT PRIMARY KEY,\n  provider_id TEXT NOT NULL REFERENCES mm_providers(id),\n  recorded_at TEXT NOT NULL,\n  balance REAL,\n  total_spent REAL,\n  raw_json TEXT\n)"
+          },
+          {
+            "name": "mm_health_log",
+            "sql": "CREATE TABLE mm_health_log (\n  id TEXT PRIMARY KEY,\n  target_type TEXT NOT NULL,\n  target_id TEXT NOT NULL,\n  checked_at TEXT NOT NULL,\n  ok INTEGER NOT NULL,\n  latency_ms INTEGER,\n  http_status INTEGER,\n  error_message TEXT,\n  response_body TEXT\n)"
+          },
+          {
+            "name": "mm_model_assignments",
+            "sql": "CREATE TABLE mm_model_assignments (\n  id TEXT PRIMARY KEY,\n  scope TEXT NOT NULL,\n  scope_id TEXT NOT NULL,\n  label TEXT NOT NULL,\n  default_model_id TEXT NOT NULL,\n  fallback_model_id TEXT,\n  config_json TEXT,\n  updated_at TEXT DEFAULT (datetime('now')),\n  UNIQUE(scope, scope_id)\n)"
+          },
+          {
+            "name": "mm_models",
+            "sql": "CREATE TABLE mm_models (\n  id TEXT PRIMARY KEY,\n  provider_id TEXT NOT NULL REFERENCES mm_providers(id),\n  model_id TEXT NOT NULL,\n  display_name TEXT NOT NULL,\n  status TEXT DEFAULT 'candidate',\n  capabilities TEXT,\n  pricing_json TEXT,\n  priority INTEGER DEFAULT 100,\n  last_health_at TEXT,\n  last_health_ok INTEGER,\n  last_health_detail TEXT,\n  notes TEXT,\n  created_at TEXT DEFAULT (datetime('now')),\n  updated_at TEXT DEFAULT (datetime('now')), company TEXT, country TEXT, vision_capability TEXT, japanese_capability TEXT, chat_selectable INTEGER DEFAULT 0, release_date TEXT,\n  UNIQUE(provider_id, model_id)\n)"
+          },
+          {
+            "name": "mm_providers",
+            "sql": "CREATE TABLE mm_providers (\n  id TEXT PRIMARY KEY,\n  display_name TEXT NOT NULL,\n  kind TEXT NOT NULL,\n  auth_method TEXT,\n  balance_api TEXT,\n  models_api TEXT,\n  status TEXT DEFAULT 'active',\n  last_health_at TEXT,\n  last_health_ok INTEGER,\n  last_health_detail TEXT,\n  config_json TEXT,\n  created_at TEXT DEFAULT (datetime('now')),\n  updated_at TEXT DEFAULT (datetime('now'))\n)"
+          },
+          {
+            "name": "mm_usage_log",
+            "sql": "CREATE TABLE mm_usage_log (\n  id TEXT PRIMARY KEY,\n  recorded_at TEXT NOT NULL,\n  model TEXT NOT NULL,\n  persona_id TEXT,\n  service TEXT DEFAULT 'chat-web',\n  context TEXT,\n  input_tokens INTEGER DEFAULT 0,\n  output_tokens INTEGER DEFAULT 0,\n  conv_id TEXT\n)"
+          },
+          {
+            "name": "pv_cards",
+            "sql": "CREATE TABLE pv_cards (\n  id        TEXT PRIMARY KEY,\n  slot_id   TEXT NOT NULL,\n  name      TEXT NOT NULL,\n  positive  TEXT DEFAULT '',\n  negative  TEXT DEFAULT '',\n  parent_id TEXT,\n  updated_at TEXT NOT NULL,\n  UNIQUE(slot_id, name)\n)"
+          },
+          {
+            "name": "pv_images",
+            "sql": "CREATE TABLE pv_images (\n  hash          TEXT PRIMARY KEY,\n  rel_path      TEXT NOT NULL,\n  filename      TEXT NOT NULL,\n  folder        TEXT NOT NULL,\n  size_bytes    INTEGER NOT NULL,\n  created_at    TEXT NOT NULL,\n  modified_at   TEXT NOT NULL,\n  width         INTEGER,\n  height        INTEGER,\n  prompt        TEXT,\n  negative      TEXT,\n  char_prompts  TEXT,\n  seed          INTEGER,\n  model         TEXT,\n  steps         INTEGER,\n  scale         REAL,\n  sampler       TEXT,\n  preset_id     TEXT,\n  favorite      INTEGER DEFAULT 0,\n  caption       TEXT,\n  caption_config TEXT,\n  thumb_ok      INTEGER DEFAULT 0,\n  indexed_at    TEXT NOT NULL,\n  r2_key        TEXT,\n  thumb_r2_key  TEXT,\n  origin        TEXT DEFAULT 'fran',\n  synced_at     TEXT\n, meta_updated_at TEXT, deleted_at DATETIME)"
+          },
+          {
+            "name": "pv_presets",
+            "sql": "CREATE TABLE pv_presets (\n  id         TEXT PRIMARY KEY,\n  name       TEXT NOT NULL,\n  tags       TEXT DEFAULT '[]',\n  cards      TEXT DEFAULT '{}',\n  updated_at TEXT NOT NULL\n, slot_order TEXT DEFAULT '[]', folder TEXT DEFAULT 'null', filename TEXT DEFAULT '[]', child_cards TEXT DEFAULT '{}')"
+          },
+          {
+            "name": "pv_settings",
+            "sql": "CREATE TABLE pv_settings (\n  key        TEXT PRIMARY KEY,\n  value      TEXT NOT NULL,\n  updated_at TEXT NOT NULL\n)"
+          },
+          {
+            "name": "pv_slots",
+            "sql": "CREATE TABLE pv_slots (\n  id              TEXT PRIMARY KEY,\n  name            TEXT NOT NULL UNIQUE,\n  slot_order      INTEGER NOT NULL,\n  use_as_folder   INTEGER DEFAULT 0,\n  use_in_filename INTEGER DEFAULT 0,\n  updated_at      TEXT NOT NULL\n)"
+          },
+          {
+            "name": "search_texts",
+            "sql": "CREATE TABLE search_texts (path TEXT PRIMARY KEY, content TEXT NOT NULL, line_count INTEGER NOT NULL, indexed_at TEXT NOT NULL DEFAULT (datetime('now')))"
+          },
+          {
+            "name": "sqlite_sequence",
+            "sql": "CREATE TABLE sqlite_sequence(name,seq)"
+          },
+          {
+            "name": "sync_ledger",
+            "sql": "CREATE TABLE sync_ledger (\n  id          TEXT PRIMARY KEY,\n  type        TEXT NOT NULL,\n  item_id     TEXT NOT NULL,\n  status      TEXT NOT NULL,\n  direction   TEXT NOT NULL,\n  payload     TEXT,\n  error       TEXT,\n  created_at  TEXT NOT NULL,\n  resolved_at TEXT\n)"
+          },
+          {
+            "name": "test_queries",
+            "sql": "CREATE TABLE test_queries (id TEXT PRIMARY KEY, question TEXT NOT NULL, embedding BLOB NOT NULL, expected_chunks TEXT)"
+          },
+          {
+            "name": "wp_error_log",
+            "sql": "CREATE TABLE wp_error_log (\n  id            TEXT PRIMARY KEY,\n  at            TEXT NOT NULL,\n  location      TEXT NOT NULL,\n  persona_id    TEXT,\n  conv_id       TEXT,\n  model         TEXT,\n  round         INTEGER,\n  http_status   INTEGER,\n  error_name    TEXT,\n  error_message TEXT,\n  response_body TEXT,\n  context       TEXT\n)"
+          },
+          {
+            "name": "wp_fire_log",
+            "sql": "CREATE TABLE wp_fire_log (\r\n  id           TEXT PRIMARY KEY,\r\n  rule_id      TEXT NOT NULL,\r\n  template_id  TEXT NOT NULL,\r\n  matched_count INTEGER NOT NULL DEFAULT 0,\r\n  matched_tasks TEXT,\r\n  persona_id   TEXT,\r\n  status       TEXT NOT NULL DEFAULT 'pending',\r\n  error        TEXT,\r\n  at           TEXT NOT NULL,\r\n  FOREIGN KEY (rule_id) REFERENCES wp_fire_rules(id)\r\n)"
+          },
+          {
+            "name": "wp_fire_rules",
+            "sql": "CREATE TABLE wp_fire_rules (\r\n  id           TEXT PRIMARY KEY,\r\n  template_id  TEXT NOT NULL,\r\n  name         TEXT NOT NULL,\r\n  category     TEXT,\r\n  enabled      INTEGER NOT NULL DEFAULT 1,\r\n  prompt       TEXT,\r\n  params       TEXT NOT NULL DEFAULT '{}',\r\n  created_at   TEXT NOT NULL,\r\n  updated_at   TEXT NOT NULL\r\n)"
+          },
+          {
+            "name": "wp_posts",
+            "sql": "CREATE TABLE wp_posts (\n  id          TEXT PRIMARY KEY,\n  author      TEXT NOT NULL,\n  body        TEXT NOT NULL,\n  reply_to    TEXT,\n  task_id     TEXT,\n  mentions    TEXT,\n  created_at  TEXT NOT NULL,\n  mirrored_at TEXT,\n  FOREIGN KEY (reply_to) REFERENCES wp_posts(id),\n  FOREIGN KEY (task_id) REFERENCES wp_tasks(id)\n)"
+          },
+          {
+            "name": "wp_reactions",
+            "sql": "CREATE TABLE wp_reactions (\n  post_id    TEXT NOT NULL,\n  actor      TEXT NOT NULL,\n  emoji      TEXT NOT NULL,\n  created_at TEXT NOT NULL,\n  PRIMARY KEY (post_id, actor, emoji),\n  FOREIGN KEY (post_id) REFERENCES wp_posts(id)\n)"
+          },
+          {
+            "name": "wp_task_assignees",
+            "sql": "CREATE TABLE wp_task_assignees (\n  task_id     TEXT NOT NULL,\n  persona_id  TEXT NOT NULL,\n  role        TEXT NOT NULL DEFAULT 'owner' CHECK(role IN ('owner','helper')),\n  accepted_at TEXT,\n  PRIMARY KEY (task_id, persona_id),\n  FOREIGN KEY (task_id) REFERENCES wp_tasks(id)\n)"
+          },
+          {
+            "name": "wp_task_events",
+            "sql": "CREATE TABLE wp_task_events (\n  id              TEXT PRIMARY KEY,\n  task_id         TEXT NOT NULL,\n  event           TEXT NOT NULL CHECK(event IN ('register','update','assign','accept','complete','cancel','neglect')),\n  actor           TEXT NOT NULL,\n  conversation_id TEXT,\n  at              TEXT NOT NULL,\n  payload         TEXT,\n  FOREIGN KEY (task_id) REFERENCES wp_tasks(id)\n)"
+          },
+          {
+            "name": "wp_tasks",
+            "sql": "CREATE TABLE wp_tasks (\n  id              TEXT PRIMARY KEY,\n  title           TEXT NOT NULL,\n  parent_id       TEXT,\n  rarity          INTEGER NOT NULL DEFAULT 1 CHECK(rarity >= 1 AND rarity <= 5),\n  category        TEXT,\n  due_date        TEXT,\n  note            TEXT,\n  status          TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','done','cancelled')),\n  created_by      TEXT NOT NULL,\n  created_in      TEXT,\n  reward_prompt   TEXT,\n  neglect_notified_at TEXT,\n  created_at      TEXT NOT NULL,\n  updated_at      TEXT NOT NULL,\n  completed_at    TEXT,\n  FOREIGN KEY (parent_id) REFERENCES wp_tasks(id)\n)"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "idx_archive_kind",
+            "sql": "CREATE INDEX idx_archive_kind ON archive_files(kind)"
+          },
+          {
+            "name": "idx_archive_mtime",
+            "sql": "CREATE INDEX idx_archive_mtime ON archive_files(mtime DESC)"
+          },
+          {
+            "name": "idx_chatpwa_conv_persona_updated",
+            "sql": "CREATE INDEX idx_chatpwa_conv_persona_updated ON chatpwa_conversations(persona_id, updated_at DESC)"
+          },
+          {
+            "name": "idx_chatpwa_conv_state",
+            "sql": "CREATE INDEX idx_chatpwa_conv_state ON chatpwa_conversations(state)"
+          },
+          {
+            "name": "idx_chatpwa_kv_ns",
+            "sql": "CREATE INDEX idx_chatpwa_kv_ns ON chatpwa_kv(persona_id, ns)"
+          },
+          {
+            "name": "idx_chatpwa_ledger_status",
+            "sql": "CREATE INDEX idx_chatpwa_ledger_status ON chatpwa_ledger_items(status)"
+          },
+          {
+            "name": "idx_chatpwa_logs_date",
+            "sql": "CREATE INDEX idx_chatpwa_logs_date ON chatpwa_logs(log_date)"
+          },
+          {
+            "name": "idx_chunks_doc_type",
+            "sql": "CREATE INDEX idx_chunks_doc_type ON chunks(doc_type)"
+          },
+          {
+            "name": "idx_chunks_domain",
+            "sql": "CREATE INDEX idx_chunks_domain ON chunks(domain)"
+          },
+          {
+            "name": "idx_chunks_heading",
+            "sql": "CREATE INDEX idx_chunks_heading ON chunks(heading)"
+          },
+          {
+            "name": "idx_conversations_updated",
+            "sql": "CREATE INDEX idx_conversations_updated ON conversations(updated_at DESC)"
+          },
+          {
+            "name": "idx_created",
+            "sql": "CREATE INDEX idx_created ON images(created_at)"
+          },
+          {
+            "name": "idx_favorite",
+            "sql": "CREATE INDEX idx_favorite ON images(favorite)"
+          },
+          {
+            "name": "idx_folder",
+            "sql": "CREATE INDEX idx_folder ON images(folder)"
+          },
+          {
+            "name": "idx_messages_conv",
+            "sql": "CREATE INDEX idx_messages_conv ON messages(conversation_id, created_at)"
+          },
+          {
+            "name": "idx_pv_created",
+            "sql": "CREATE INDEX idx_pv_created ON pv_images(created_at)"
+          },
+          {
+            "name": "idx_pv_favorite",
+            "sql": "CREATE INDEX idx_pv_favorite ON pv_images(favorite)"
+          },
+          {
+            "name": "idx_pv_folder",
+            "sql": "CREATE INDEX idx_pv_folder ON pv_images(folder)"
+          },
+          {
+            "name": "idx_pv_origin",
+            "sql": "CREATE INDEX idx_pv_origin ON pv_images(origin)"
+          },
+          {
+            "name": "idx_sync_created",
+            "sql": "CREATE INDEX idx_sync_created ON sync_ledger(created_at)"
+          },
+          {
+            "name": "idx_sync_type_status",
+            "sql": "CREATE INDEX idx_sync_type_status ON sync_ledger(type, status)"
+          },
+          {
+            "name": "idx_usage_log_model",
+            "sql": "CREATE INDEX idx_usage_log_model ON mm_usage_log(model)"
+          },
+          {
+            "name": "idx_usage_log_persona",
+            "sql": "CREATE INDEX idx_usage_log_persona ON mm_usage_log(persona_id)"
+          },
+          {
+            "name": "idx_usage_log_recorded",
+            "sql": "CREATE INDEX idx_usage_log_recorded ON mm_usage_log(recorded_at)"
+          },
+          {
+            "name": "idx_wp_error_log_at",
+            "sql": "CREATE INDEX idx_wp_error_log_at ON wp_error_log(at)"
+          },
+          {
+            "name": "idx_wp_events_at",
+            "sql": "CREATE INDEX idx_wp_events_at ON wp_task_events(at)"
+          },
+          {
+            "name": "idx_wp_events_task",
+            "sql": "CREATE INDEX idx_wp_events_task ON wp_task_events(task_id)"
+          },
+          {
+            "name": "idx_wp_fire_log_at",
+            "sql": "CREATE INDEX idx_wp_fire_log_at ON wp_fire_log(at)"
+          },
+          {
+            "name": "idx_wp_fire_log_status",
+            "sql": "CREATE INDEX idx_wp_fire_log_status ON wp_fire_log(status)"
+          },
+          {
+            "name": "idx_wp_posts_author",
+            "sql": "CREATE INDEX idx_wp_posts_author ON wp_posts(author)"
+          },
+          {
+            "name": "idx_wp_posts_created",
+            "sql": "CREATE INDEX idx_wp_posts_created ON wp_posts(created_at)"
+          },
+          {
+            "name": "idx_wp_posts_reply",
+            "sql": "CREATE INDEX idx_wp_posts_reply ON wp_posts(reply_to)"
+          },
+          {
+            "name": "idx_wp_tasks_parent",
+            "sql": "CREATE INDEX idx_wp_tasks_parent ON wp_tasks(parent_id)"
+          },
+          {
+            "name": "idx_wp_tasks_status",
+            "sql": "CREATE INDEX idx_wp_tasks_status ON wp_tasks(status)"
+          },
+          {
+            "name": "sqlite_autoindex_archive_files_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_app_settings_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_attachments_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_conversations_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_evidence_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_inbox_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_kv_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_ledger_items_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_ledger_state_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_personas_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_presets_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_private_memory_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_private_topics_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_references_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_soul_edits_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chatpwa_usage_daily_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_chunks_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_conversations_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_d1_migrations_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_images_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_messages_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_mm_cost_snapshots_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_mm_health_log_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_mm_model_assignments_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_mm_model_assignments_2",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_mm_models_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_mm_models_2",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_mm_providers_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_mm_usage_log_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_pv_cards_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_pv_cards_2",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_pv_images_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_pv_presets_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_pv_settings_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_pv_slots_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_pv_slots_2",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_search_texts_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_sync_ledger_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_test_queries_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_wp_error_log_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_wp_fire_log_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_wp_fire_rules_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_wp_posts_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_wp_reactions_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_wp_task_assignees_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_wp_task_events_1",
+            "sql": null
+          },
+          {
+            "name": "sqlite_autoindex_wp_tasks_1",
+            "sql": null
+          }
+        ]
+      },
+      "schema": {
+        "chatpwa_conversations": {
+          "exists": true,
+          "columns": [
+            {
+              "name": "id",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": true
+            },
+            {
+              "name": "persona_id",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "title",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": "'新しい会話'",
+              "primaryKey": false
+            },
+            {
+              "name": "state",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": "'active'",
+              "primaryKey": false
+            },
+            {
+              "name": "created_at",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "updated_at",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "data",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "key_id",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "iv_crypto",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "ciphertext",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "encrypted",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": "0",
+              "primaryKey": false
+            },
+            {
+              "name": "mode",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": "'default'",
+              "primaryKey": false
+            },
+            {
+              "name": "divide_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "divided_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "last_reflection_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "tags",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": "'[]'",
+              "primaryKey": false
+            },
+            {
+              "name": "summary",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": "''",
+              "primaryKey": false
+            },
+            {
+              "name": "summary_source",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": "NULL",
+              "primaryKey": false
+            },
+            {
+              "name": "distilled_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "distill_msg_count",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": "0",
+              "primaryKey": false
+            }
+          ]
+        },
+        "mm_models": {
+          "exists": true,
+          "columns": [
+            {
+              "name": "id",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": true
+            },
+            {
+              "name": "provider_id",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "model_id",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "display_name",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "status",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": "'candidate'",
+              "primaryKey": false
+            },
+            {
+              "name": "capabilities",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "pricing_json",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "priority",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": "100",
+              "primaryKey": false
+            },
+            {
+              "name": "last_health_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "last_health_ok",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "last_health_detail",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "notes",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "created_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": "datetime('now')",
+              "primaryKey": false
+            },
+            {
+              "name": "updated_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": "datetime('now')",
+              "primaryKey": false
+            },
+            {
+              "name": "company",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "country",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "vision_capability",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "japanese_capability",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "chat_selectable",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": "0",
+              "primaryKey": false
+            },
+            {
+              "name": "release_date",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            }
+          ]
+        },
+        "pv_images": {
+          "exists": true,
+          "columns": [
+            {
+              "name": "hash",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": true
+            },
+            {
+              "name": "rel_path",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "filename",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "folder",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "size_bytes",
+              "type": "INTEGER",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "created_at",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "modified_at",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "width",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "height",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "prompt",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "negative",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "char_prompts",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "seed",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "model",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "steps",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "scale",
+              "type": "REAL",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "sampler",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "preset_id",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "favorite",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": "0",
+              "primaryKey": false
+            },
+            {
+              "name": "caption",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "caption_config",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "thumb_ok",
+              "type": "INTEGER",
+              "notNull": false,
+              "defaultValue": "0",
+              "primaryKey": false
+            },
+            {
+              "name": "indexed_at",
+              "type": "TEXT",
+              "notNull": true,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "r2_key",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "thumb_r2_key",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "origin",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": "'fran'",
+              "primaryKey": false
+            },
+            {
+              "name": "synced_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "meta_updated_at",
+              "type": "TEXT",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            },
+            {
+              "name": "deleted_at",
+              "type": "DATETIME",
+              "notNull": false,
+              "defaultValue": null,
+              "primaryKey": false
+            }
+          ]
+        }
+      },
+      "missingRequired": [],
+      "tableErrors": [],
+      "histories": {
+        "d1_migrations": {
+          "exists": true,
+          "rows": [
+            {
+              "id": 1,
+              "name": "0001_init",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 2,
+              "name": "0002_gallery",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 3,
+              "name": "0003_chat",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 4,
+              "name": "0004_archive",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 5,
+              "name": "0005_search",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 6,
+              "name": "0006_search_texts",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 7,
+              "name": "0007_chatpwa",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 8,
+              "name": "0008_chatpwa_crypto",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 9,
+              "name": "0009_context",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 10,
+              "name": "0010_prompt_vault",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 11,
+              "name": "0011_inbox",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 12,
+              "name": "0012_conv_annotations",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 13,
+              "name": "0013_sync_foundation",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 14,
+              "name": "0014_workplace",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 15,
+              "name": "0015_fire_rules",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 16,
+              "name": "0016_error_log",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 17,
+              "name": "0017_model_management",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 18,
+              "name": "0018_pv_soft_delete",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 19,
+              "name": "0019_cost_config",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 20,
+              "name": "0020_model_enrichment",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 21,
+              "name": "0021_model_assignments",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 22,
+              "name": "0022_openrouter_free_models",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 23,
+              "name": "0023_openrouter_free_models_2",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 24,
+              "name": "0024_app_settings",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 25,
+              "name": "0025_distill",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 26,
+              "name": "0026_model_chat_selectable",
+              "applied_at": "2026-09-09 16:05:33"
+            },
+            {
+              "id": 27,
+              "name": "0027_distill_tracking",
+              "applied_at": "2026-09-09 16:05:33"
+            }
+          ],
+          "versions": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27
+          ]
+        },
+        "_migrations": {
+          "exists": true,
+          "rows": [
+            {
+              "version": 1,
+              "name": "0001_init",
+              "applied_at": "2026-08-21 13:30:43"
+            },
+            {
+              "version": 2,
+              "name": "0002_gallery",
+              "applied_at": "2026-08-22 04:48:21"
+            },
+            {
+              "version": 3,
+              "name": "0003_chat",
+              "applied_at": "2026-08-22 05:22:21"
+            },
+            {
+              "version": 4,
+              "name": "0004_archive",
+              "applied_at": "2026-08-22 07:40:59"
+            },
+            {
+              "version": 5,
+              "name": "0005_search",
+              "applied_at": "2026-08-22 08:19:49"
+            },
+            {
+              "version": 6,
+              "name": "0006_search_texts",
+              "applied_at": "2026-08-22 12:50:25"
+            },
+            {
+              "version": 7,
+              "name": "0007_chatpwa",
+              "applied_at": "2026-08-22 14:40:11"
+            },
+            {
+              "version": 8,
+              "name": "0008_chatpwa_crypto",
+              "applied_at": "2026-08-26 05:27:29"
+            },
+            {
+              "version": 9,
+              "name": "0009_context",
+              "applied_at": "2026-09-01 21:28:00"
+            },
+            {
+              "version": 10,
+              "name": "0010_prompt_vault",
+              "applied_at": "2026-09-01 21:28:00"
+            },
+            {
+              "version": 11,
+              "name": "0011_inbox",
+              "applied_at": "2026-09-01 21:28:00"
+            },
+            {
+              "version": 12,
+              "name": "0012_conv_annotations",
+              "applied_at": "2026-09-01 21:28:00"
+            },
+            {
+              "version": 13,
+              "name": "0013_sync_foundation",
+              "applied_at": "2026-09-01 21:28:00"
+            },
+            {
+              "version": 14,
+              "name": "0014_workplace",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 15,
+              "name": "0015_fire_rules",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 16,
+              "name": "0016_error_log",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 17,
+              "name": "0017_model_management",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 18,
+              "name": "0018_pv_soft_delete",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 19,
+              "name": "0019_cost_config",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 20,
+              "name": "0020_model_enrichment",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 21,
+              "name": "0021_model_assignments",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 22,
+              "name": "0022_openrouter_free_models",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 23,
+              "name": "0023_openrouter_free_models_2",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 24,
+              "name": "0024_app_settings",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 25,
+              "name": "0025_distill",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 26,
+              "name": "0026_model_chat_selectable",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 27,
+              "name": "0027_distill_tracking",
+              "applied_at": "2026-09-09 16:02:13"
+            },
+            {
+              "version": 28,
+              "name": "0028_pv_presets_extend",
+              "applied_at": "2026-09-11 16:34:10"
+            }
+          ],
+          "versions": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28
+          ]
+        }
+      },
+      "historyAnalysis": {
+        "bothHistoriesPresent": true,
+        "historyDiverged": true,
+        "repositoryVersions": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27
+        ],
+        "trackedUnionVersions": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28
+        ],
+        "untrackedRepositoryVersions": [],
+        "historyQueryErrors": []
+      }
+    }
+  },
+  "limitations": [
+    "R2 objects, Durable Object storage, Worker deployment versions, cron state, and Fran sync-agent state are not inspected.",
+    "Repository migration analysis detects duplicate ADD COLUMN statements but does not execute migrations.",
+    "Remote queries intentionally avoid application data rows; only sqlite_master, PRAGMA table_info, and migration history tables are read."
+  ]
+}
