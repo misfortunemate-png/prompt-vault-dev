@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync, appen
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
+import { execSync } from 'node:child_process';
 import { getByHash, listFolders, listByFolder, getRecent, getRecentByDays, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, getImagePath, removeImageRow, getGalleryByCard, getTotalByCard } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
@@ -26,6 +27,15 @@ if (existsSync(_envPath)) {
 }
 
 const pkg = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
+let GIT_SHA = 'unknown';
+try {
+  GIT_SHA = execSync('git rev-parse --short HEAD', {
+    cwd: __dirname,
+    encoding: 'utf8',
+    timeout: 3000,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+} catch {}
 const THUMBS_DIR = join(__dirname, 'data', 'thumbs');
 const PORT = process.env.PORT || 8789;
 
@@ -267,7 +277,7 @@ async function start() {
   const api = express.Router();
 
   // ── System ──
-  api.get('/healthz', (_req, res) => res.json({ status: 'ok', version: pkg.version }));
+  api.get('/healthz', (_req, res) => res.json({ status: 'ok', version: pkg.version, sha: GIT_SHA }));
 
   api.get('/settings', (_req, res) => res.json(readSettings()));
   api.put('/settings', (req, res) => {
