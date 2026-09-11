@@ -1069,14 +1069,14 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         if (connectionRoute !== routeAtFetch) return;
         if (result.task_id) addedTaskIdsRef.current.add(result.task_id);
         setResults(prev => {
-          const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, saved: false, blobUrl }, ...prev];
+          const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false, blobUrl }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
         if (plainBuf) generateAndUploadThumb(plainBuf, hash, conn).catch(() => {});
       } else {
         if (connectionRoute !== routeAtFetch) return;
         setResults(prev => {
-          const next = [{ ...result.image, folderSegments, filenameSegments, saved: false }, ...prev];
+          const next = [{ ...result.image, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
       }
