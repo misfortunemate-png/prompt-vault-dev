@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { issueVerifiers } from '../tests/issues/manifest.mjs';
 
 const argv = process.argv.slice(2);
@@ -7,8 +11,31 @@ const strictNotRun = argv.includes('--strict-not-run');
 const requested = argv.filter((arg) => !arg.startsWith('--'));
 const issueIds = requested.length > 0 ? requested : Object.keys(issueVerifiers);
 
+function currentGitSha() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
+function verifierSha256(verifierPath) {
+  if (!verifierPath) return null;
+  try {
+    const bytes = readFileSync(resolve(process.cwd(), verifierPath));
+    return createHash('sha256').update(bytes).digest('hex');
+  } catch {
+    return null;
+  }
+}
+
 const report = {
   generated_at: new Date().toISOString(),
+  repository_sha: currentGitSha(),
   platform: process.platform,
   node: process.version,
   strict_all: strictAll,
@@ -24,6 +51,8 @@ for (const issueId of issueIds) {
       level: 'UNKNOWN',
       gate: true,
       status: 'FAIL',
+      verifier_path: null,
+      verifier_sha256: null,
       checks: [{ name: 'verifier registered', status: 'FAIL', detail: `No verifier registered for ${issueId}` }],
     });
     continue;
@@ -55,6 +84,8 @@ for (const issueId of issueIds) {
     level: verifier.level,
     gate: verifier.gate !== false,
     status,
+    verifier_path: verifier.verifierPath || null,
+    verifier_sha256: verifierSha256(verifier.verifierPath),
     checks: normalized,
   });
 }
@@ -76,8 +107,12 @@ report.summary = report.issues.reduce((summary, issue) => {
 if (jsonMode) {
   console.log(JSON.stringify(report, null, 2));
 } else {
+  console.log(`repository_sha=${report.repository_sha}`);
   for (const issue of report.issues) {
     console.log(`\n${issue.issue} [${issue.level}] gate=${issue.gate} ${issue.title || ''}`.trimEnd());
+    if (issue.verifier_path) {
+      console.log(`  VERIFIER ${issue.verifier_path} sha256=${issue.verifier_sha256 || 'unknown'}`);
+    }
     for (const check of issue.checks) {
       const marker = check.status === 'NOT_RUN' ? 'NOT RUN' : check.status;
       console.log(`  ${marker.padEnd(7)} ${check.name}${check.detail ? ` — ${check.detail}` : ''}`);
