@@ -102,7 +102,11 @@ export default {
 
       return checks;
     } finally {
-      rmSync(tempRoot, { recursive: true, force: true });
+      try { db.closeDb?.(); } catch {}
+      try { scanner.closeDb?.(); } catch {}
+      // Windows: give OS time to release SQLite WAL memory-mapped locks
+      await new Promise(r => setTimeout(r, 200));
+      try { rmSync(tempRoot, { recursive: true, force: true }); } catch {}
     }
   },
 };
