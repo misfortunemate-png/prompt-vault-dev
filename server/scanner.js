@@ -145,6 +145,7 @@ export async function startScan(vaultRoot) {
           if (!existing.thumb_ok) thumbQueue.push({ hash, filePath });
         }
       } catch (e) {
+        scanState.incomplete = true;
         console.warn(`[Scanner] ファイル処理失敗 ${filePath}: ${e.message}`);
       }
       scanState.processed++;
