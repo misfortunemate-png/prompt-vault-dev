@@ -161,7 +161,7 @@ export default function App() {
 
   useEffect(() => {
     setResults([]);
-  }, [connectionState.route]);
+  }, [connectionState.route, connectionState.franUrl, connectionState.cloudUrl]);
 
   // cloud モードで認証トークン or vault key が未設定なら警告
   useEffect(() => {
@@ -202,13 +202,13 @@ export default function App() {
         <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} activeTab={activeTab} />
       </div>
       {activeTab === 'album' && <AlbumScreen addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
-      {activeTab === 'template' && <TemplateScreen key={connectionState.route} addToast={addToast} resetKey={resetKey} />}
+      {activeTab === 'template' && <TemplateScreen key={`${connectionState.route}|${connectionState.franUrl}|${connectionState.cloudUrl}`} addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
       {activeTab !== 'generate' && activeTab !== 'album' && activeTab !== 'template' && <PlaceholderView message="未実装のタブです" />}
       <Footer activeTab={activeTab} onTabChange={handleTabChange} />
       <Toast toasts={toasts} removeToast={removeToast} />
       {settingsOpen && (
         <SettingsScreen
-          key={connectionState.route}
+          key={`${connectionState.route}|${connectionState.franUrl}|${connectionState.cloudUrl}`}
           onClose={() => { setSettingsOpen(false); setDebugInitialOpen(false); }}
           addToast={addToast}
           displaySettings={displaySettings}

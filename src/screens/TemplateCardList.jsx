@@ -51,7 +51,7 @@ function ThumbGrid({ thumbs }) {
   );
 }
 
-export default function TemplateCardList({ addToast }) {
+export default function TemplateCardList({ addToast, connectionRoute }) {
   const [cardsData, setCardsData] = useState(null);
   const [presetsData, setPresetsData] = useState(null);
   const [nav, setNav] = useState({ view: 'slots' });
@@ -71,7 +71,7 @@ export default function TemplateCardList({ addToast }) {
     }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); }, [connectionRoute]);
 
   // ────── Load thumbnails for card list view ──────
   useEffect(() => {

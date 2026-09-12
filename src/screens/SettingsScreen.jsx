@@ -102,6 +102,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
   const [guard, setGuard] = useState(null);
   const [captionStyle, setCaptionStyle] = useState(null);
   const [systemInfo, setSystemInfo] = useState(null);
+  const [loadedRoute, setLoadedRoute] = useState(null);
   const [debugOpen, setDebugOpen] = useState(!!debugInitialOpen);
   const [version, setVersion] = useState('');
   const [errors, setErrors] = useState([]);
@@ -124,15 +125,17 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
   const [vaultGenResult, setVaultGenResult] = useState(null);
 
   useEffect(() => {
+    setLoadedRoute(connectionState.route);
     api.getSettings().then(s => {
       setGen(s.generation);
       setGuard(s.guard);
       setCaptionStyle(s.captionStyle || { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true });
     }).catch(() => addToast('error', '設定の読み込みに失敗しました'));
     api.getSystemInfo().then(setSystemInfo).catch(() => {});
-  }, [addToast]);
+  }, [addToast, connectionState.route]);
 
   const handleSave = async () => {
+    if (loadedRoute && loadedRoute !== connectionState.route) return;
     if (guard && guard.intervalMax < guard.intervalMin) {
       addToast('error', '最大間隔は最小間隔以上にしてください');
       return;

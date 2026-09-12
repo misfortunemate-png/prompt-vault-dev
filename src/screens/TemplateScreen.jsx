@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import TemplateCardList from './TemplateCardList';
 import TemplatePresetList from './TemplatePresetList';
 
-export default function TemplateScreen({ addToast, resetKey }) {
+export default function TemplateScreen({ addToast, resetKey, connectionRoute }) {
   const [subNav, setSubNav] = useState('cards');
 
   useEffect(() => {
@@ -39,8 +39,8 @@ export default function TemplateScreen({ addToast, resetKey }) {
       </div>
 
       {subNav === 'cards'
-        ? <TemplateCardList addToast={addToast} />
-        : <TemplatePresetList addToast={addToast} />
+        ? <TemplateCardList key={connectionRoute} connectionRoute={connectionRoute} addToast={addToast} />
+        : <TemplatePresetList key={connectionRoute} connectionRoute={connectionRoute} addToast={addToast} />
       }
     </div>
   );

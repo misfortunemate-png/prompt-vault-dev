@@ -51,7 +51,7 @@ function ThumbGrid({ thumbs }) {
   );
 }
 
-export default function TemplatePresetList({ addToast }) {
+export default function TemplatePresetList({ addToast, connectionRoute }) {
   const [cardsData, setCardsData] = useState(null);
   const [presetsData, setPresetsData] = useState(null);
   const [allTags, setAllTags] = useState([]);
@@ -70,7 +70,7 @@ export default function TemplatePresetList({ addToast }) {
     }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); }, [connectionRoute]);
 
   // Load thumbnails for each preset
   useEffect(() => {
