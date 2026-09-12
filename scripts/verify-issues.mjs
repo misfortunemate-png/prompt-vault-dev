@@ -57,7 +57,6 @@ for (const issueId of issueIds) {
     });
     continue;
   }
-
   let checks;
   try {
     checks = await verifier.verify();
@@ -90,18 +89,15 @@ for (const issueId of issueIds) {
   });
 }
 
-report.summary = report.issues.reduce((summary, issue) => {
-  summary.issues += 1;
-  if (issue.gate) summary.gated_issues += 1;
-  for (const check of issue.checks) {
-    if (check.status === 'PASS') summary.pass += 1;
-    else if (check.status === 'FAIL') {
-      summary.fail += 1;
-      if (issue.gate) summary.gated_fail += 1;
-    } else if (check.status === 'NOT_RUN') summary.not_run += 1;
-    else if (check.status === 'WAIVED') summary.waived += 1;
+report.summary = report.issues.reduce((s, issue) => {
+  s.issues += 1; if (issue.gate) s.gated_issues += 1;
+  for (const c of issue.checks) {
+    if (c.status === 'PASS') s.pass += 1;
+    else if (c.status === 'FAIL') { s.fail += 1; if (issue.gate) s.gated_fail += 1; }
+    else if (c.status === 'NOT_RUN') s.not_run += 1;
+    else if (c.status === 'WAIVED') s.waived += 1;
   }
-  return summary;
+  return s;
 }, { issues: 0, gated_issues: 0, pass: 0, fail: 0, gated_fail: 0, not_run: 0, waived: 0 });
 
 if (jsonMode) {
@@ -121,7 +117,6 @@ if (jsonMode) {
   }
   console.log(`\nSUMMARY issues=${report.summary.issues} gated=${report.summary.gated_issues} pass=${report.summary.pass} fail=${report.summary.fail} gated_fail=${report.summary.gated_fail} not_run=${report.summary.not_run} waived=${report.summary.waived}`);
 }
-
 const anyFailure = report.summary.fail > 0;
 const gatedFailure = report.summary.gated_fail > 0;
 const notRunFailure = strictNotRun && report.summary.not_run > 0;
