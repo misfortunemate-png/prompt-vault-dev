@@ -5,6 +5,7 @@ import pv042 from './pv-042-template-backend-identity.mjs';
 import pv043 from './pv-043-settings-backend-identity.mjs';
 import pv044 from './pv-044-reachability-race.mjs';
 import pv045 from './pv-045-template-cloud-thumb.mjs';
+import pv047 from './pv-047-cross-tab-connection.mjs';
 
 export const issueVerifiers = Object.freeze({
   [pv016.issue]: pv016,
@@ -14,4 +15,5 @@ export const issueVerifiers = Object.freeze({
   [pv043.issue]: pv043,
   [pv044.issue]: pv044,
   [pv045.issue]: pv045,
+  [pv047.issue]: pv047,
 });
