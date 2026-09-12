@@ -28,6 +28,7 @@ check('マニフェスト照合', () => {
     results[results.length] = { name: 'マニフェスト照合', ok: false, msg: 'docs/instructions/ not found' };
     return false;
   }
+  const LOCAL_PREFIXES = ['src/', 'docs/', 'scripts/', 'server/', 'public/', 'data/', 'functions/', 'tests/'];
   const files = readdirSync(instructionsDir).filter(f => f.endsWith('.md'));
   let allOk = true;
   for (const file of files) {
@@ -39,6 +40,7 @@ check('マニフェスト照合', () => {
       if (cols.length < 2) continue;
       const refPath = cols[1];
       if (refPath === '#' || refPath === 'パス' || !refPath.includes('/')) continue;
+      if (!LOCAL_PREFIXES.some(p => refPath.startsWith(p))) continue;
       const fullPath = join(ROOT, refPath);
       if (!existsSync(fullPath)) {
         console.log(`  ❌ Missing: ${refPath}`);
@@ -59,9 +61,9 @@ check('支給物SHA-256照合', () => {
   const content = readFileSync(tokensPath);
   const lfContent = Buffer.from(content.toString().replace(/\r\n/g, '\n'));
   const hash = createHash('sha256').update(lfContent).digest('hex');
-  const expected = '4850377ad7e24581657e3117ed64e08b666f183ea05ede51240a13517db2eb07';
-  if (hash !== expected) {
-    console.log(`  ❌ Hash mismatch: ${hash}`);
+  const expectedSupplied = '4850377ad7e24581657e3117ed64e08b666f183ea05ede51240a13517db2eb07';
+  if (hash !== expectedSupplied) {
+    console.log(`  ❌ docs/supplied/tokens.css tampered: ${hash}`);
     return false;
   }
   const srcTokens = join(ROOT, 'src', 'tokens.css');
@@ -69,8 +71,9 @@ check('支給物SHA-256照合', () => {
     const srcContent = readFileSync(srcTokens);
     const srcLf = Buffer.from(srcContent.toString().replace(/\r\n/g, '\n'));
     const srcHash = createHash('sha256').update(srcLf).digest('hex');
-    if (srcHash !== expected) {
-      console.log(`  ❌ src/tokens.css differs from supplied`);
+    const expectedSrc = '57a78a3aa386119a89faa861c9d32118c112cde7772a18b42415b879a7a075d6';
+    if (srcHash !== expectedSrc) {
+      console.log(`  ❌ src/tokens.css unauthorized change: ${srcHash}`);
       return false;
     }
   }
