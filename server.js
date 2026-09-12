@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync, rmSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync, rmSync, accessSync, constants as fsConstants } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
@@ -277,7 +277,51 @@ async function start() {
   const api = express.Router();
 
   // ── System ──
-  api.get('/healthz', (_req, res) => res.json({ status: 'ok', version: pkg.version, sha: GIT_SHA }));
+  api.get('/livez', (_req, res) => res.json({ status: 'ok', version: pkg.version, sha: GIT_SHA, git_sha: GIT_SHA }));
+
+  api.get('/healthz', (_req, res) => {
+    const vaultRoot = process.env.VAULT_ROOT || '';
+    const checks = {
+      vault: { configured: !!vaultRoot, exists: false, readable: false, writable: false },
+      database: { ok: false },
+      novelai: { configured: !!process.env.NOVELAI_TOKEN },
+    };
+
+    if (vaultRoot) {
+      checks.vault.exists = existsSync(vaultRoot);
+      if (checks.vault.exists) {
+        try {
+          accessSync(vaultRoot, fsConstants.R_OK);
+          checks.vault.readable = true;
+        } catch {}
+        try {
+          accessSync(vaultRoot, fsConstants.W_OK);
+          checks.vault.writable = true;
+        } catch {}
+      }
+    }
+
+    try {
+      getStats();
+      checks.database.ok = true;
+    } catch (error) {
+      console.error('[healthz] database check failed:', error.message);
+      checks.database.error = 'Database unavailable';
+    }
+
+    const ok = checks.vault.configured && checks.vault.exists &&
+      checks.vault.readable && checks.vault.writable &&
+      checks.database.ok && checks.novelai.configured;
+
+    res.status(ok ? 200 : 503).json({
+      status: ok ? 'ok' : 'degraded',
+      ok,
+      version: pkg.version,
+      sha: GIT_SHA,
+      git_sha: GIT_SHA,
+      checks,
+    });
+  });
 
   api.get('/settings', (_req, res) => res.json(readSettings()));
   api.put('/settings', (req, res) => {
@@ -804,8 +848,8 @@ async function start() {
   });
 
   api.post('/debug/test-api', async (_req, res) => {
-    const apiKey = process.env.NOVELAI_API_KEY;
-    if (!apiKey) return res.json({ ok: false, error: 'APIキーが未設定です' });
+    const apiKey = process.env.NOVELAI_TOKEN || process.env.NOVELAI_API_KEY;
+    if (!apiKey) return res.json({ ok: false, error: 'NovelAIトークンが未設定です' });
     try {
       const resp = await fetch('https://image.novelai.net/ai/generate-image', {
         method: 'POST',
