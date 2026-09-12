@@ -4,7 +4,8 @@ import { join, relative, dirname } from 'path';
 import { mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
-import { getByHash, upsertImage, deleteByHash, getAllHashes, setThumbOk } from './db.js';
+import { getByHash, upsertImage, deleteByHash, getAllHashes, setThumbOk, closeDb } from './db.js';
+export { closeDb };
 import { parsePngMeta } from './png-meta.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -17,6 +18,7 @@ let scanState = {
   newCount: 0,
   movedCount: 0,
   deletedCount: 0,
+  incomplete: false,
 };
 
 export function getScanStatus() {
@@ -29,6 +31,7 @@ async function walkDir(dir) {
   try {
     entries = await readdir(dir, { withFileTypes: true });
   } catch {
+    scanState.incomplete = true;
     return files;
   }
   for (const entry of entries) {
@@ -59,7 +62,7 @@ export async function generateThumb(hash, srcPath) {
 export async function startScan(vaultRoot) {
   if (scanState.scanning) return;
 
-  scanState = { scanning: true, total: 0, processed: 0, newCount: 0, movedCount: 0, deletedCount: 0 };
+  scanState = { scanning: true, total: 0, processed: 0, newCount: 0, movedCount: 0, deletedCount: 0, incomplete: false };
 
   try {
     const files = await walkDir(vaultRoot);
@@ -147,12 +150,14 @@ export async function startScan(vaultRoot) {
       scanState.processed++;
     }
 
-    // Delete DB entries not found on FS
-    for (const [hash] of dbByHash) {
-      if (!fsHashes.has(hash)) {
-        deleteByHash(hash);
-        try { await rm(join(THUMBS_DIR, `${hash}.webp`), { force: true }); } catch {}
-        scanState.deletedCount++;
+    // Delete DB entries not found on FS — only when the walk was complete
+    if (!scanState.incomplete) {
+      for (const [hash] of dbByHash) {
+        if (!fsHashes.has(hash)) {
+          deleteByHash(hash);
+          try { await rm(join(THUMBS_DIR, `${hash}.webp`), { force: true }); } catch {}
+          scanState.deletedCount++;
+        }
       }
     }
 

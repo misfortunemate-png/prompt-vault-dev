@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import TemplateCardEdit from './TemplateCardEdit';
 import { api } from '../lib/api';
-import { resolveThumbUrl } from '../lib/connection';
+import { getConnection } from '../lib/connection';
 
 const btnStyle = (danger) => ({
   background: 'none',
@@ -16,12 +16,35 @@ const btnStyle = (danger) => ({
   whiteSpace: 'nowrap',
 });
 
+function ThumbCell({ hash }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    if (!hash) return;
+    let blobUrl = null;
+    let cancelled = false;
+    const isCloud = getConnection().route === 'cloud';
+    api.getThumb(hash).then(result => {
+      if (cancelled) {
+        if (isCloud && result && result.startsWith('blob:')) URL.revokeObjectURL(result);
+        return;
+      }
+      blobUrl = isCloud ? result : null;
+      setSrc(result);
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [hash]);
+  return src ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : null;
+}
+
 function ThumbGrid({ thumbs }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', width: '86px', flexShrink: 0 }}>
       {[0, 1, 2, 3].map(i => (
         <div key={i} style={{ width: '42px', height: '42px', background: 'var(--line)', borderRadius: '2px', overflow: 'hidden' }}>
-          {thumbs[i] && <img src={resolveThumbUrl(thumbs[i].hash)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+          {thumbs[i] && <ThumbCell hash={thumbs[i].hash} />}
         </div>
       ))}
     </div>

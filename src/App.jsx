@@ -136,7 +136,16 @@ export default function App() {
     initVisibilityCheck(() => {
       checkReachability().then(setConnectionState).catch(() => {});
     });
-    return () => destroyVisibilityCheck();
+    const handleStorage = (e) => {
+      if (e.key === 'pv-connection' || e.key === null) {
+        setConnectionState(getConnection());
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      destroyVisibilityCheck();
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   // offline / cloud 時は 30 秒ごとに自動再チェック（manual=false の場合のみ）
@@ -193,12 +202,13 @@ export default function App() {
         <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} activeTab={activeTab} />
       </div>
       {activeTab === 'album' && <AlbumScreen addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
-      {activeTab === 'template' && <TemplateScreen addToast={addToast} resetKey={resetKey} />}
+      {activeTab === 'template' && <TemplateScreen key={connectionState.route} addToast={addToast} resetKey={resetKey} />}
       {activeTab !== 'generate' && activeTab !== 'album' && activeTab !== 'template' && <PlaceholderView message="未実装のタブです" />}
       <Footer activeTab={activeTab} onTabChange={handleTabChange} />
       <Toast toasts={toasts} removeToast={removeToast} />
       {settingsOpen && (
         <SettingsScreen
+          key={connectionState.route}
           onClose={() => { setSettingsOpen(false); setDebugInitialOpen(false); }}
           addToast={addToast}
           displaySettings={displaySettings}

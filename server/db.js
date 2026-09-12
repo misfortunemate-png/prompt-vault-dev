@@ -141,6 +141,14 @@ export function getAllHashes() {
   return getDb().prepare('SELECT hash, rel_path FROM images').all();
 }
 
+export function closeDb() {
+  if (db) {
+    try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch {}
+    db.close();
+    db = null;
+  }
+}
+
 export function setFavorite(hash, flag, metaUpdatedAt) {
   const ts = metaUpdatedAt || new Date().toISOString();
   getDb().prepare('UPDATE images SET favorite = ?, meta_updated_at = ? WHERE hash = ?').run(flag, ts, hash);
