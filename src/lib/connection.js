@@ -62,13 +62,19 @@ async function fetchReachable(url, timeoutMs, token = null) {
   }
 }
 
+// Generation counter: incremented on each new probe start and on manual switch.
+// Any in-flight probe whose gen no longer matches _probeGeneration is stale and must not commit.
+let _probeGeneration = 0;
+
 export async function checkReachability() {
   const state = getConnection();
   if (state.manual) return state;
+  const gen = ++_probeGeneration;
   const timeoutMs = getTimeoutMs();
   const lastCheck = new Date().toISOString();
 
   const franOk = await fetchReachable(state.franUrl + '/healthz', timeoutMs);
+  if (gen !== _probeGeneration) return getConnection();
   if (franOk) {
     const next = { ...state, route: 'fran', lastCheck };
     saveConnection(next);
@@ -77,10 +83,12 @@ export async function checkReachability() {
 
   if (state.cloudUrl) {
     const cloudHealthOk = await fetchReachable(state.cloudUrl + '/healthz', timeoutMs);
+    if (gen !== _probeGeneration) return getConnection();
     if (cloudHealthOk) {
       const authOk = state.token
         ? await fetchReachable(state.cloudUrl + '/settings', timeoutMs, state.token)
         : false;
+      if (gen !== _probeGeneration) return getConnection();
       if (authOk) {
         const next = { ...state, route: 'cloud', lastCheck };
         saveConnection(next);
@@ -89,12 +97,14 @@ export async function checkReachability() {
     }
   }
 
+  if (gen !== _probeGeneration) return getConnection();
   const next = { ...state, route: 'offline', lastCheck };
   saveConnection(next);
   return next;
 }
 
 export function switchRoute(target) {
+  ++_probeGeneration;
   const state = getConnection();
   const next = { ...state, route: target, manual: true };
   saveConnection(next);

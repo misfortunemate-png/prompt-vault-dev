@@ -1054,6 +1054,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         preset_id: selectedPresetId || null,
       });
       const conn = getConnection();
+      if (conn.route !== routeAtFetch) return;
       if (conn.route === 'cloud' && result.image?.hash) {
         const hash = result.image.hash;
         const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
@@ -1066,7 +1067,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
             blobUrl = URL.createObjectURL(new Blob([plainBuf], { type: 'image/png' }));
           }
         } catch {}
-        if (connectionRoute !== routeAtFetch) return;
+        if (getConnection().route !== routeAtFetch) return;
         if (result.task_id) addedTaskIdsRef.current.add(result.task_id);
         setResults(prev => {
           const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false, blobUrl }, ...prev];
@@ -1074,7 +1075,6 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         });
         if (plainBuf) generateAndUploadThumb(plainBuf, hash, conn).catch(() => {});
       } else {
-        if (connectionRoute !== routeAtFetch) return;
         setResults(prev => {
           const next = [{ ...result.image, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
