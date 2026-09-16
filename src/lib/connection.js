@@ -1,28 +1,25 @@
 const LS_KEY = 'pv-connection';
 const LS_TIMEOUT_KEY = 'pv-connection-timeout';
 
+export const FRAN_URL = 'https://fraine.tail204746.ts.net:8445/api';
 export const CLOUD_URL = 'https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault';
 
 const DEFAULTS = {
   route: 'offline',
   manual: false,
   lastCheck: null,
-  franUrl: 'https://fraine.tail204746.ts.net:8445/api',
+  franUrl: FRAN_URL,
   cloudUrl: CLOUD_URL,
   token: '',
   cloudOfflineReason: null, // null | 'no-token' | 'auth-failed' | 'cloud-error'
 };
 
-// 旧デフォルト URL（ポート未指定→443→別サービス）を自動修正
+// Backend endpoint identity is product-owned. Historical/user-stored endpoint
+// values are normalized so connection semantics cannot drift with localStorage.
 function migrateState(state) {
   let s = state;
-  if (s.franUrl === 'https://fraine.tail204746.ts.net/api') {
-    s = { ...s, franUrl: 'https://fraine.tail204746.ts.net:8445/api' };
-  }
-  // Cloud endpoint is product-owned. Historical/user-stored values are normalized
-  // to the canonical API base so connection semantics cannot drift with localStorage.
-  if (s.cloudUrl !== CLOUD_URL) {
-    s = { ...s, cloudUrl: CLOUD_URL };
+  if (s.franUrl !== FRAN_URL || s.cloudUrl !== CLOUD_URL) {
+    s = { ...s, franUrl: FRAN_URL, cloudUrl: CLOUD_URL };
   }
   return s;
 }
@@ -42,7 +39,8 @@ export function getConnection() {
 
 export function saveConnection(state) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    const normalized = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL };
+    localStorage.setItem(LS_KEY, JSON.stringify(normalized));
   } catch {}
 }
 
@@ -94,10 +92,10 @@ export async function checkReachability() {
   const timeoutMs = getTimeoutMs();
   const lastCheck = new Date().toISOString();
 
-  const franOk = await fetchReachable(state.franUrl + '/healthz', timeoutMs);
+  const franOk = await fetchReachable(FRAN_URL + '/healthz', timeoutMs);
   if (gen !== _probeGeneration) return getConnection();
   if (franOk) {
-    const next = { ...state, route: 'fran', lastCheck, cloudOfflineReason: null };
+    const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'fran', lastCheck, cloudOfflineReason: null };
     saveConnection(next);
     return next;
   }
@@ -106,27 +104,27 @@ export async function checkReachability() {
   if (gen !== _probeGeneration) return getConnection();
   if (cloudHealthOk) {
     if (!state.token) {
-      const next = { ...state, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason: 'no-token' };
+      const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason: 'no-token' };
       saveConnection(next);
       return next;
     }
     const settingsStatus = await fetchStatus(CLOUD_URL + '/settings', timeoutMs, state.token);
     if (gen !== _probeGeneration) return getConnection();
     if (settingsStatus !== null && settingsStatus >= 200 && settingsStatus < 300) {
-      const next = { ...state, cloudUrl: CLOUD_URL, route: 'cloud', lastCheck, cloudOfflineReason: null };
+      const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'cloud', lastCheck, cloudOfflineReason: null };
       saveConnection(next);
       return next;
     }
     const cloudOfflineReason = (settingsStatus === 401 || settingsStatus === 403)
       ? 'auth-failed'
       : 'cloud-error';
-    const next = { ...state, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason };
+    const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason };
     saveConnection(next);
     return next;
   }
 
   if (gen !== _probeGeneration) return getConnection();
-  const next = { ...state, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason: null };
+  const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason: null };
   saveConnection(next);
   return next;
 }
@@ -134,21 +132,20 @@ export async function checkReachability() {
 export function switchRoute(target) {
   ++_probeGeneration;
   const state = getConnection();
-  const next = { ...state, route: target, manual: true };
+  const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: target, manual: true };
   saveConnection(next);
   return next;
 }
 
 export async function clearManual() {
   const state = getConnection();
-  saveConnection({ ...state, manual: false });
+  saveConnection({ ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, manual: false });
   return checkReachability();
 }
 
 export function updateSettings(settings) {
   const state = getConnection();
-  const next = { ...state, cloudUrl: CLOUD_URL };
-  if (settings.franUrl !== undefined) next.franUrl = settings.franUrl;
+  const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL };
   if (settings.token !== undefined) next.token = settings.token;
   saveConnection(next);
   if (settings.timeoutMs !== undefined) {
@@ -183,21 +180,19 @@ function _handleVisibility() {
 export function resolveApiUrl(path) {
   const conn = getConnection();
   if (conn.route === 'cloud') return CLOUD_URL + path;
-  return conn.franUrl + path;
+  return FRAN_URL + path;
 }
 
 export function resolveThumbUrl(hash) {
   const conn = getConnection();
   if (conn.route === 'cloud') return CLOUD_URL + `/thumbs/${hash}`;
-  return conn.franUrl + `/thumbs/${hash}.webp`;
+  return FRAN_URL + `/thumbs/${hash}.webp`;
 }
 
 export function resolveFullImgUrl(hash) {
-  const conn = getConnection();
-  return conn.franUrl + `/images/full/${hash}`;
+  return FRAN_URL + `/images/full/${hash}`;
 }
 
 export function resolveTmpImgUrl(filename) {
-  const conn = getConnection();
-  return conn.franUrl + `/images/.tmp/${filename}`;
+  return FRAN_URL + `/images/.tmp/${filename}`;
 }
