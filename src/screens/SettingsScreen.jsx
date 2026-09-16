@@ -156,12 +156,11 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     }
   };
 
-  // 接続設定が変わるたびにlocalStorageへ即時書込み
+  // ユーザーが所有する接続設定だけをlocalStorageへ即時書込み
   const handleConnSettingChange = useCallback((patch) => {
     const next = { ...conn, ...patch };
     setConn(next);
     const updated = updateSettings({
-      franUrl: next.franUrl,
       token: next.token,
     });
     if (onConnectionChange) onConnectionChange(updated);
@@ -203,10 +202,6 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
       setConnChecking(false);
     }
   }, [onConnectionChange]);
-
-  const handleFranUrlReset = useCallback(() => {
-    handleConnSettingChange({ franUrl: 'https://fraine.tail204746.ts.net:8445/api' });
-  }, [handleConnSettingChange]);
 
   // vault鍵ハンドラー
   const handleGenKey = useCallback(async () => {
@@ -793,17 +788,9 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
           <h3 style={{ fontSize: 'var(--fs-title)', marginBottom: '12px' }}>接続設定</h3>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>フランURL</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                value={conn.franUrl}
-                onChange={e => handleConnSettingChange({ franUrl: e.target.value })}
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              <button onClick={handleFranUrlReset} style={{ ...debugBtnStyle, padding: '8px 10px', fontSize: '11px', whiteSpace: 'nowrap' }}>
-                リセット
-              </button>
+            <label style={labelStyle}>フランURL（固定）</label>
+            <div style={{ ...inputStyle, color: 'var(--text-secondary)', userSelect: 'text', cursor: 'default', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+              {conn.franUrl}
             </div>
           </div>
 
