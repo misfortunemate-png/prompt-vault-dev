@@ -10,6 +10,7 @@ const DEFAULTS = {
   franUrl: 'https://fraine.tail204746.ts.net:8445/api',
   cloudUrl: CLOUD_URL,
   token: '',
+  cloudOfflineReason: null, // null | 'no-token' | 'auth-failed' | 'cloud-error'
 };
 
 // 旧デフォルト URL（ポート未指定→443→別サービス）を自動修正
@@ -18,7 +19,8 @@ function migrateState(state) {
   if (s.franUrl === 'https://fraine.tail204746.ts.net/api') {
     s = { ...s, franUrl: 'https://fraine.tail204746.ts.net:8445/api' };
   }
-  // cloudUrl は常に固定値に上書き（ユーザー設定を無視）
+  // Cloud endpoint is product-owned. Historical/user-stored values are normalized
+  // to the canonical API base so connection semantics cannot drift with localStorage.
   if (s.cloudUrl !== CLOUD_URL) {
     s = { ...s, cloudUrl: CLOUD_URL };
   }
@@ -64,6 +66,23 @@ async function fetchReachable(url, timeoutMs) {
   }
 }
 
+// Returns HTTP status (number) or null on network error / timeout / CORS failure.
+async function fetchStatus(url, timeoutMs, token) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return res.status;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Generation counter: incremented on each new probe start and on manual switch.
 // Any in-flight probe whose gen no longer matches _probeGeneration is stale and must not commit.
 let _probeGeneration = 0;
@@ -78,23 +97,36 @@ export async function checkReachability() {
   const franOk = await fetchReachable(state.franUrl + '/healthz', timeoutMs);
   if (gen !== _probeGeneration) return getConnection();
   if (franOk) {
-    const next = { ...state, route: 'fran', lastCheck };
+    const next = { ...state, route: 'fran', lastCheck, cloudOfflineReason: null };
     saveConnection(next);
     return next;
   }
 
-  if (state.cloudUrl) {
-    const cloudOk = await fetchReachable(state.cloudUrl + '/healthz', timeoutMs);
-    if (gen !== _probeGeneration) return getConnection();
-    if (cloudOk) {
-      const next = { ...state, route: 'cloud', lastCheck };
+  const cloudHealthOk = await fetchReachable(CLOUD_URL + '/healthz', timeoutMs);
+  if (gen !== _probeGeneration) return getConnection();
+  if (cloudHealthOk) {
+    if (!state.token) {
+      const next = { ...state, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason: 'no-token' };
       saveConnection(next);
       return next;
     }
+    const settingsStatus = await fetchStatus(CLOUD_URL + '/settings', timeoutMs, state.token);
+    if (gen !== _probeGeneration) return getConnection();
+    if (settingsStatus !== null && settingsStatus >= 200 && settingsStatus < 300) {
+      const next = { ...state, cloudUrl: CLOUD_URL, route: 'cloud', lastCheck, cloudOfflineReason: null };
+      saveConnection(next);
+      return next;
+    }
+    const cloudOfflineReason = (settingsStatus === 401 || settingsStatus === 403)
+      ? 'auth-failed'
+      : 'cloud-error';
+    const next = { ...state, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason };
+    saveConnection(next);
+    return next;
   }
 
   if (gen !== _probeGeneration) return getConnection();
-  const next = { ...state, route: 'offline', lastCheck };
+  const next = { ...state, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason: null };
   saveConnection(next);
   return next;
 }
@@ -115,10 +147,9 @@ export async function clearManual() {
 
 export function updateSettings(settings) {
   const state = getConnection();
-  const next = { ...state };
+  const next = { ...state, cloudUrl: CLOUD_URL };
   if (settings.franUrl !== undefined) next.franUrl = settings.franUrl;
   if (settings.token !== undefined) next.token = settings.token;
-  next.cloudUrl = CLOUD_URL;
   saveConnection(next);
   if (settings.timeoutMs !== undefined) {
     try { localStorage.setItem(LS_TIMEOUT_KEY, String(settings.timeoutMs)); } catch {}
@@ -151,13 +182,13 @@ function _handleVisibility() {
 
 export function resolveApiUrl(path) {
   const conn = getConnection();
-  if (conn.route === 'cloud') return conn.cloudUrl + path;
+  if (conn.route === 'cloud') return CLOUD_URL + path;
   return conn.franUrl + path;
 }
 
 export function resolveThumbUrl(hash) {
   const conn = getConnection();
-  if (conn.route === 'cloud') return conn.cloudUrl + `/thumbs/${hash}`;
+  if (conn.route === 'cloud') return CLOUD_URL + `/thumbs/${hash}`;
   return conn.franUrl + `/thumbs/${hash}.webp`;
 }
 

@@ -163,16 +163,27 @@ export default function App() {
     setResults([]);
   }, [connectionState.route, connectionState.franUrl, connectionState.cloudUrl]);
 
-  // cloud モードで認証トークン or vault key が未設定なら警告
+  // cloud モードで vault key が未設定なら警告。
+  // 認証トークン未設定/不正は checkReachability() が offline reason として扱う。
   useEffect(() => {
     if (connectionState.route !== 'cloud') return;
-    const missing = [];
-    if (!connectionState.token) missing.push('認証トークン');
-    if (!hasVaultKey()) missing.push('vault鍵');
-    if (missing.length > 0) {
-      addToast('error', `クラウドモード: ${missing.join('・')}が未設定 → 設定 → 接続設定`);
+    if (!hasVaultKey()) {
+      addToast('error', 'クラウドモード: vault鍵が未設定 → 設定 → 接続設定');
     }
-  }, [connectionState.route, connectionState.token, addToast]);
+  }, [connectionState.route, addToast]);
+
+  // Cloud healthz 到達後の認証/API失敗理由をユーザーに区別して示す。
+  useEffect(() => {
+    if (connectionState.route !== 'offline') return;
+    const reason = connectionState.cloudOfflineReason;
+    if (reason === 'no-token') {
+      addToast('error', 'クラウドへ到達済み: 認証トークンが未設定です → 設定 → 接続設定');
+    } else if (reason === 'auth-failed') {
+      addToast('error', '認証エラー: トークンが正しくありません → 設定 → 接続設定');
+    } else if (reason === 'cloud-error') {
+      addToast('warn', 'クラウドAPI エラー: しばらく後に自動で再確認します');
+    }
+  }, [connectionState.route, connectionState.cloudOfflineReason, addToast]);
 
   useEffect(() => {
     return startVersionCheck(() => {
