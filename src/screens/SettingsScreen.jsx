@@ -809,7 +809,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
 
           <div style={{ marginBottom: '12px' }}>
             <label style={labelStyle}>クラウドURL（固定）</label>
-            <div style={{ ...inputStyle, color: 'var(--text-secondary)', userSelect: 'text', cursor: 'default' }}>
+            <div style={{ ...inputStyle, color: 'var(--text-secondary)', userSelect: 'text', cursor: 'default', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
               {conn.cloudUrl}
             </div>
           </div>
