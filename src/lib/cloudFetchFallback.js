@@ -3,9 +3,9 @@
 //
 // The Cloud Worker already supports ?token= authentication. Keep Bearer auth
 // as the primary path, and only retry idempotent GET requests after fetch()
-// itself rejects (CORS/preflight/DNS/transport class failure). This avoids
-// changing normal auth semantics while giving affected PWA runtimes a
-// no-custom-header fallback path.
+// itself rejects (CORS/preflight/transport class failure). This avoids changing
+// normal auth semantics while giving affected PWA runtimes a no-custom-header
+// fallback path.
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
@@ -31,13 +31,18 @@ function getBearer(headers) {
 }
 
 function isPromptVaultCloudUrl(url) {
-  return url.pathname === '/api/prompt-vault' || url.pathname.startsWith('/api/prompt-vault/');
+  return url.protocol === 'https:' &&
+    (url.pathname === '/api/prompt-vault' || url.pathname.startsWith('/api/prompt-vault/'));
 }
 
 async function fetchWithCloudGetFallback(input, init) {
   try {
     return await nativeFetch(input, init);
   } catch (primaryError) {
+    // A deliberate AbortController timeout/user abort is not a CORS fallback
+    // case; retrying with the already-aborted signal cannot succeed.
+    if (primaryError?.name === 'AbortError') throw primaryError;
+
     const method = requestMethod(input, init);
     if (method !== 'GET') throw primaryError;
 
