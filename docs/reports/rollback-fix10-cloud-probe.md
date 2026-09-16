@@ -1,28 +1,33 @@
 # Roll back fix #10 Cloud route probe
 
-## Why
+> **Superseded (2026-09-17):** This rollback was a temporary diagnostic step. The later #56 investigation found that the affected PWA held the historical path-less Worker URL while the current frontend expected the Prompt Vault API base. That value came from the original user-facing connection design, not a user error. PR #64 canonicalized the Cloud endpoint, and PR #66 restored the authenticated `/settings` probe from #10/#53. The rollback described below is no longer current behavior.
 
-The owner reports that around 2026-09-12 the installed PWA could use Cloud while Fran was off. Earlier runtime diagnosis showed the actually deployed Pages frontend at that time was pre-fix#10, while repository HEAD on 2026-09-12 already contained fix #10 (`7c850e5`). Therefore restoring the 2026-09-12 repository tree did not restore the actually-working deployed behavior.
+## Historical reason for rollback
 
-## Change
+The owner reported that around 2026-09-12 the installed PWA appeared able to use Cloud while Fran was off. During investigation, repository HEAD and deployed/frontend state did not align, so the #10 authenticated probe was temporarily removed to reproduce earlier route-selection behavior.
 
-Restore only the Cloud selection behavior from immediately before fix #10:
+At that point the missing `/api/prompt-vault` suffix in the affected PWA's stored `cloudUrl` had not yet been identified.
 
-- Fran `/healthz` is checked first.
-- If Fran is unavailable, Cloud `/healthz` success selects `route='cloud'`.
-- The authenticated `/settings` precondition added by fix #10 is removed from route selection.
-- The later probe-generation race protection is retained.
-- Normal Cloud API requests still send the configured Bearer token, so invalid/missing credentials surface on the actual API call instead of forcing route `offline` during reachability selection.
+## Historical change
 
-## Known regression
+The temporary rollback did the following:
 
-This intentionally reintroduces the original #10 behavior: Cloud can be selected when `/healthz` succeeds even if the token is missing or invalid. Issue #10 must therefore be reopened until a replacement design separates transport reachability from auth state without blocking Cloud fallback.
+- Fran `/healthz` was checked first.
+- If Fran was unavailable, Cloud `/healthz` success selected `route='cloud'`.
+- The authenticated `/settings` precondition added by fix #10 was removed from route selection.
+- Probe-generation race protection was retained.
 
-## Runtime verification
+This intentionally reintroduced the original #10 defect: a reachable Cloud health endpoint could be selected even when the token was absent or invalid.
 
-After deployment to Fran, with manual route disabled:
+## Final state
 
-1. Stop Fran on port 8445.
-2. Confirm automatic route changes to Cloud rather than Offline.
-3. Confirm cards, presets and album API calls succeed with the user's existing token.
-4. If Cloud is selected but API calls fail, keep #56 open and diagnose the actual API path separately.
+PR #64 now makes Cloud endpoint identity product-owned and migrates any historical stored `cloudUrl` to the canonical `https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault` API base.
+
+PR #66 restored the authenticated Cloud selection behavior:
+
+1. Fran `/healthz` success -> Fran.
+2. Fran unavailable -> canonical Cloud `/healthz`.
+3. Cloud health success requires a token and authenticated `/settings` success before `route='cloud'`.
+4. Missing token, 401/403, and other Cloud API failures are distinguished through `cloudOfflineReason`.
+
+Issue #10 is therefore closed again. This file remains only as a record of the temporary diagnostic rollback.
