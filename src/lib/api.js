@@ -12,7 +12,14 @@ async function request(path, opts = {}) {
     throw new Error('オフライン: サーバーに接続できません');
   }
 
-  const headers = { 'Content-Type': 'application/json', ...opts.headers };
+  // Keep bodyless reads free of application/json so the Cloud compatibility
+  // retry can become a simple GET after Authorization is removed.
+  const headers = { ...opts.headers };
+  const hasBody = opts.body !== undefined && opts.body !== null;
+  const hasContentType = Object.keys(headers).some(k => k.toLowerCase() === 'content-type');
+  if (hasBody && !hasContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
   if (conn.route === 'cloud' && conn.token) {
     headers['Authorization'] = `Bearer ${conn.token}`;
   }
