@@ -8,7 +8,6 @@ const DEFAULTS = {
   franUrl: 'https://fraine.tail204746.ts.net:8445/api',
   cloudUrl: 'https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault',
   token: '',
-  cloudOfflineReason: null, // null | 'no-token' | 'auth-failed' | 'cloud-error'
 };
 
 // 旧デフォルト URL（ポート未指定→443→別サービス）を自動修正
@@ -49,31 +48,15 @@ function getTimeoutMs() {
   } catch { return 8000; }
 }
 
-async function fetchReachable(url, timeoutMs) {
+async function fetchReachable(url, timeoutMs, token = null) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const res = await fetch(url, { signal: ctrl.signal, headers });
     return res.ok;
   } catch {
     return false;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-// Returns HTTP status (number) or null on network error / timeout / CORS failure.
-async function fetchStatus(url, timeoutMs, token) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    return res.status;
-  } catch {
-    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -93,7 +76,7 @@ export async function checkReachability() {
   const franOk = await fetchReachable(state.franUrl + '/healthz', timeoutMs);
   if (gen !== _probeGeneration) return getConnection();
   if (franOk) {
-    const next = { ...state, route: 'fran', lastCheck, cloudOfflineReason: null };
+    const next = { ...state, route: 'fran', lastCheck };
     saveConnection(next);
     return next;
   }
@@ -102,29 +85,20 @@ export async function checkReachability() {
     const cloudHealthOk = await fetchReachable(state.cloudUrl + '/healthz', timeoutMs);
     if (gen !== _probeGeneration) return getConnection();
     if (cloudHealthOk) {
-      if (!state.token) {
-        const next = { ...state, route: 'offline', lastCheck, cloudOfflineReason: 'no-token' };
-        saveConnection(next);
-        return next;
-      }
-      const settingsStatus = await fetchStatus(state.cloudUrl + '/settings', timeoutMs, state.token);
+      const authOk = state.token
+        ? await fetchReachable(state.cloudUrl + '/settings', timeoutMs, state.token)
+        : false;
       if (gen !== _probeGeneration) return getConnection();
-      if (settingsStatus !== null && settingsStatus >= 200 && settingsStatus < 300) {
-        const next = { ...state, route: 'cloud', lastCheck, cloudOfflineReason: null };
+      if (authOk) {
+        const next = { ...state, route: 'cloud', lastCheck };
         saveConnection(next);
         return next;
       }
-      const cloudOfflineReason = (settingsStatus === 401 || settingsStatus === 403)
-        ? 'auth-failed'
-        : 'cloud-error';
-      const next = { ...state, route: 'offline', lastCheck, cloudOfflineReason };
-      saveConnection(next);
-      return next;
     }
   }
 
   if (gen !== _probeGeneration) return getConnection();
-  const next = { ...state, route: 'offline', lastCheck, cloudOfflineReason: null };
+  const next = { ...state, route: 'offline', lastCheck };
   saveConnection(next);
   return next;
 }

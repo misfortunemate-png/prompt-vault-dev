@@ -174,19 +174,6 @@ export default function App() {
     }
   }, [connectionState.route, connectionState.token, addToast]);
 
-  // offline かつ cloud check で原因が特定できた場合に actionable toast を表示
-  useEffect(() => {
-    if (connectionState.route !== 'offline') return;
-    const reason = connectionState.cloudOfflineReason;
-    if (reason === 'no-token') {
-      addToast('error', 'クラウドへ到達済み: 認証トークンが未設定です → 設定 → 接続設定');
-    } else if (reason === 'auth-failed') {
-      addToast('error', '認証エラー: トークンが正しくありません → 設定 → 接続設定');
-    } else if (reason === 'cloud-error') {
-      addToast('warn', 'クラウドAPI エラー: しばらく後に自動で再確認します');
-    }
-  }, [connectionState.route, connectionState.cloudOfflineReason, addToast]);
-
   useEffect(() => {
     return startVersionCheck(() => {
       addToast('info', '新しいバージョンがあります。3秒後に更新します…');
