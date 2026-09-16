@@ -1,5 +1,7 @@
 # #56 affected PWA Cloud GET compatibility fallback
 
+> **Superseded (2026-09-17):** This report records an intermediate diagnosis that was later disproved as the root cause. The actual #56 failure was a historical `cloudUrl` value that omitted `/api/prompt-vault`. The path-less value came from the original user-facing connection design; it was not a user mistake. PR #64 made the Cloud endpoint product-owned and normalized historical values. PR #66 then removed the query-token compatibility fallback described below. Treat the remainder of this file as historical investigation notes only.
+
 ## Confirmed runtime evidence (2026-09-17)
 
 Read-only production diagnostics reported in #56 established:
@@ -9,37 +11,28 @@ Read-only production diagnostics reported in #56 established:
 - OPTIONS for `/api/prompt-vault/cards` and `/gallery/recent` returns 204 with the expected CORS headers;
 - authenticated GET `/cards` and `/gallery/recent` returns 200 from an independent client and reaches Worker with `outcome: ok`;
 - the existing `?token=` authentication path also returns 200;
-- the affected installed PWA still reports Fetch API `TypeError: Failed to fetch` for authenticated Cloud GETs.
+- the affected installed PWA still reported Fetch API `TypeError: Failed to fetch` while its stored `cloudUrl` pointed at the Worker root rather than the Prompt Vault API base.
 
-This establishes a client-side transport/runtime incompatibility for the affected PWA. It does **not** by itself identify a specific browser vendor bug or browser version.
+These observations ruled out the production Worker as the source of the failure, but they did **not** establish a browser/PWA Authorization bug. The later `cloudUrl` finding explains the affected PWA behavior without requiring that hypothesis.
 
-## Compatibility change
+## Historical compatibility change
 
-Bearer remains the normal Cloud authentication path. Only when a configured Prompt Vault Cloud **GET** with Bearer rejects with `TypeError` before an HTTP response is exposed, the frontend retries once using the already-supported `?token=` path.
+A temporary compatibility fallback retried a failed Bearer GET using the already-supported `?token=` path. This was merged during diagnosis and later removed by PR #66 after the root cause was corrected.
 
-The retry:
+The temporary retry was:
 
-- is limited to the currently configured HTTPS `cloudUrl` origin/path;
-- is GET-only;
-- does not run for HTTP 401/403/404/5xx;
-- does not run for AbortError or an aborted signal;
-- removes `Authorization` and `Content-Type`, making the retry a simple GET;
-- uses `cache: no-store`, `credentials: omit`, and `referrerPolicy: no-referrer`;
-- does not apply to POST/PUT/DELETE.
+- limited to the configured HTTPS `cloudUrl` origin/path;
+- GET-only;
+- not used for HTTP 401/403/404/5xx;
+- not used for AbortError or an aborted signal;
+- stripped `Authorization` and `Content-Type`;
+- used `cache: no-store`, `credentials: omit`, and `referrerPolicy: no-referrer`;
+- not applied to POST/PUT/DELETE.
 
-`src/lib/api.js` also avoids adding `Content-Type: application/json` to bodyless requests so the fallback does not reintroduce a preflight through that header.
+## Final resolution
 
-## Security follow-up
+- PR #64: canonical `CLOUD_URL` is product-owned, historical stored values are normalized, and Cloud URL is no longer user-editable.
+- PR #66: authenticated `/settings` Cloud probe restored; `cloudOfflineReason` diagnostics restored; temporary query-token fallback removed.
+- #61: closed because the query-token fallback and its long-lived-token URL exposure risk were removed.
 
-The compatibility retry places the long-lived token in a query parameter. This was already supported and runtime-verified by the Worker, but automatic use can expose the token in request-URL diagnostics/logs. This risk is tracked separately as #61. The compatibility path should be replaced by a non-query long-lived-token design before it is treated as a permanent transport layer.
-
-## Required runtime verification
-
-After Fran distribution is updated:
-
-1. disable manual route pinning;
-2. stop Fran API on port 8445;
-3. confirm automatic route becomes Cloud;
-4. confirm `/cards`, `/presets`, `/gallery`, `/gallery/recent` load in the affected PWA;
-5. confirm thumbnails load;
-6. confirm writes still use the normal Bearer path and are not routed through the GET fallback.
+Design rule: infrastructure endpoint identity that the application can provide must not be delegated to normal user input. Environment-specific overrides belong in application/build/runtime configuration, not ordinary user settings.
