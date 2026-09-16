@@ -1,12 +1,14 @@
 const LS_KEY = 'pv-connection';
 const LS_TIMEOUT_KEY = 'pv-connection-timeout';
 
+export const CLOUD_URL = 'https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault';
+
 const DEFAULTS = {
   route: 'offline',
   manual: false,
   lastCheck: null,
   franUrl: 'https://fraine.tail204746.ts.net:8445/api',
-  cloudUrl: 'https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault',
+  cloudUrl: CLOUD_URL,
   token: '',
 };
 
@@ -16,8 +18,9 @@ function migrateState(state) {
   if (s.franUrl === 'https://fraine.tail204746.ts.net/api') {
     s = { ...s, franUrl: 'https://fraine.tail204746.ts.net:8445/api' };
   }
-  if (!s.cloudUrl || s.cloudUrl === 'https://ai-family-foundation.shogosakamoto.workers.dev/api/prompt-vault') {
-    s = { ...s, cloudUrl: 'https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault' };
+  // cloudUrl は常に固定値に上書き（ユーザー設定を無視）
+  if (s.cloudUrl !== CLOUD_URL) {
+    s = { ...s, cloudUrl: CLOUD_URL };
   }
   return s;
 }
@@ -114,8 +117,8 @@ export function updateSettings(settings) {
   const state = getConnection();
   const next = { ...state };
   if (settings.franUrl !== undefined) next.franUrl = settings.franUrl;
-  if (settings.cloudUrl !== undefined) next.cloudUrl = settings.cloudUrl;
   if (settings.token !== undefined) next.token = settings.token;
+  next.cloudUrl = CLOUD_URL;
   saveConnection(next);
   if (settings.timeoutMs !== undefined) {
     try { localStorage.setItem(LS_TIMEOUT_KEY, String(settings.timeoutMs)); } catch {}

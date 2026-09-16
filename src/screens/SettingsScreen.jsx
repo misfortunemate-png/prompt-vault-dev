@@ -162,7 +162,6 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     setConn(next);
     const updated = updateSettings({
       franUrl: next.franUrl,
-      cloudUrl: next.cloudUrl,
       token: next.token,
     });
     if (onConnectionChange) onConnectionChange(updated);
@@ -809,14 +808,10 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
           </div>
 
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>クラウドURL（空欄でクラウド経路無効）</label>
-            <input
-              type="text"
-              value={conn.cloudUrl}
-              onChange={e => handleConnSettingChange({ cloudUrl: e.target.value })}
-              style={inputStyle}
-              placeholder="https://..."
-            />
+            <label style={labelStyle}>クラウドURL（固定）</label>
+            <div style={{ ...inputStyle, color: 'var(--text-secondary)', userSelect: 'text', cursor: 'default' }}>
+              {conn.cloudUrl}
+            </div>
           </div>
 
           <div style={{ marginBottom: '12px' }}>
