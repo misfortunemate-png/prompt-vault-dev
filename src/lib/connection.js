@@ -11,37 +11,81 @@ const DEFAULTS = {
   franUrl: FRAN_URL,
   cloudUrl: CLOUD_URL,
   token: '',
+  revision: '0',
   cloudOfflineReason: null, // null | 'no-token' | 'auth-failed' | 'cloud-error'
 };
 
-// Backend endpoint identity is product-owned. Historical/user-stored endpoint
-// values are normalized so connection semantics cannot drift with localStorage.
-function migrateState(state) {
-  let s = state;
-  if (s.franUrl !== FRAN_URL || s.cloudUrl !== CLOUD_URL) {
-    s = { ...s, franUrl: FRAN_URL, cloudUrl: CLOUD_URL };
-  }
-  return s;
+function newRevision() {
+  try {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  } catch {}
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
+function normalizeState(state = {}) {
+  return {
+    ...DEFAULTS,
+    ...state,
+    franUrl: FRAN_URL,
+    cloudUrl: CLOUD_URL,
+    revision: typeof state.revision === 'string' && state.revision ? state.revision : DEFAULTS.revision,
+  };
+}
+
+function sameBackendIdentity(a, b) {
+  return a.route === b.route && a.token === b.token;
+}
+
+// Backend endpoint identity is product-owned. Historical/user-stored endpoint
+// values are normalized so connection semantics cannot drift with localStorage.
 export function getConnection() {
   try {
     const saved = localStorage.getItem(LS_KEY);
     if (saved) {
       const raw = JSON.parse(saved);
-      const parsed = migrateState(raw);
-      if (parsed !== raw) localStorage.setItem(LS_KEY, JSON.stringify(parsed));
-      return { ...DEFAULTS, ...parsed };
+      const parsed = normalizeState(raw);
+      if (
+        raw.franUrl !== FRAN_URL ||
+        raw.cloudUrl !== CLOUD_URL ||
+        raw.revision !== parsed.revision
+      ) {
+        localStorage.setItem(LS_KEY, JSON.stringify(parsed));
+      }
+      return parsed;
     }
   } catch {}
   return { ...DEFAULTS };
 }
 
+// revision is an opaque backend-identity generation. It changes only when
+// route or authentication principal changes; lastCheck/manual/diagnostic
+// updates do not invalidate backend-scoped data.
 export function saveConnection(state) {
+  const previous = getConnection();
+  const normalized = normalizeState(state);
+  normalized.revision = sameBackendIdentity(previous, normalized)
+    ? previous.revision
+    : newRevision();
   try {
-    const normalized = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL };
     localStorage.setItem(LS_KEY, JSON.stringify(normalized));
   } catch {}
+  return normalized;
+}
+
+export function captureConnectionSnapshot(state = getConnection()) {
+  return Object.freeze({
+    revision: state.revision,
+    route: state.route,
+    token: state.token,
+  });
+}
+
+export function isConnectionSnapshotCurrent(snapshot) {
+  if (!snapshot) return false;
+  const current = getConnection();
+  return current.revision === snapshot.revision
+    && current.route === snapshot.route
+    && current.token === snapshot.token;
 }
 
 function getTimeoutMs() {
@@ -88,70 +132,66 @@ let _probeGeneration = 0;
 export async function checkReachability() {
   const state = getConnection();
   if (state.manual) return state;
+  const snapshot = captureConnectionSnapshot(state);
   const gen = ++_probeGeneration;
   const timeoutMs = getTimeoutMs();
   const lastCheck = new Date().toISOString();
 
+  const stillCurrent = () => {
+    const current = getConnection();
+    return gen === _probeGeneration
+      && isConnectionSnapshotCurrent(snapshot)
+      && current.manual === state.manual;
+  };
+
   const franOk = await fetchReachable(FRAN_URL + '/healthz', timeoutMs);
-  if (gen !== _probeGeneration) return getConnection();
+  if (!stillCurrent()) return getConnection();
   if (franOk) {
-    const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'fran', lastCheck, cloudOfflineReason: null };
-    saveConnection(next);
-    return next;
+    return saveConnection({ ...state, route: 'fran', lastCheck, cloudOfflineReason: null });
   }
 
   const cloudHealthOk = await fetchReachable(CLOUD_URL + '/healthz', timeoutMs);
-  if (gen !== _probeGeneration) return getConnection();
+  if (!stillCurrent()) return getConnection();
   if (cloudHealthOk) {
     if (!state.token) {
-      const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason: 'no-token' };
-      saveConnection(next);
-      return next;
+      return saveConnection({ ...state, route: 'offline', lastCheck, cloudOfflineReason: 'no-token' });
     }
     const settingsStatus = await fetchStatus(CLOUD_URL + '/settings', timeoutMs, state.token);
-    if (gen !== _probeGeneration) return getConnection();
+    if (!stillCurrent()) return getConnection();
     if (settingsStatus !== null && settingsStatus >= 200 && settingsStatus < 300) {
-      const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'cloud', lastCheck, cloudOfflineReason: null };
-      saveConnection(next);
-      return next;
+      return saveConnection({ ...state, route: 'cloud', lastCheck, cloudOfflineReason: null });
     }
     const cloudOfflineReason = (settingsStatus === 401 || settingsStatus === 403)
       ? 'auth-failed'
       : 'cloud-error';
-    const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason };
-    saveConnection(next);
-    return next;
+    return saveConnection({ ...state, route: 'offline', lastCheck, cloudOfflineReason });
   }
 
-  if (gen !== _probeGeneration) return getConnection();
-  const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: 'offline', lastCheck, cloudOfflineReason: null };
-  saveConnection(next);
-  return next;
+  if (!stillCurrent()) return getConnection();
+  return saveConnection({ ...state, route: 'offline', lastCheck, cloudOfflineReason: null });
 }
 
 export function switchRoute(target) {
   ++_probeGeneration;
   const state = getConnection();
-  const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, route: target, manual: true };
-  saveConnection(next);
-  return next;
+  return saveConnection({ ...state, route: target, manual: true });
 }
 
 export async function clearManual() {
   const state = getConnection();
-  saveConnection({ ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL, manual: false });
+  saveConnection({ ...state, manual: false });
   return checkReachability();
 }
 
 export function updateSettings(settings) {
   const state = getConnection();
-  const next = { ...state, franUrl: FRAN_URL, cloudUrl: CLOUD_URL };
+  const next = { ...state };
   if (settings.token !== undefined) next.token = settings.token;
-  saveConnection(next);
+  const saved = saveConnection(next);
   if (settings.timeoutMs !== undefined) {
     try { localStorage.setItem(LS_TIMEOUT_KEY, String(settings.timeoutMs)); } catch {}
   }
-  return next;
+  return saved;
 }
 
 export function getTimeoutSetting() {
