@@ -1,10 +1,10 @@
 ---
 project: prompt-vault
 version: 4.0.0
-milestone: 接続設計ドキュメント整備
-status: done
+milestone: 外部レビュー収束
+status: in_progress
 updated: 2026-09-18
-next: Cloudflare Pages自動deploy確認
+next: Issue #54 Cloudflare Pages production deploy確認
 ---
 
 ## 完了マイルストーン
@@ -29,3 +29,11 @@ next: Cloudflare Pages自動deploy確認
 - [x] fix(#27): healthz に git SHA 公開（`sha: GIT_SHA` フィールド追加済み）
 - [x] ci(#28): GitHub Pages 自動 deploy（`deploy-pages` ジョブ実装済み・mainブランチpush時に実行）
 - [x] docs(#69): README 初期設定セクション整備（Cloud URL/Fran URLをread-only明記・ユーザー入力はCloud Token・Vault Keyのみ）
+- [x] fix(#70): Albumをbackend identity単位でremountし、route切替後の旧backend遅延response混入を防止
+- [x] refactor(#49): connection revisionを導入し、API層でbackend-scoped stale responseを共通破棄
+
+## 現在の未解決事項
+
+- [ ] #54 [P1]: Cloudflare Pages本番がmain更新を確実に反映するdeploy経路の確認・復旧
+
+#27 / #28 / #49 / #70 は完了・close済み。
