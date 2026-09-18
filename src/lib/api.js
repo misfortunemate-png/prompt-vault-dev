@@ -1,8 +1,21 @@
-import { getConnection, resolveThumbUrl } from './connection.js';
+import { getConnection, resolveThumbUrl, captureConnectionSnapshot, isConnectionSnapshotCurrent } from './connection.js';
 import { decrypt } from './crypto.js';
+
+export class StaleConnectionError extends Error {
+  constructor(path) {
+    super(`接続先が変更されたため古い応答を破棄しました: ${path}`);
+    this.name = 'StaleConnectionError';
+    this.code = 'STALE_CONNECTION';
+  }
+}
+
+function assertCurrentConnection(snapshot, path) {
+  if (!isConnectionSnapshotCurrent(snapshot)) throw new StaleConnectionError(path);
+}
 
 async function request(path, opts = {}) {
   const conn = getConnection();
+  const snapshot = captureConnectionSnapshot(conn);
   let base;
   if (conn.route === 'fran') {
     base = conn.franUrl;
@@ -12,8 +25,7 @@ async function request(path, opts = {}) {
     throw new Error('オフライン: サーバーに接続できません');
   }
 
-  // Keep bodyless reads free of application/json so the Cloud compatibility
-  // retry can become a simple GET after Authorization is removed.
+  // Bodyless reads do not need an application/json content type.
   const headers = { ...opts.headers };
   const hasBody = opts.body !== undefined && opts.body !== null;
   const hasContentType = Object.keys(headers).some(k => k.toLowerCase() === 'content-type');
@@ -28,13 +40,17 @@ async function request(path, opts = {}) {
   try {
     res = await fetch(`${base}${path}`, { ...opts, headers });
   } catch (e) {
+    if (!isConnectionSnapshotCurrent(snapshot)) throw new StaleConnectionError(path);
     const route = conn.route === 'cloud' ? 'Cloud' : 'Fran';
     throw new Error(`ネットワークエラー [${route}] ${path}: ${e.message || '到達不能'}`);
   }
 
+  assertCurrentConnection(snapshot, path);
+
   if (!res.ok) {
     let body = '';
     try { const j = await res.json(); body = j.error || j.message || ''; } catch {}
+    assertCurrentConnection(snapshot, path);
     const detail = body ? `: ${body}` : '';
     if (res.status === 401) throw new Error(`認証エラー (401): トークンを設定してください`);
     if (res.status === 403) throw new Error(`権限エラー (403)${detail}`);
@@ -42,7 +58,9 @@ async function request(path, opts = {}) {
     if (res.status >= 500) throw new Error(`サーバーエラー (${res.status})${detail}`);
     throw new Error(`API エラー (${res.status})${detail}`);
   }
-  return res.json();
+  const data = await res.json();
+  assertCurrentConnection(snapshot, path);
+  return data;
 }
 
 export const api = {
@@ -114,11 +132,13 @@ export const api = {
   async getThumb(hash) {
     const conn = getConnection();
     if (conn.route !== 'cloud') return resolveThumbUrl(hash);
+    const snapshot = captureConnectionSnapshot(conn);
     const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
     try {
       const res = await fetch(conn.cloudUrl + `/thumbs/${hash}`, { headers });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const plain = await decrypt(await res.arrayBuffer());
+      if (!isConnectionSnapshotCurrent(snapshot)) return null;
       return URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
     } catch { return null; }
   },
