@@ -7,6 +7,7 @@ import pv043 from './pv-043-settings-backend-identity.mjs';
 import pv044 from './pv-044-reachability-race.mjs';
 import pv045 from './pv-045-template-cloud-thumb.mjs';
 import pv047 from './pv-047-cross-tab-connection.mjs';
+import pv049 from './pv-049-connection-revision.mjs';
 import pv070 from './pv-070-album-backend-scope.mjs';
 
 export const issueVerifiers = Object.freeze({
@@ -19,5 +20,6 @@ export const issueVerifiers = Object.freeze({
   [pv044.issue]: pv044,
   [pv045.issue]: pv045,
   [pv047.issue]: pv047,
+  [pv049.issue]: pv049,
   [pv070.issue]: pv070,
 });
