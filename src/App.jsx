@@ -161,7 +161,7 @@ export default function App() {
 
   useEffect(() => {
     setResults([]);
-  }, [connectionState.route, connectionState.franUrl, connectionState.cloudUrl]);
+  }, [connectionState.revision]);
 
   // cloud モードで vault key が未設定なら警告。
   // 認証トークン未設定/不正は checkReachability() が offline reason として扱う。
@@ -210,16 +210,16 @@ export default function App() {
         connectionState={connectionState}
       />
       <div style={{ display: activeTab === 'generate' ? 'block' : 'none' }}>
-        <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} activeTab={activeTab} />
+        <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} connectionRevision={connectionState.revision} activeTab={activeTab} />
       </div>
-      {activeTab === 'album' && <AlbumScreen key={connectionState.route} addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
-      {activeTab === 'template' && <TemplateScreen key={`${connectionState.route}|${connectionState.franUrl}|${connectionState.cloudUrl}`} addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
+      {activeTab === 'album' && <AlbumScreen key={connectionState.revision} addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
+      {activeTab === 'template' && <TemplateScreen key={connectionState.revision} addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
       {activeTab !== 'generate' && activeTab !== 'album' && activeTab !== 'template' && <PlaceholderView message="未実装のタブです" />}
       <Footer activeTab={activeTab} onTabChange={handleTabChange} />
       <Toast toasts={toasts} removeToast={removeToast} />
       {settingsOpen && (
         <SettingsScreen
-          key={`${connectionState.route}|${connectionState.franUrl}|${connectionState.cloudUrl}`}
+          key={connectionState.revision}
           onClose={() => { setSettingsOpen(false); setDebugInitialOpen(false); }}
           addToast={addToast}
           displaySettings={displaySettings}
