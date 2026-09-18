@@ -50,12 +50,13 @@ ALLOWED_ORIGINS=https://misfortunemate-png.github.io,https://prompt-vault-6gr.pa
 
 ## 初期設定（サイトデータをクリアした後など）
 
-設定画面（歯車アイコン）から以下を再入力する。
+設定画面（歯車アイコン）から以下を入力する。
+
+> **Cloud URL・Fran URL はアプリが管理する固定エンドポイント（read-only）。ユーザーが手入力するのは以下の 2 項目のみ。**
 
 | 設定項目 | 値 |
 |----------|-----|
-| Cloud URL | `https://ai-family-foundation.misfortunemate.workers.dev/api/prompt-vault` |
-| Token | （管理者に確認） |
+| Cloud Token | （管理者に確認） |
 | Vault Key | （管理者に確認） |
 
 ---
