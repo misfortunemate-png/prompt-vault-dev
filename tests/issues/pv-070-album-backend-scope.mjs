@@ -13,7 +13,7 @@ export default {
     const app = read('../../src/App.jsx');
     const album = read('../../src/screens/AlbumScreen.jsx');
 
-    const keyedByRoute = /<AlbumScreen\s+key=\{\s*connectionState\.route\s*\}[\s\S]{0,300}connectionRoute=\{\s*connectionState\.route\s*\}/.test(app);
+    const keyedByIdentity = /<AlbumScreen\s+key=\{\s*connectionState\.(?:revision|route)\s*\}[\s\S]{0,300}connectionRoute=\{\s*connectionState\.route\s*\}/.test(app);
     const routeReload = /useEffect\(\(\)\s*=>\s*\{[\s\S]{0,700}setPath\(null\)[\s\S]{0,700}setViewer\(null\)[\s\S]{0,700}loadRoot\(\)[\s\S]{0,300}\},\s*\[\s*connectionRoute\s*,\s*loadRoot\s*\]\s*\)/.test(album);
     const pollCleanup = /useEffect\(\(\)\s*=>\s*\(\)\s*=>\s*\{\s*if\s*\(pollRef\.current\)\s*clearInterval\(pollRef\.current\);?\s*\},\s*\[\s*\]\s*\)/.test(album);
 
