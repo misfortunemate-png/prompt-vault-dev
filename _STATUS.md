@@ -1,10 +1,10 @@
 ---
 project: prompt-vault
 version: 4.0.0
-milestone: 外部レビュー修正
+milestone: 接続設計ドキュメント整備
 status: done
-updated: 2026-09-08
-next: Worker統合待ち
+updated: 2026-09-18
+next: Cloudflare Pages自動deploy確認
 ---
 
 ## 完了マイルストーン
@@ -26,3 +26,6 @@ next: Worker統合待ち
 - [x] v3.12.2: fetchReachableタイムアウト 3s→8s（tailscale初回接続が遅い環境でcloudフォールバックしていた問題修正）
 - [x] v3.12.3: cloud route でvaultReady=true固定（cloud WorkerにVAULT_ROOTがないため生成画面が壊れていた問題修正）
 - [x] v3.13.0: ランダムサイズ生成（縦/横/正方からランダム選択・生成/キュー/直積の全ルート対応・チェックボックスOFF時は既存動作を維持）
+- [x] fix(#27): healthz に git SHA 公開（`sha: GIT_SHA` フィールド追加済み）
+- [x] ci(#28): GitHub Pages 自動 deploy（`deploy-pages` ジョブ実装済み・mainブランチpush時に実行）
+- [x] docs(#69): README 初期設定セクション整備（Cloud URL/Fran URLをread-only明記・ユーザー入力はCloud Token・Vault Keyのみ）
