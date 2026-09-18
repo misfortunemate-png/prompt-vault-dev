@@ -20,8 +20,8 @@ export default {
     return [
       check(
         'Album component is remounted when backend route changes',
-        keyedByRoute,
-        'AlbumScreen is not keyed by connectionState.route, so stale async completions can target the same component instance after a route switch',
+        keyedByIdentity,
+        'AlbumScreen is not keyed by backend identity/revision, so stale async completions can target the same component instance after a connection identity change',
       ),
       check(
         'new Album instance reloads backend-scoped root state',
