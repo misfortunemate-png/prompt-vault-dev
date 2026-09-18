@@ -212,7 +212,7 @@ export default function App() {
       <div style={{ display: activeTab === 'generate' ? 'block' : 'none' }}>
         <GenerateScreen addToast={addToast} results={results} setResults={setResults} maxResults={maxResults} resetKey={resetKey} connectionRoute={connectionState.route} activeTab={activeTab} />
       </div>
-      {activeTab === 'album' && <AlbumScreen addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
+      {activeTab === 'album' && <AlbumScreen key={connectionState.route} addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
       {activeTab === 'template' && <TemplateScreen key={`${connectionState.route}|${connectionState.franUrl}|${connectionState.cloudUrl}`} addToast={addToast} resetKey={resetKey} connectionRoute={connectionState.route} />}
       {activeTab !== 'generate' && activeTab !== 'album' && activeTab !== 'template' && <PlaceholderView message="未実装のタブです" />}
       <Footer activeTab={activeTab} onTabChange={handleTabChange} />
