@@ -1,6 +1,17 @@
 name: Issue Verifier
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/verify-issues.mjs'
+      - 'tests/issues/**'
+      - 'src/**'
+      - 'server/**'
+      - 'server.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/issue-verifier.yml'
   pull_request:
     paths:
       - 'scripts/verify-issues.mjs'
