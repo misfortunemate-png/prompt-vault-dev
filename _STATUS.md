@@ -3,7 +3,7 @@ project: prompt-vault
 version: 4.0.0
 milestone: 外部レビュー収束
 status: in_progress
-updated: 2026-09-18
+updated: 2026-09-19
 next: Issue #54 Cloudflare Pages production deploy確認
 ---
 
@@ -16,6 +16,7 @@ next: Issue #54 Cloudflare Pages production deploy確認
 - #70: Albumのbackend切替時stale response混入を防止
 - #49: connection revision導入、API層でbackend-scoped stale responseを共通破棄
 - #69: README初期設定を現行接続設計へ更新
+- 回帰verifier Batch 1: #5/#8/#9/#53/#56 — 5件を tests/issues/ に追加・manifest登録 (16件全件PASS)
 
 ## 現在の未解決事項
 - #54 [P1]: Cloudflare Pages本番がmain更新を確実に反映するdeploy経路の確認・復旧
