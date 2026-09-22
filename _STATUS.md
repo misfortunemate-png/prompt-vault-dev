@@ -3,8 +3,8 @@ project: prompt-vault
 version: 4.0.0
 milestone: 外部レビュー収束
 status: in_progress
-updated: 2026-09-19
-next: Issue #54 Cloudflare Pages production deploy確認
+updated: 2026-09-22
+next: PM検収待ち
 ---
 
 ## 完了
