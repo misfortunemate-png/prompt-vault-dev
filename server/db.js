@@ -206,6 +206,17 @@ export function getTotalByCard(positive) {
   return (getDb().prepare('SELECT COUNT(*) as count FROM images WHERE prompt LIKE ?').get(like) || { count: 0 }).count;
 }
 
+export function getSyncInventory(offset = 0, limit = 100) {
+  const db = getDb();
+  const images = db.prepare(
+    `SELECT hash, filename, folder, favorite, caption,
+            meta_updated_at, preset_id, created_at
+     FROM images ORDER BY created_at DESC LIMIT ? OFFSET ?`
+  ).all(limit, offset);
+  const { total } = db.prepare('SELECT COUNT(*) as total FROM images').get();
+  return { images, total };
+}
+
 export function getAllPreviewHashes(limit = 4) {
   const rows = getDb().prepare(`
     SELECT folder, hash FROM (
