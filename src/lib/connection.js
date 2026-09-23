@@ -95,11 +95,13 @@ function getTimeoutMs() {
   } catch { return 8000; }
 }
 
-async function fetchReachable(url, timeoutMs) {
+async function fetchReachable(url, timeoutMs, token) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const init = { signal: ctrl.signal };
+    if (token) init.headers = { 'Authorization': `Bearer ${token}` };
+    const res = await fetch(url, init);
     return res.ok;
   } catch {
     return false;
@@ -150,12 +152,13 @@ export async function checkReachability() {
     return saveConnection({ ...state, route: 'fran', lastCheck, cloudOfflineReason: null });
   }
 
-  const cloudHealthOk = await fetchReachable(CLOUD_URL + '/healthz', timeoutMs);
+  // family-auth: クラウドの healthz は入口照合の内側。トークンが無ければ叩かない
+  if (!state.token) {
+    return saveConnection({ ...state, route: 'offline', lastCheck, cloudOfflineReason: 'no-token' });
+  }
+  const cloudHealthOk = await fetchReachable(CLOUD_URL + '/healthz', timeoutMs, state.token);
   if (!stillCurrent()) return getConnection();
   if (cloudHealthOk) {
-    if (!state.token) {
-      return saveConnection({ ...state, route: 'offline', lastCheck, cloudOfflineReason: 'no-token' });
-    }
     const settingsStatus = await fetchStatus(CLOUD_URL + '/settings', timeoutMs, state.token);
     if (!stillCurrent()) return getConnection();
     if (settingsStatus !== null && settingsStatus >= 200 && settingsStatus < 300) {

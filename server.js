@@ -5,7 +5,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
 import { execSync } from 'node:child_process';
-import { getByHash, listFolders, listByFolder, getRecent, getRecentByDays, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, getImagePath, removeImageRow, getGalleryByCard, getTotalByCard, updateSyncMeta } from './server/db.js';
+import { getByHash, listFolders, listByFolder, getRecent, getRecentByDays, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, getImagePath, removeImageRow, getGalleryByCard, getTotalByCard, updateSyncMeta, getSyncInventory } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
@@ -580,6 +580,15 @@ async function start() {
       const limit = parseInt(req.query.limit) || 50;
       const images = getFavorites(limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
+  api.get('/gallery/sync-inventory', (req, res) => {
+    const offset = Math.max(0, parseInt(req.query.offset) || 0);
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 100));
+    try {
+      const { images, total } = getSyncInventory(offset, limit);
+      res.json({ images, total, offset, limit });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
