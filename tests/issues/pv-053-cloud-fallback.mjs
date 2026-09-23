@@ -56,8 +56,10 @@ export default {
       mkdirSync(srcDir, { recursive: true });
 
       // Write a copy for the negative control: skip Cloud probe when Fran fails
+      const NEG_ANCHOR = "  const cloudHealthOk = await fetchReachable(CLOUD_URL + '/healthz', timeoutMs, state.token);";
+      if (!connSrc.includes(NEG_ANCHOR)) throw new Error('negative control: アンカー不一致（connection.js に置換元の行が無い）');
       const negConnSrc = connSrc.replace(
-        "  const cloudHealthOk = await fetchReachable(CLOUD_URL + '/healthz', timeoutMs);",
+        NEG_ANCHOR,
         "  // [neg-ctrl] Cloud fallback bypassed — old bug\n  return saveConnection({ ...state, route: 'offline', lastCheck, cloudOfflineReason: null });\n  // eslint-disable-next-line no-unreachable\n  const cloudHealthOk = await fetchReachable(CLOUD_URL + '/healthz', timeoutMs);",
       );
       const negConnPath = join(srcDir, 'connection-neg.mjs');
