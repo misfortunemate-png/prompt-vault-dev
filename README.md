@@ -80,3 +80,4 @@ Cloudflare Pages は `main` ブランチへの push を検知して自動ビル�
 
 - 現在のキャッシュ名: `prompt-vault-v4.0.0`
 - クロスオリジンリクエスト（フランサーバー等）は SW が傍受しない（same-origin ガード適用済み）
+
