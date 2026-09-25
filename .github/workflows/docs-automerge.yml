@@ -1,0 +1,75 @@
+name: Docs automerge
+
+# docs だけの PR を、必須チェックがすべて成功した後に自動でマージする（instructions-docs-fastpath.md 手順3）
+# 必須チェックを出すワークフローの完了で起動し、そのコミットを head に持つ PR を再判定する。
+# 一つでも条件を満たさなければ何もしない（後から完了した側の起動で再判定される）。
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: docs だけの PR なら必須チェック成功後にマージ
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -u
+          log() { echo "docs-automerge: $*"; }
+          default_branch=$(gh api "repos/$REPO" -q .default_branch)
+          prs=$(gh api "repos/$REPO/commits/$HEAD_SHA/pulls" -q '.[] | select(.state=="open") | .number')
+          if [ -z "$prs" ]; then log "head $HEAD_SHA に開いた PR がない。何もしない"; exit 0; fi
+
+          # 必須チェック（ブランチ保護の設定から読む）
+          required=$(gh api "repos/$REPO/branches/$default_branch" -q '.protection.required_status_checks.contexts[]?')
+          if [ -z "$required" ]; then log "必須チェックの設定が読めない。何もしない"; exit 0; fi
+
+          for pr in $prs; do
+            info=$(gh api "repos/$REPO/pulls/$pr" -q '[.base.ref, .head.repo.full_name, (.draft|tostring), .head.sha, .head.ref] | join(" ")')
+            read -r base head_repo draft pr_sha head_ref <<< "$info"
+            if [ "$base" != "$default_branch" ]; then log "PR #$pr: base が $default_branch でない（$base）。マージしない"; continue; fi
+            if [ "$head_repo" != "$REPO" ]; then log "PR #$pr: フォークからの PR。マージしない"; continue; fi
+            if [ "$draft" = "true" ]; then log "PR #$pr: ドラフト。マージしない"; continue; fi
+            if [ "$pr_sha" != "$HEAD_SHA" ]; then log "PR #$pr: head が $HEAD_SHA から進んでいる。マージしない"; continue; fi
+
+            # docs だけか（PR のファイル一覧 API で独立に判定。定義は scripts/ci/docs-only.sh と同じ）
+            files=$(gh api --paginate "repos/$REPO/pulls/$pr/files" -q '.[].filename') || { log "PR #$pr: ファイル一覧が取れない。マージしない"; continue; }
+            if [ -z "$files" ]; then log "PR #$pr: ファイル一覧が空。マージしない"; continue; fi
+            reason=""
+            while IFS= read -r f; do
+              case "$f" in
+                docs/supplied/*) reason="docs/supplied/ を含む: $f"; break ;;
+                docs/*) ;;
+                *) reason="docs/ 外を含む: $f"; break ;;
+              esac
+            done <<< "$files"
+            if [ -n "$reason" ]; then log "PR #$pr: docs だけでない（$reason）。マージしない"; continue; fi
+
+            # 必須チェックがすべて成功しているか（同名は最新の実行で判定）
+            runs=$(gh api --paginate "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100" -q '.check_runs[] | [.name, .status, (.conclusion // "none"), .started_at] | join("\t")')
+            pending=""
+            while IFS= read -r ctx; do
+              latest=$(printf '%s\n' "$runs" | awk -F'\t' -v n="$ctx" '$1==n' | sort -t$'\t' -k4 | tail -1)
+              if [ -z "$latest" ]; then pending="$ctx（未開始）"; break; fi
+              status=$(printf '%s' "$latest" | cut -f2); conclusion=$(printf '%s' "$latest" | cut -f3)
+              if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then pending="$ctx（$status/$conclusion）"; break; fi
+            done <<< "$required"
+            if [ -n "$pending" ]; then log "PR #$pr: 必須チェックが成功していない: $pending。マージしない"; continue; fi
+
+            if gh pr merge "$pr" -R "$REPO" --squash --delete-branch --match-head-commit "$HEAD_SHA"; then
+              log "PR #$pr: docs だけ・必須チェックすべて成功のため squash でマージし、ブランチ $head_ref を削除した"
+            else
+              log "PR #$pr: マージに失敗した（権限・保護の設定を確認）"
+              exit 1
+            fi
+          done

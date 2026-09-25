@@ -12,20 +12,38 @@ permissions:
 jobs:
   source-gate:
     runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: docs だけの変更かを判定
+        id: docs
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.event.after }}
+        run: bash scripts/ci/docs-only.sh
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
       - run: npm ci
+        if: steps.docs.outputs.docs_only != 'true'
       - run: npm run build
+        if: steps.docs.outputs.docs_only != 'true'
       - run: npm run build:pages
+        if: steps.docs.outputs.docs_only != 'true'
       - run: npm run inspect
+        if: steps.docs.outputs.docs_only != 'true'
 
   deploy-pages:
     needs: source-gate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.source-gate.outputs.docs_only != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
