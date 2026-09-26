@@ -1,0 +1,2 @@
+# docs-only.sh は Windows の runner でも bash で動かすため LF に固定する
+*.sh text eol=lf
