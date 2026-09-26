@@ -1,4 +1,4 @@
-const CACHE_NAME = 'prompt-vault-v4.0.0';
+const CACHE_NAME = 'prompt-vault-v4.0.1';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
