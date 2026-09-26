@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Toast from './components/Toast';
@@ -10,6 +10,14 @@ import { api } from './lib/api';
 import { getConnection, checkReachability, initVisibilityCheck, destroyVisibilityCheck } from './lib/connection';
 import { hasVaultKey } from './lib/crypto';
 import { startVersionCheck } from './lib/versionCheck';
+
+// 一覧の持ち主を更新し、消すべきかを返す（offline は持ち主を変えない）
+function resolveResultsOwner(owner, conn) {
+  if (conn.route !== 'cloud' && conn.route !== 'fran') return { owner, clear: false };
+  const key = `${conn.route}\u0000${conn.token || ''}`;
+  if (owner === null || owner === key) return { owner: key, clear: false };
+  return { owner: key, clear: true };
+}
 
 const DISPLAY_KEY = 'pv-display-settings';
 
@@ -159,9 +167,14 @@ export default function App() {
     return () => clearInterval(id);
   }, [connectionState.route, connectionState.manual]);
 
+  // 生成結果の一覧は作られたときの接続先（route＋token）に属する（pv#81）。
+  // offline を挟んで同じ接続先に戻っただけなら消さない
+  const resultsOwnerRef = useRef(null);
   useEffect(() => {
-    setResults([]);
-  }, [connectionState.revision]);
+    const { owner, clear } = resolveResultsOwner(resultsOwnerRef.current, connectionState);
+    resultsOwnerRef.current = owner;
+    if (clear) setResults([]);
+  }, [connectionState.route, connectionState.token]);
 
   // cloud モードで vault key が未設定なら警告。
   // 認証トークン未設定/不正は checkReachability() が offline reason として扱う。

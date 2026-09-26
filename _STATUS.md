@@ -1,10 +1,10 @@
 ---
 project: prompt-vault
-version: 4.0.0
-milestone: 外部レビュー収束
+version: 4.0.1
+milestone: 生成直後の画像表示（pv#81）
 status: in_progress
-updated: 2026-09-22
-next: PM検収待ち
+updated: 2026-09-26
+next: PM検収待ち・発注者実機確認（pv#81 AC-3/4/6/7）
 ---
 
 ## 完了
