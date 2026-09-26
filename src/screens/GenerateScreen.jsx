@@ -59,12 +59,29 @@ const arrowBtnStyle = {
   flexShrink: 0,
 };
 
+// 保存前の生成結果をタスク id で取得（pv#81）。404（掃除済み・存在しない）は期限切れとして返す
+async function fetchTaskImage(conn, taskId) {
+  const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+  const r = await fetch(conn.cloudUrl + `/queue/task/${encodeURIComponent(taskId)}/data`, { headers });
+  if (r.status === 404) return { expired: true, plain: null };
+  if (!r.ok) return { expired: false, plain: null };
+  return { expired: false, plain: await decrypt(await r.arrayBuffer()) };
+}
+
+// 保存成功後にだけサムネを作る（pv#81）。元データは手元の blob から取る
+async function uploadThumbAfterSave(blobUrl, hash, conn) {
+  if (!blobUrl || !hash || conn.route !== 'cloud') return;
+  const plain = await (await fetch(blobUrl)).arrayBuffer();
+  await generateAndUploadThumb(plain, hash, conn);
+}
+
 const STATUS_ICONS = { pending: '⏳', running: '🔄', done: '✅', error: '❌', skipped: '⏭' };
 
 function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
   const conn = getConnection();
   const isCloud = conn.route === 'cloud';
   const [blobUrl, setBlobUrl] = useState(null);
+  const [expired, setExpired] = useState(false);
 
   const parsedResult = (() => {
     if (!task.result) return null;
@@ -74,21 +91,20 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
 
   useEffect(() => {
     if (task.status !== 'done') return;
-    if (!isCloud || !parsedResult?.hash) return;
+    if (!isCloud || !task.id) return;
     let url = null;
     let cancelled = false;
-    const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
-    fetch(conn.cloudUrl + `/gallery/image/${parsedResult.hash}/data`, { headers })
-      .then(r => r.ok ? r.arrayBuffer() : null)
-      .then(buf => buf ? decrypt(buf) : null)
-      .then(plain => {
-        if (cancelled || !plain) return;
+    fetchTaskImage(conn, task.id)
+      .then(({ expired: gone, plain }) => {
+        if (cancelled) return;
+        if (gone) { setExpired(true); return; }
+        if (!plain) return;
         url = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
         setBlobUrl(url);
       })
       .catch(() => {});
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [task.status, parsedResult?.hash, isCloud, conn.cloudUrl, conn.token]);
+  }, [task.status, task.id, isCloud, conn.cloudUrl, conn.token]);
 
   const hasThumb = isCloud ? !!blobUrl : !!(parsedResult?.filename);
   const thumbSrc = isCloud ? blobUrl : (parsedResult?.filename ? resolveTmpImgUrl(parsedResult.filename) : null);
@@ -103,6 +119,8 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
           onClick={() => onPreview(previewResult)}
           style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, cursor: 'zoom-in', background: 'var(--line)' }}
         />
+      ) : task.status === 'done' && expired ? (
+        <span style={{ fontSize: '10px', flexShrink: 0, width: 36, textAlign: 'center', color: 'var(--text-secondary)' }}>期限切れ</span>
       ) : (
         <span style={{ fontSize: '14px', flexShrink: 0, width: 36, textAlign: 'center' }}>{STATUS_ICONS[task.status] || '?'}</span>
       )}
@@ -112,7 +130,7 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
       </span>
       {task.status === 'done' && (
         <button
-          onClick={onSave}
+          onClick={() => onSave(blobUrl)}
           style={{ padding: '3px 10px', border: task.saved ? '1px solid var(--line)' : 'none', borderRadius: 'var(--radius-s)', background: task.saved ? 'none' : 'var(--accent)', color: task.saved ? 'var(--text-secondary)' : 'var(--accent-contrast)', cursor: task.saved ? 'default' : 'pointer', fontSize: '11px', flexShrink: 0 }}
         >{task.saved ? '✓' : '保存'}</button>
       )}
@@ -137,12 +155,16 @@ function ResultCard({ item, onSave, onPreview }) {
       gap: '12px',
       alignItems: 'flex-start',
     }}>
-      <img
-        src={imgSrc}
-        alt=""
-        onClick={onPreview}
-        style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', cursor: 'zoom-in' }}
-      />
+      {item.expired ? (
+        <div style={{ width: 72, height: 72, borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>期限切れ</div>
+      ) : (
+        <img
+          src={imgSrc}
+          alt=""
+          onClick={onPreview}
+          style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', cursor: 'zoom-in' }}
+        />
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '2px' }}>
           {item.width}×{item.height} • seed: {item.seed}
@@ -494,15 +516,11 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         filenameSegments: parseSegArr(task.filename_segments ?? task.filenameSegments),
         saved: !!task.saved,
       };
-      if (isCloud && parsedResult.hash) {
-        const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+      if (isCloud) {
         try {
-          const r = await fetch(conn.cloudUrl + `/gallery/image/${parsedResult.hash}/data`, { headers });
-          if (r.ok) {
-            const plain = await decrypt(await r.arrayBuffer());
-            entry.blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
-            generateAndUploadThumb(plain, parsedResult.hash, conn).catch(() => {});
-          }
+          const { expired, plain } = await fetchTaskImage(conn, task.id);
+          if (expired) entry.expired = true;
+          else if (plain) entry.blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
         } catch {}
       }
       setResults(prev => [entry, ...prev].slice(0, maxResults));
@@ -1058,25 +1076,21 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       if (conn.revision !== revisionAtFetch) return;
       if (conn.route !== routeAtFetch) return;
       if (conn.route === 'cloud' && result.image?.hash) {
-        const hash = result.image.hash;
-        const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+        const taskId = result.task_id ?? result.image.task_id;
         let blobUrl = null;
-        let plainBuf = null;
+        let expired = false;
         try {
-          const imgRes = await fetch(conn.cloudUrl + `/gallery/image/${hash}/data`, { headers });
-          if (imgRes.ok) {
-            plainBuf = await decrypt(await imgRes.arrayBuffer());
-            blobUrl = URL.createObjectURL(new Blob([plainBuf], { type: 'image/png' }));
-          }
+          const got = taskId ? await fetchTaskImage(conn, taskId) : { expired: true, plain: null };
+          expired = got.expired;
+          if (got.plain) blobUrl = URL.createObjectURL(new Blob([got.plain], { type: 'image/png' }));
         } catch {}
         if (getConnection().revision !== revisionAtFetch) return;
         if (getConnection().route !== routeAtFetch) return;
         if (result.task_id) addedTaskIdsRef.current.add(result.task_id);
         setResults(prev => {
-          const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false, blobUrl }, ...prev];
+          const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false, blobUrl, expired }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
-        if (plainBuf) generateAndUploadThumb(plainBuf, hash, conn).catch(() => {});
       } else {
         setResults(prev => {
           const next = [{ ...result.image, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false }, ...prev];
@@ -1106,6 +1120,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       if (getConnection().revision !== revisionAtFetch) return;
       if (connectionRoute !== routeAtFetch) return;
       setResults(prev => prev.map((r, i) => i === idx ? { ...r, saved: true } : r));
+      if (conn.route === 'cloud') uploadThumbAfterSave(item.blobUrl, item.hash, conn).catch(() => {});
     } catch (e) {
       addToast('error', '保存に失敗しました: ' + (e.message || ''));
     }
@@ -1458,9 +1473,15 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                 ) : (
                   <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '8px', borderTop: '1px solid var(--line)' }}>
                     {queueData.tasks.map(task => (
-                      <QueueTaskRow key={task.id} task={task} onPreview={setPreviewItem} onSave={async () => {
+                      <QueueTaskRow key={task.id} task={task} onPreview={setPreviewItem} onSave={async (rowBlobUrl) => {
                         if (task.saved) return;
-                        try { await api.queueTaskSave(task.id); setQueueData(await api.getQueue()); addToast('success', '保存しました'); }
+                        try {
+                          await api.queueTaskSave(task.id);
+                          let hash = null;
+                          try { hash = (typeof task.result === 'string' ? JSON.parse(task.result) : task.result)?.hash; } catch {}
+                          uploadThumbAfterSave(rowBlobUrl, hash, getConnection()).catch(() => {});
+                          setQueueData(await api.getQueue()); addToast('success', '保存しました');
+                        }
                         catch (e) { addToast('error', e.message); }
                       }} onRemove={() => handleRemoveTask(task.id)} />
                     ))}

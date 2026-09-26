@@ -96,10 +96,36 @@ export default {
         'Album/Template/Settings are not all keyed by connectionState.revision',
       ));
 
+      // pv#81 PM 裁定（issuecomment-5842144262）により挙動検査へ差し替え：
+      // 一覧は接続先（route+token）が変わったときに消え、offline を挟んで同じ接続先に戻っただけでは消えない
+      let ownerVerdict = { ok: false, detail: 'resolveResultsOwner not found in App.jsx' };
+      const ownerStart = app.indexOf('function resolveResultsOwner(');
+      if (ownerStart >= 0) {
+        let i = app.indexOf(') {', ownerStart) + 2;
+        let depth = 0;
+        let ownerSrc = '';
+        for (; i < app.length; i++) {
+          if (app[i] === '{') depth++;
+          else if (app[i] === '}') { depth--; if (depth === 0) { ownerSrc = app.slice(ownerStart, i + 1); break; } }
+        }
+        const resolveOwner = new Function(`${ownerSrc}; return resolveResultsOwner;`)();
+        let owner = null;
+        const step = (route, token) => { const r = resolveOwner(owner, { route, token }); owner = r.owner; return r.clear; };
+        step('cloud', 'T1');
+        const offlineBlip = [step('offline', 'T1'), step('cloud', 'T1')];
+        const toFran = step('fran', 'T1');
+        const toCloud = step('cloud', 'T1');
+        const tokenChanged = step('cloud', 'T2');
+        const wired = /resolveResultsOwner\(resultsOwnerRef\.current, connectionState\)[\s\S]{0,160}if \(clear\) setResults\(\[\]\);[\s\S]{0,40}\[connectionState\.route, connectionState\.token\]/.test(app);
+        ownerVerdict = {
+          ok: wired && toFran && toCloud && tokenChanged && offlineBlip.every(c => c === false),
+          detail: `wired=${wired} cloud→fran=${toFran} fran→cloud=${toCloud} token change=${tokenChanged} cloud→offline→cloud=${JSON.stringify(offlineBlip)}`,
+        };
+      }
       checks.push(check(
-        'Generate result invalidation consumes the common connection revision',
-        /setResults\(\[\]\)[\s\S]{0,120}\[connectionState\.revision\]/.test(app),
-        'Generate results are not invalidated by connection revision',
+        'Generate results are invalidated when backend identity (route+token) changes',
+        ownerVerdict.ok,
+        ownerVerdict.detail,
       ));
 
       checks.push(check(
