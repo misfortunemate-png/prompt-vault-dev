@@ -63,14 +63,16 @@ ALLOWED_ORIGINS=https://misfortunemate-png.github.io,https://prompt-vault-6gr.pa
 
 ## デプロイ手順
 
-本番への反映は **Git push** が確実。
+フロントの公開先は Cloudflare Pages（プロジェクト `prompt-vault`）だけ。本番 URL は `https://prompt-vault-6gr.pages.dev`。
 
 ```bash
-git push origin main
+npm run build
+npx wrangler pages deploy dist --project-name=prompt-vault --branch=main
 ```
 
-Cloudflare Pages は `main` ブランチへの push を検知して自動ビルド・デプロイを行う。  
-`wrangler pages deploy` を直接実行した場合はハッシュ URL にのみ反映され、`prompt-vault-6gr.pages.dev` が更新されないことがある。
+- `main` への push では本番に**自動反映されない**（Git 連携なし）。反映は上の手動配信で行う
+- Worker（ai-family-foundation）側の経路を使う変更は、**Worker を先に公開**してからフロントを公開する
+- 版を上げるときは `package.json` の `version` と `public/sw.js` の `CACHE_NAME` を同じ版にそろえる
 
 ---
 
@@ -78,5 +80,5 @@ Cloudflare Pages は `main` ブランチへの push を検知して自動ビル�
 
 `public/sw.js` のキャッシュ名を変更すると古い SW が強制的に入れ替わる。
 
-- 現在のキャッシュ名: `prompt-vault-v4.0.0`
+- 現在のキャッシュ名: `prompt-vault-v4.0.1`
 - クロスオリジンリクエスト（フランサーバー等）は SW が傍受しない（same-origin ガード適用済み）
