@@ -9,8 +9,8 @@
 
 | # | パス／参照 | 種別 | SHA-256 |
 |---|---|---|---|
-| 1 | docs/instructions/instructions-pv-095-invalid-residue.md（本書） | 指示書 | — |
-| 2 | docs/reports/report-95-invalid-residue.md（調査回答・対象 main `91118ff`） | 調査回答（箇所 ID の正） | — |
+| 1 | docs/instructions/instructions-pv-095-invalid-residue.md | 指示書（本書） | — |
+| 2 | docs/reports/report-95-invalid-residue.md | 調査回答（箇所 ID の正・対象 main `91118ff`） | — |
 | 3 | pv#95 と子 Issue pv#98〜pv#103 の本文・PM コメント | 要件・裁定の記録 | — |
 | 4 | PR #97（CLAUDE.md「コードの規則」C-1・C-2） | 規則 | — |
 
