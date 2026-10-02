@@ -1,0 +1,283 @@
+repository_sha=88be9500235de633ee223c5c6e3737881fa00483
+
+pv#99 [AUTO_FAILURE_INJECTION] gate=true Checker scripts must not fold unknown verdicts/values into PASS or defaults
+  VERIFIER tests/issues/pv-099-checker-residue.mjs sha256=c0b895ddd936860697b7115a2af1b763ce8d166c44fb2c9c2c6c5aa38287d2c6
+  FAIL    T-01: fx#ERROR (status ERROR) is not judged PASS — verdict=PASS
+repository_sha=88be9500235de633ee223c5c6e3737881fa00483
+
+fx#ERROR [AUTO] gate=true fixture fx#ERROR
+  PASS    ok
+  ERROR   odd — boom
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=1 fail=0 gated_fail=0 not_run=0 waived=0
+
+  FAIL    T-01: fx#ERROR is counted in the summary — summary=SUMMARY issues=1 gated=1 pass=1 fail=0 gated_fail=0 not_run=0 waived=0
+  FAIL    T-01: fx#ERROR makes the exit code non-zero — exit=0
+  FAIL    T-01: fx#ERROR output shows the raw value and a reason — repository_sha=88be9500235de633ee223c5c6e3737881fa00483
+
+fx#ERROR [AUTO] gate=true fixture fx#ERROR
+  PASS    ok
+  ERROR   odd — boom
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=1 fail=0 gated_fail=0 not_run=0 waived=0
+
+  FAIL    T-01: fx#lower (status pass) is not judged PASS — verdict=PASS
+repository_sha=88be9500235de633ee223c5c6e3737881fa00483
+
+fx#lower [AUTO] gate=true fixture fx#lower
+  pass    lower
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=0 fail=0 gated_fail=0 not_run=0 waived=0
+
+  FAIL    T-01: fx#lower is counted in the summary — summary=SUMMARY issues=1 gated=1 pass=0 fail=0 gated_fail=0 not_run=0 waived=0
+  FAIL    T-01: fx#lower makes the exit code non-zero — exit=0
+  FAIL    T-01: fx#lower output shows the raw value and a reason — repository_sha=88be9500235de633ee223c5c6e3737881fa00483
+
+fx#lower [AUTO] gate=true fixture fx#lower
+  pass    lower
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=0 fail=0 gated_fail=0 not_run=0 waived=0
+
+  FAIL    T-01: fx#undef (status undefined) is not judged PASS — verdict=undefined
+_sha=88be9500235de633ee223c5c6e3737881fa00483
+
+fx#undef [AUTO] gate=true fixture fx#undef
+file:///D:/AI/github/prompt-vault-dev/.pv95-pv099-GbUEVu/scripts/verify-issues.mjs:114
+      console.log(`  ${marker.padEnd(7)} ${check.name}${check.detail ? ` — ${check.detail}` : ''}`);
+                              ^
+
+TypeError: Cannot read properties of undefined (reading 'padEnd')
+    at file:///D:/AI/github/prompt-vault-dev/.pv95-pv099-GbUEVu/scripts/verify-issues.mjs:114:31
+
+Node.js v24.15.0
+
+  FAIL    T-01: fx#undef is counted in the summary — summary=
+  PASS    T-01: fx#undef makes the exit code non-zero
+  FAIL    T-01: fx#undef output shows the raw value and a reason — _sha=88be9500235de633ee223c5c6e3737881fa00483
+
+fx#undef [AUTO] gate=true fixture fx#undef
+file:///D:/AI/github/prompt-vault-dev/.pv95-pv099-GbUEVu/scripts/verify-issues.mjs:114
+      console.log(`  ${marker.padEnd(7)} ${check.name}${check.detail ? ` — ${check.detail}` : ''}`);
+                              ^
+
+TypeError: Cannot read properties of undefined (reading 'padEnd')
+    at file:///D:/AI/github/prompt-vault-dev/.pv95-pv099-GbUEVu/scripts/verify-issues.mjs:114:31
+
+Node.js v24.15.0
+
+  FAIL    T-01: fx#notarray (status {"status":"PASS"}) is not judged PASS — verdict=undefined
+file:///D:/AI/github/prompt-vault-dev/.pv95-pv099-GbUEVu/scripts/verify-issues.mjs:67
+  const normalized = checks.map((check) => ({
+                            ^
+
+TypeError: checks.map is not a function
+    at file:///D:/AI/github/prompt-vault-dev/.pv95-pv099-GbUEVu/scripts/verify-issues.mjs:67:29
+
+Node.js v24.15.0
+
+  FAIL    T-01: fx#notarray is counted in the summary — summary=
+  PASS    T-01: fx#notarray makes the exit code non-zero
+  FAIL    T-01: fx#notarray output shows the raw value and a reason — file:///D:/AI/github/prompt-vault-dev/.pv95-pv099-GbUEVu/scripts/verify-issues.mjs:67
+  const normalized = checks.map((check) => ({
+                            ^
+
+TypeError: checks.map is not a function
+    at file:///D:/AI/github/prompt-vault-dev/.pv95-pv099-GbUEVu/scripts/verify-issues.mjs:67:29
+
+Node.js v24.15.0
+
+  PASS    T-01 control: a PASS-only verifier still passes with exit 0
+  FAIL    T-01: an unknown flag is rejected with exit 64 and the raw flag — exit=0
+repository_sha=88be9500235de633ee223c5c6e3737881fa00483
+
+fx#control [AUTO] gate=true fixture fx#control
+  PASS    fine
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=1 fail=0 gated_fail=0 not_run=0 waived=0
+
+  FAIL    T-02: HTTP 500 is reported as an anomaly, not "Server not running" — line=⚠ 版確認: NOT_RUN
+package.json version: 9.9.9
+  ⚠ Server not running — healthz check NOT_RUN
+  ❌ _STATUS.md not found
+  ❌ docs/supplied/danbooru-filtered.csv not found
+  ❌ Build failed: Command failed: npm run build 2>&1
+
+=== Inspect Results ===
+
+❌ マニフェスト照合: docs/instructions/ not found
+❌ マニフェスト照合: FAILED
+❌ 支給物SHA-256照合: FAILED
+⚠ 版確認: NOT_RUN
+❌ _STATUS.md 行数: FAILED
+❌ danbooru-filtered.csv SHA-256: FAILED
+❌ ビルド確認: FAILED
+
+=== SOME CHECKS FAILED ===
+
+  FAIL    T-02: HTTP 500 output carries the raw response and a reason — package.json version: 9.9.9
+  ⚠ Server not running — healthz check NOT_RUN
+  ❌ _STATUS.md not found
+  ❌ docs/supplied/danbooru-filtered.csv not found
+  ❌ Build failed: Command failed: npm run build 2>&1
+
+=== Inspect Results ===
+
+❌ マニフェスト照合: docs/instructions/ not found
+❌ マニフェスト照合: FAILED
+❌ 支給物SHA-256照合: FAILED
+⚠ 版確認: NOT_RUN
+❌ _STATUS.md 行数: FAILED
+❌ danbooru-filtered.csv SHA-256: FAILED
+❌ ビルド確認: FAILED
+
+=== SOME CHECKS FAILED ===
+
+  FAIL    T-02: non-JSON 200 is reported as an anomaly, not "Server not running" — line=⚠ 版確認: NOT_RUN
+package.json version: 9.9.9
+  ⚠ Server not running — healthz check NOT_RUN
+  ❌ _STATUS.md not found
+  ❌ docs/supplied/danbooru-filtered.csv not found
+  ❌ Build failed: Command failed: npm run build 2>&1
+
+=== Inspect Results ===
+
+❌ マニフェスト照合: docs/instructions/ not found
+❌ マニフェスト照合: FAILED
+❌ 支給物SHA-256照合: FAILED
+⚠ 版確認: NOT_RUN
+❌ _STATUS.md 行数: FAILED
+❌ danbooru-filtered.csv SHA-256: FAILED
+❌ ビルド確認: FAILED
+
+=== SOME CHECKS FAILED ===
+
+  FAIL    T-02: non-JSON 200 output carries the raw response and a reason — package.json version: 9.9.9
+  ⚠ Server not running — healthz check NOT_RUN
+  ❌ _STATUS.md not found
+  ❌ docs/supplied/danbooru-filtered.csv not found
+  ❌ Build failed: Command failed: npm run build 2>&1
+
+=== Inspect Results ===
+
+❌ マニフェスト照合: docs/instructions/ not found
+❌ マニフェスト照合: FAILED
+❌ 支給物SHA-256照合: FAILED
+⚠ 版確認: NOT_RUN
+❌ _STATUS.md 行数: FAILED
+❌ danbooru-filtered.csv SHA-256: FAILED
+❌ ビルド確認: FAILED
+
+=== SOME CHECKS FAILED ===
+
+  PASS    T-02: JSON without version is reported as an anomaly, not "Server not running"
+  FAIL    T-02: JSON without version output carries the raw response and a reason — package.json version: 9.9.9
+  healthz version: undefined
+  ❌ Version mismatch
+  ❌ _STATUS.md not found
+  ❌ docs/supplied/danbooru-filtered.csv not found
+  ❌ Build failed: Command failed: npm run build 2>&1
+
+=== Inspect Results ===
+
+❌ マニフェスト照合: docs/instructions/ not found
+❌ マニフェスト照合: FAILED
+❌ 支給物SHA-256照合: FAILED
+❌ 版確認: FAILED
+❌ _STATUS.md 行数: FAILED
+❌ danbooru-filtered.csv SHA-256: FAILED
+❌ ビルド確認: FAILED
+
+=== SOME CHECKS FAILED ===
+
+  FAIL    T-02: no listener is reported as not running (NOT_RUN) with a reason — package.json version: 9.9.9
+  ⚠ Server not running — healthz check NOT_RUN
+  ❌ _STATUS.md not found
+  ❌ docs/supplied/danbooru-filtered.csv not found
+  ❌ Build failed: Command failed: npm run build 2>&1
+
+=== Inspect Results ===
+
+❌ マニフェスト照合: docs/instructions/ not found
+❌ マニフェスト照合: FAILED
+❌ 支給物SHA-256照合: FAILED
+⚠ 版確認: NOT_RUN
+❌ _STATUS.md 行数: FAILED
+❌ danbooru-filtered.csv SHA-256: FAILED
+❌ ビルド確認: FAILED
+
+=== SOME CHECKS FAILED ===
+
+  FAIL    T-03: review-doctor --port=abc exits 64 with the raw value and a reason — exit=0
+{
+  "tool": {
+    "name": "prompt-vault-review-doctor",
+    "version": "1.0.2",
+    "readOnly": true
+  },
+  "checkedAt": "2026-10-02T23:46:39.698Z",
+  "verdict": "COMPATIBLE",
+  "repository": {
+    "root": ".",
+    "branch": "pv95-invalid-residue-fix",
+    "head": "88be9500235de633ee223c5c6e3737881f
+  FAIL    T-03: review-doctor --port=0 exits 64 with the raw value and a reason — exit=0
+{
+  "tool": {
+    "name": "prompt-vault-review-doctor",
+    "version": "1.0.2",
+    "readOnly": true
+  },
+  "checkedAt": "2026-10-02T23:46:39.869Z",
+  "verdict": "COMPATIBLE",
+  "repository": {
+    "root": ".",
+    "branch": "pv95-invalid-residue-fix",
+    "head": "88be9500235de633ee223c5c6e3737881f
+  FAIL    T-03: review-doctor --port=70000 exits 64 with the raw value and a reason — exit=1
+node:internal/url:819
+      href = bindingUrl.parse(input, base, true);
+                        ^
+
+TypeError: Invalid URL
+    at new URL (node:internal/url:819:25)
+    at new ClientRequest (node:_http_client:198:30)
+    at request (node:http:108:10)
+    at Object.get (node:http:119:15)
+    
+  FAIL    T-03: review-doctor --timeout-ms=abc exits 64 with the raw value and a reason — exit=1
+node:internal/timers:424
+    throw new ERR_OUT_OF_RANGE(name, 'a non-negative finite number', msecs);
+          ^
+
+RangeError [ERR_OUT_OF_RANGE]: The value of "timeout" is out of range. It must be a non-negative finite number. Received NaN
+    at getTimerDuration (node:internal/timers:424:11)
+
+  FAIL    T-03: review-doctor --timeout-ms=-5 exits 64 with the raw value and a reason — exit=1
+node:internal/timers:424
+    throw new ERR_OUT_OF_RANGE(name, 'a non-negative finite number', msecs);
+          ^
+
+RangeError [ERR_OUT_OF_RANGE]: The value of "timeout" is out of range. It must be a non-negative finite number. Received -5
+    at getTimerDuration (node:internal/timers:424:11)
+ 
+  FAIL    T-03: review-doctor --port= exits 64 with the raw value and a reason — exit=0
+{
+  "tool": {
+    "name": "prompt-vault-review-doctor",
+    "version": "1.0.2",
+    "readOnly": true
+  },
+  "checkedAt": "2026-10-02T23:46:40.544Z",
+  "verdict": "COMPATIBLE",
+  "repository": {
+    "root": ".",
+    "branch": "pv95-invalid-residue-fix",
+    "head": "88be9500235de633ee223c5c6e3737881f
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=4 fail=27 gated_fail=27 not_run=0 waived=0

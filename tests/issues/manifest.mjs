@@ -16,6 +16,7 @@ import pv056 from './pv-056-cloud-business-api.mjs';
 import pv070 from './pv-070-album-backend-scope.mjs';
 import pv081 from './pv-081-result-fetch-by-task.mjs';
 import pv098 from './pv-098-invalid-aggregator.mjs';
+import pv099 from './pv-099-checker-residue.mjs';
 
 export const issueVerifiers = Object.freeze({
   [pv005.issue]: pv005,
@@ -36,4 +37,5 @@ export const issueVerifiers = Object.freeze({
   [pv070.issue]: pv070,
   [pv081.issue]: pv081,
   [pv098.issue]: pv098,
+  [pv099.issue]: pv099,
 });
