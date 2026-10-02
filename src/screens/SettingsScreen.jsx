@@ -8,6 +8,7 @@ import {
 import {
   hasVaultKey, getVaultKey, setVaultKey, clearVaultKey, generateVaultKey,
 } from '../lib/crypto';
+import { getInvalidLog, clearInvalidLog, subscribeInvalidLog } from '../lib/invalidLog';
 
 const SAMPLER_OPTIONS = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2m_sde'];
 
@@ -86,6 +87,48 @@ function SelectRow({ label, value, options, onChange }) {
 const LS_SELECTION_KEY = 'pv-selection-rules';
 const SELECTION_DEFAULTS = { days: 30, includeFavorites: true, r2LimitMb: 5120 };
 
+// 当たらなかった入力（この端末の集約先）。接続先に関係なく表示する（offline でも見える）
+function InvalidLogPanel() {
+  const [entries, setEntries] = useState(getInvalidLog);
+  useEffect(() => subscribeInvalidLog(() => setEntries(getInvalidLog())), []);
+  return (
+    <div style={{ marginBottom: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <h4 style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', margin: 0 }}>
+          当たらなかった入力（この端末）: {entries.length}件
+        </h4>
+        <button
+          onClick={() => { if (confirm('この端末の「当たらなかった入力」の記録を消去しますか？')) clearInvalidLog(); }}
+          disabled={entries.length === 0}
+          style={{ ...debugBtnStyle, minHeight: '32px', padding: '4px 10px' }}
+        >消去</button>
+      </div>
+      {entries.length === 0 ? (
+        <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>記録はありません</div>
+      ) : (
+        <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+          {entries.slice().reverse().map((e, i) => (
+            <InvalidEntry key={`${e.kind}|${e.stage}|${e.raw}|${i}`} e={e} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InvalidEntry({ e }) {
+  return (
+    <div style={{ background: 'var(--bg)', padding: '8px', borderRadius: 'var(--radius-s)', marginBottom: '6px', fontSize: 'var(--fs-label)', wordBreak: 'break-all' }}>
+      <div style={{ color: 'var(--text-secondary)' }}>
+        {e.lastTs ?? e.ts ?? '時刻不明'}{e.count > 1 ? ` ×${e.count}（初回 ${e.ts}）` : ''}
+      </div>
+      <div><strong>[{e.code ?? 'INVALID'}: {e.kind}]</strong> {e.reason}</div>
+      <div style={{ color: 'var(--text-secondary)' }}>段: {e.stage}</div>
+      <div style={{ color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '2px' }}>raw: {e.raw}</div>
+    </div>
+  );
+}
+
 function loadSelectionRules() {
   try {
     const v = localStorage.getItem(LS_SELECTION_KEY);
@@ -106,6 +149,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
   const [debugOpen, setDebugOpen] = useState(!!debugInitialOpen);
   const [version, setVersion] = useState('');
   const [errors, setErrors] = useState([]);
+  const [errorsFailure, setErrorsFailure] = useState(null);
 
   // 接続設定
   const [conn, setConn] = useState(() => connectionState ?? getConnection());
@@ -247,13 +291,17 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     } catch {}
     try {
       const e = await api.getErrors();
-      setErrors(e);
-    } catch {}
+      setErrors(Array.isArray(e) ? e : []);
+      setErrorsFailure(Array.isArray(e) ? null : `応答が配列でない: ${JSON.stringify(e).slice(0, 200)}`);
+    } catch (err) {
+      setErrors([]);
+      setErrorsFailure(err?.message || String(err));
+    }
   }, []);
 
   useEffect(() => {
     if (debugOpen) loadDebug();
-  }, [debugOpen, loadDebug]);
+  }, [debugOpen, loadDebug, connectionState.route]);
 
   const handleClearSW = async () => {
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
@@ -755,27 +803,36 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
                 </button>
               </div>
 
+              <InvalidLogPanel />
+
               <div>
                 <h4 style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                  直近エラー一覧
+                  直近エラー（接続中の経路: {connectionState.route === 'fran' ? 'Fran' : connectionState.route === 'cloud' ? 'Cloud' : '未接続'} の /debug/errors）
                 </h4>
-                {errors.length === 0 ? (
+                {errorsFailure ? (
+                  <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
+                    取得できません: {errorsFailure}
+                  </div>
+                ) : errors.length === 0 ? (
                   <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
                     エラーはありません
                   </div>
                 ) : (
-                  errors.map((e, i) => (
-                    <div key={i} style={{
-                      background: 'var(--bg)',
-                      padding: '8px',
-                      borderRadius: 'var(--radius-s)',
-                      marginBottom: '6px',
-                      fontSize: 'var(--fs-label)',
-                    }}>
-                      <div style={{ color: 'var(--text-secondary)' }}>{e.ts}</div>
-                      <div><strong>[{e.code}]</strong> {e.message}</div>
-                      {e.detail && <div style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>{e.detail}</div>}
-                    </div>
+                  errors.slice().reverse().map((e, i) => (
+                    e && e.code === 'INVALID' ? <InvalidEntry key={i} e={e} /> : (
+                      <div key={i} style={{
+                        background: 'var(--bg)',
+                        padding: '8px',
+                        borderRadius: 'var(--radius-s)',
+                        marginBottom: '6px',
+                        fontSize: 'var(--fs-label)',
+                        wordBreak: 'break-all',
+                      }}>
+                        <div style={{ color: 'var(--text-secondary)' }}>{e?.ts}</div>
+                        <div><strong>[{e?.code}]</strong> {e?.message}</div>
+                        {e?.detail && <div style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>{typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)}</div>}
+                      </div>
+                    )
                   ))
                 )}
               </div>

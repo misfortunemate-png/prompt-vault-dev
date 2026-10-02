@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync, rmSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync, unlinkSync, readdirSync, renameSync, statSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
@@ -8,6 +8,7 @@ import { execSync } from 'node:child_process';
 import { getByHash, listFolders, listByFolder, getRecent, getRecentByDays, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, getImagePath, removeImageRow, getGalleryByCard, getTotalByCard, updateSyncMeta, getSyncInventory } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
+import { writeLog, recordInvalid, logFileFor } from './server/log.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -68,9 +69,20 @@ function generateId(prefix) {
   return prefix + randomBytes(4).toString('hex').slice(0, 5);
 }
 
+// S-17: data/*.json が解析できないときは INVALID に残してから例外を上げる（応答は従来どおり 500）
+function parseDataFile(path, stage) {
+  const text = readFileSync(path, 'utf8');
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    recordInvalid({ kind: 'data-file-unparseable', stage, raw: text, reason: `JSON として解析できない: ${e.message}` });
+    throw e;
+  }
+}
+
 function readSettings() {
   if (!existsSync(SETTINGS_PATH)) writeFileSync(SETTINGS_PATH, JSON.stringify(DEFAULT_SETTINGS, null, 2));
-  return JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'));
+  return parseDataFile(SETTINGS_PATH, 'S-17 readSettings');
 }
 
 function readCardsData() {
@@ -79,7 +91,7 @@ function readCardsData() {
     writeFileSync(CARDS_PATH, JSON.stringify(initial, null, 2));
     return initial;
   }
-  return JSON.parse(readFileSync(CARDS_PATH, 'utf8'));
+  return parseDataFile(CARDS_PATH, 'S-17 readCardsData');
 }
 
 function atomicWriteJson(filePath, data) {
@@ -103,7 +115,7 @@ function readPresetsData() {
     writeFileSync(PRESETS_DATA_PATH, JSON.stringify(initial, null, 2));
     return initial;
   }
-  return JSON.parse(readFileSync(PRESETS_DATA_PATH, 'utf8'));
+  return parseDataFile(PRESETS_DATA_PATH, 'S-17 readPresetsData');
 }
 
 function writePresetsData(data) {
@@ -122,12 +134,6 @@ function createInitialCards() {
     ],
     cards: [],
   };
-}
-
-function writeLog(level, code, message, detail) {
-  const d = new Date();
-  const entry = JSON.stringify({ ts: d.toISOString(), level, code, message, detail });
-  appendFileSync(join(__dirname, 'logs', `${d.toISOString().slice(0, 10)}.log`), entry + '\n');
 }
 
 function loadDanbooruTags() {
@@ -805,11 +811,26 @@ async function start() {
 
   // ── デバッグ ──
 
+  // S-20: 解析できない行は捨てず、その位置に INVALID として出す（元の行を raw に残す）
   api.get('/debug/errors', (_req, res) => {
-    const logFile = join(__dirname, 'logs', `${new Date().toISOString().slice(0, 10)}.log`);
+    const logFile = logFileFor();
     if (!existsSync(logFile)) return res.json([]);
-    const lines = readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
-    res.json(lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean).slice(-20));
+    const lines = readFileSync(logFile, 'utf8').split('\n').filter(l => l.trim());
+    const entries = lines.map((l, i) => {
+      try {
+        const e = JSON.parse(l);
+        if (e && typeof e === 'object' && !Array.isArray(e)) return e;
+        throw new Error('オブジェクトでない');
+      } catch (err) {
+        return {
+          ts: null, level: 'warn', code: 'INVALID', message: 'log-line-unparseable',
+          kind: 'log-line-unparseable', stage: `S-20 /debug/errors line ${i + 1}`,
+          raw: l.length > 500 ? `${l.slice(0, 500)}…(+${l.length - 500}字)` : l,
+          reason: `ログ行が JSON のオブジェクトとして解析できない: ${err.message}`,
+        };
+      }
+    });
+    res.json(entries.slice(-50));
   });
 
   api.post('/debug/test-api', async (_req, res) => {

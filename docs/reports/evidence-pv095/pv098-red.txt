@@ -1,0 +1,19 @@
+repository_sha=9db948367c3a429d69ef8245f86342f9bd37d8fe
+
+pv#98 [AUTO_FAILURE_INJECTION] gate=true One aggregation point for invalid residue (Fran logs/ INVALID + front store + settings debug view)
+  VERIFIER tests/issues/pv-098-invalid-aggregator.mjs sha256=858b1187c3c3bfa5f0db49a8827ce72bf86d71ddd4436b13a1a5d0efb64fe17a
+  PASS    AC-1: Fran test instance starts
+  PASS    AC-1: GET /settings response is unchanged for an unparseable settings.json (500, J-5)
+  FAIL    AC-1: logs/ has code INVALID with kind/stage/raw/reason for the residue — INVALID entries=[]
+  FAIL    AC-1: raw keeps the original text — raw=undefined
+  FAIL    AC-1: /debug/errors returns the INVALID entry — status=200 body=[{"ts":"2026-10-02T23:32:17.173Z","level":"warn","code":"DANBOORU_LOAD","message":"danbooru-filtered.csv 読み込み失敗","detail":"ENOENT: no such file or directory, open 'D:\\AI\\github\\prompt-vault-dev\\.pv95-pv098-ssZKTL\\docs\\supplied\\danbooru-filtered.csv'"},{"ts":"2026-10-02T23:32:17.343Z","level":
+  FAIL    AC-1 (S-20): /debug/errors keeps an unparseable log line as INVALID with its raw text — body=[{"ts":"2026-10-02T23:32:17.173Z","level":"warn","code":"DANBOORU_LOAD","message":"danbooru-filtered.csv 読み込み失敗","detail":"ENOENT: no such file or directory, open 'D:\\AI\\github\\prompt-vault-dev\\.pv95-pv098-ssZKTL\\docs\\supplied\\danbooru-filtered.csv'"},{"ts":"2026-10-02T23:32:17.343Z","level":"error","code":"UNHANDLED","message":"Expected property name or '}' in JSON at position 18 (line 1 c
+  FAIL    AC-2: front aggregation module exists — src/lib/invalidLog.js not found
+  FAIL    AC-2: settings debug imports the front aggregation store — invalidLog import missing in SettingsScreen.jsx
+  FAIL    AC-2: the front list is rendered without a route condition (visible offline) — InvalidLogPanel not rendered
+  FAIL    AC-2: the route /debug/errors list is shown next to it — route error list label missing
+  FAIL    AC-3: no parallel ErrorCode/createError mechanism remains — errors.js exists=true refs=D:\AI\github\prompt-vault-dev\src\lib\errors.js:1: export const ErrorCode = {
+D:\AI\github\prompt-vault-dev\src\lib\errors.js:12: export function createError(code, message, detail) {
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=2 fail=9 gated_fail=9 not_run=0 waived=0
