@@ -43,13 +43,16 @@
 - **J-2 当たる枝と残余の境目**: コードがすでに定めて扱っている結果（例: pv#81 の 404 →「期限切れ」、いまの Worker が出す state `idle`、実際に使われているトースト型 `warn`・`warning`）は当たる枝として明示する。集約先に送るのは、どの枝にも当たらなかったものだけ。各箇所で当たる枝として定めた値を報告に列挙すること
 - **J-3 秘密を raw に残さない**: トークン・vault 鍵・NovelAI の鍵・`Authorization` の値は raw に書かず、種別と長さだけを残す（F-01 の `pv-connection`・F-12 の鍵インポートが該当）。認証情報そのもの（値・照合方式・保存場所）は変えない（R-020 改訂・2026-09-23）
 - **J-4 表示**: 集約先への記録はすべての残余で行う。トーストは、利用者が自分で行った操作が失敗したとき（保存・お気に入り・セリフ・鍵インポート・生成）に限る。裏で走る取得（サムネイル・タグ候補・ポーリング・到達確認）は記録だけにし、トーストを連発しない
-- **J-5 応答の形を変える箇所の扱い**: HTTP の状態コード・応答の形を変える前に、その経路の呼び出し元をすべて確かめる（フロント・`scripts/`・ai-family-ops の pv-sync 系は読み取りのみ）。**フロント以外の呼び出し元がある経路（`/gallery/sync-inventory`・`/gallery/image/:hash/meta` ほか）は応答を変えず、記録だけにする**。呼び出し元が確かめきれない経路も同じ扱い
+- **J-5 応答の形を変える箇所の扱い**（2026-10-03 改訂・停止報告 report-pv-095-invalid-residue-stop-pv100.md への裁定）: HTTP の状態コード・応答の形を変える前に、その経路の呼び出し元をすべて確かめる（フロント・`scripts/`・ai-family-foundation `scripts/pv-sync.mjs` は読み取りのみ）。**フロント以外の呼び出し元がある経路は、原則として応答を変えず記録だけにする**（`/gallery/sync-inventory`・`/gallery/image/:hash/meta` ほか）。例外は J-6 の書き込み経路で、呼び出し元がその応答をどう扱うかを確かめ、報告に記した場合に限り 4xx を返してよい。呼び出し元が確かめきれない経路は記録だけ
 
 ### 書き込み・有料呼び出し（pv#100・pv#101）
 
 - **J-6 書き込みは確かめてから**: 保存・削除・置き換えの経路で当たらない入力が来たら、書き込まずに 4xx で拒み、集約先に残す（S-10・S-11・S-12・S-13）。既定に寄せて書くこと・未知のキーを合流させることはしない
   - 正の対照（これが通らなければ停止）: いまの Fran の `settings.json`・`cards.json`・`presets.json` の実物と、いまのフロントが送る本文はすべて受け付けられること
-  - S-13 の 0 行更新は、フロントだけが呼ぶ経路（favorite・caption）は 404 にする。meta は J-5 により記録だけ
+  - J-6 は J-5 に優先する。S-10 の 3 経路（PUT settings・cards・presets）と S-13 の favorite・caption は、pv-sync（handback）も呼ぶが、当たらなければ 4xx で拒む
+  - S-13 の 0 行更新は favorite・caption を 404 にする（pv-sync は 2xx 以外を errors に数えて次へ進む・pv-sync.mjs:668-684）。meta は記録だけ
+  - 正の対照に **Cloud 由来の本文**を加える。PG が foundation の `.env` のトークンで Cloud の GET `/api/prompt-vault/{settings,cards,presets}` を**読み取りだけ**行い、pv-sync の handback が組み立てるのと同じ形（settings は Fran の `sync.*` キーを合わせた形）にして fixture とする。GET 以外を送らない。トークンの値を出力・fixture・報告に残さない（J-3）。取得日時を報告に記す
+  - pv-sync の handback が途中（cards だけ置き換えた後）で止まりうることは pv-sync 側の性質であり、本件では直さない（foundation のコードは変えない）。正の対照が通らなかった場合は、検査を緩めずに停止報告する
 - **J-7 消す前に残す**: T-06 は、削除するカードの中身全体を集約先に残してから削除する。normalize-cards の削除の判定そのものは変えない
 - **J-8 鍵**（F-12）: インポート時に base64・長さを確かめ、当たらなければ保存しない。暗号文の keyId が手元の鍵と違うものは記録する。鍵の世代を振り分ける仕組みは作らない
 - **J-9 有料呼び出しは寄せずに止める**（pv#101）: NovelAI を呼ぶ前の値（S-03 モデル・S-04 生成パラメータ・S-18 キューのガード値・S-19 タスク）に当たらないものがあれば、**呼ばずに**拒み（単発は 4xx、キューは開始しない）、集約先に残す
@@ -110,7 +113,8 @@
 | scripts/orphan-cards-report.mjs | T-04・T-05（残余の型あり） | 確認のみ |
 | tests/issues/manifest.mjs と新設 verifier | pv#98〜pv#103 | 要修正・新設 |
 | package.json | 版 4.1.0 | 要修正 |
-| ai-family-ops の pv-sync 系 | Fran API の呼び出し元（J-5） | 確認のみ（読み取り・変更禁止） |
+| ai-family-foundation `scripts/pv-sync.mjs` | Fran API の呼び出し元（J-5・J-6） | 確認のみ（読み取り・変更禁止） |
+| Cloud `/api/prompt-vault/{settings,cards,presets}` | 正の対照の写し（J-6） | GET のみ |
 | ai-family-foundation（Worker `/api/prompt-vault/*`・PvQueue） | 応答の値の確認のみ（F-08 の `idle` 等） | 対象外（変更禁止） |
 
 （PGは表にない箇所を触る場合、停止条件1で報告する）
@@ -130,7 +134,8 @@
 - 当たらないものを既定値・近い型に寄せて進めること（J-9 の「未指定」を除く）
 - テストで NovelAI を実際に呼ぶこと（有料。モックで行う）
 - NovelAI 呼び出しに再試行・待機を足すこと（J-10）
-- フロント以外の呼び出し元がある経路の応答を変えること（J-5）
+- フロント以外の呼び出し元がある経路の応答を変えること（J-5。J-6 の例外を除く）
+- Cloud に GET 以外を送ること（J-6）
 - 秘密の値を集約先・ログ・画面に出すこと（J-3）
 - 認証情報（トークンの値・照合方式）・family-auth に触れること
 - ai-family-foundation・ai-family-ops のコードを変えること
@@ -146,7 +151,7 @@
 | AC-3 | pv#98 | `ErrorCode`・`createError` の並立がない（統合または除去） | verifier `pv#98` | verifier 出力 | 該当なし |
 | AC-4 | pv#99 | T-01: 未知の status（`ERROR`・`pass`・`undefined`）を返す verifier の判定が PASS にならず、集計に数えられ、終了コードが 0 でない。T-02: 応答の異常と「起動していない」が理由つきで区別される。T-03: 当たらない引数が理由つきで終了コード 64 になる | verifier `pv#99`（模擬 verifier を fixture に置く） | verifier 出力 | 有（いまは PASS・exit 0 → 赤） |
 | AC-5 | pv#100 | S-10・S-11・S-12: 当たらない本文・クエリが 4xx で拒まれ、ファイル・DB はバイト単位で変わらず、集約先に残る | verifier `pv#100` | verifier 出力 | 有（いまは保存される → 赤） |
-| AC-6 | pv#100 | J-6 の正の対照: いまの実物の settings／cards／presets と、いまのフロントが送る本文がすべて受け付けられる | verifier `pv#100`（実物の写しを fixture に） | verifier 出力 | 該当なし |
+| AC-6 | pv#100 | J-6 の正の対照: いまの実物の settings／cards／presets、いまのフロントが送る本文、Cloud 由来の本文（pv-sync handback の形）がすべて受け付けられる | verifier `pv#100`（写しを fixture に） | verifier 出力 | 該当なし |
 | AC-7 | pv#100 | S-13: 存在しない hash への favorite・caption は 404 と記録。meta は応答が変わらず記録だけ（J-5）。F-12: 壊れた鍵は保存されない・keyId の不一致は記録。T-06: 削除したカードの中身全体が集約先にある。§4.3 #6: 解析できない result のタスクが一覧から永久に外れない。#11・#12: 失敗がトーストと集約先に出る | verifier `pv#100` | verifier 出力 | 有（いまは各々素通り・握りつぶし → 赤） |
 | AC-8 | pv#101 | S-03・S-04・S-19: 当たらない値で NovelAI（モック）が**呼ばれず**に拒まれ、記録される。未指定は既定値で通る。J-9 の正の対照がすべて通る | verifier `pv#101` | verifier 出力（モックの呼び出し回数を含む） | 有（いまはモックが呼ばれる → 赤） |
 | AC-9 | pv#101 | S-18: ガード値が `NaN`・文字列のときキューが開始されず、理由が集約先に残る | verifier `pv#101` | verifier 出力 | 有（いまは `sleep(NaN)` で間隔なしに進む → 赤） |
