@@ -9,6 +9,7 @@ import { getByHash, listFolders, listByFolder, getRecent, getRecentByDays, getSt
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
 import { writeLog, recordInvalid, logFileFor } from './server/log.js';
+import { validateSettings, validateCardsDoc, validatePresetsDoc, validateSlotBody, validateCardBody, validatePresetBody, parseIntQuery } from './server/validate.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -243,6 +244,26 @@ function initVaultStructure() {
   readPresetsData();
 }
 
+// J-6: 当たらない本文は書き込まずに 400 で拒み、INVALID に残す
+function rejectInvalid(res, stage, body, problems) {
+  recordInvalid({
+    kind: 'request-body-invalid',
+    stage,
+    raw: { problems: problems.slice(0, 10), body },
+    reason: problems.slice(0, 5).map(p => `${p.path}: ${p.reason}`).join(' / '),
+  });
+  return res.status(400).json({ error: '当たらない入力のため保存しませんでした', problems });
+}
+
+// S-12: クエリの数値。未指定は既定値、指定されて当たらなければ 400 と INVALID（null を返す）
+function queryInt(req, res, key, opts, stage) {
+  const r = parseIntQuery(req.query[key], { name: key, ...opts });
+  if (r.ok) return r.value;
+  recordInvalid({ kind: 'query-invalid', stage, raw: r.problem, reason: `${key}: ${r.problem.reason}` });
+  res.status(400).json({ error: `${key} が当たらない値です`, problems: [r.problem] });
+  return null;
+}
+
 function requireVaultRoot(req, res, next) {
   if (!process.env.VAULT_ROOT) return res.status(400).json({ error: 'VAULT_ROOT未設定' });
   next();
@@ -287,6 +308,8 @@ async function start() {
 
   api.get('/settings', (_req, res) => res.json(readSettings()));
   api.put('/settings', (req, res) => {
+    const problems = validateSettings(req.body);
+    if (problems.length) return rejectInvalid(res, 'S-10 PUT /settings', req.body, problems);
     atomicWriteJson(SETTINGS_PATH, req.body);
     res.json({ ok: true });
   });
@@ -309,6 +332,8 @@ async function start() {
 
   api.put('/cards', (req, res) => {
     const data = req.body;
+    const problems = validateCardsDoc(data);
+    if (problems.length) return rejectInvalid(res, 'S-10 PUT /cards', data, problems);
     const now = new Date().toISOString();
     if (Array.isArray(data.slots)) for (const s of data.slots) { if (!s.updated_at) s.updated_at = now; }
     if (Array.isArray(data.cards)) for (const c of data.cards) { if (!c.updated_at) c.updated_at = now; }
@@ -317,6 +342,8 @@ async function start() {
   });
 
   api.post('/cards/slot', (req, res) => {
+    const problems = validateSlotBody(req.body, { create: true });
+    if (problems.length) return rejectInvalid(res, 'S-11 POST /cards/slot', req.body, problems);
     const data = readCardsData();
     const { name } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'スロット名は必須です' });
@@ -338,6 +365,8 @@ async function start() {
     const data = readCardsData();
     const idx = data.slots.findIndex(s => s.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'スロットが見つかりません' });
+    const problems = validateSlotBody(req.body, { create: false });
+    if (problems.length) return rejectInvalid(res, 'S-11 PUT /cards/slot/:id', req.body, problems);
     const { name } = req.body;
     if (name !== undefined && !name.trim()) return res.status(400).json({ error: 'スロット名は必須です' });
     if (name && name.trim() !== data.slots[idx].name && data.slots.some(s => s.name === name.trim())) {
@@ -360,6 +389,8 @@ async function start() {
 
   api.post('/cards/card', (req, res) => {
     const data = readCardsData();
+    const problems = validateCardBody(req.body, new Set(data.slots.map(s => s.id)));
+    if (problems.length) return rejectInvalid(res, 'S-11 POST /cards/card', req.body, problems);
     const { slotId, name, positive = '', negative = '', parentId = null } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'カード名は必須です' });
     if (!data.slots.some(s => s.id === slotId)) return res.status(400).json({ error: 'スロットが見つかりません' });
@@ -382,6 +413,8 @@ async function start() {
     const data = readCardsData();
     const idx = data.cards.findIndex(c => c.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'カードが見つかりません' });
+    const problems = validateCardBody(req.body, new Set(data.slots.map(s => s.id)));
+    if (problems.length) return rejectInvalid(res, 'S-11 PUT /cards/card/:id', req.body, problems);
     const { name, slotId } = req.body;
     if (name !== undefined && !name.trim()) return res.status(400).json({ error: 'カード名は必須です' });
     const targetSlotId = slotId || data.cards[idx].slotId;
@@ -432,10 +465,15 @@ async function start() {
   api.get('/presets', (_req, res) => res.json(readPresetsData()));
 
   api.post('/presets', (req, res) => {
+    const problems = validatePresetBody(req.body);
+    if (problems.length) return rejectInvalid(res, 'S-11 POST /presets', req.body, problems);
     const data = readPresetsData();
     const { name, tags = [], cards = {} } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'プリセット名は必須です' });
-    const preset = { id: generateId('p_'), name: name.trim(), tags, cards, updated_at: new Date().toISOString() };
+    const preset = { id: generateId('p_'), name: name.trim(), tags, cards };
+    // フロントが送る既知の欄（slotOrder・folder・filename・childCards）は黙って捨てずに保存する
+    for (const k of ['slotOrder', 'folder', 'filename', 'childCards']) if (k in req.body) preset[k] = req.body[k];
+    preset.updated_at = new Date().toISOString();
     data.presets.push(preset);
     writePresetsData(data);
     res.json(preset);
@@ -443,6 +481,8 @@ async function start() {
 
   api.put('/presets', (req, res) => {
     const data = req.body;
+    const problems = validatePresetsDoc(data);
+    if (problems.length) return rejectInvalid(res, 'S-10 PUT /presets', data, problems);
     const now = new Date().toISOString();
     if (Array.isArray(data.presets)) for (const p of data.presets) { if (!p.updated_at) p.updated_at = now; }
     writePresetsData(data);
@@ -453,6 +493,8 @@ async function start() {
     const data = readPresetsData();
     const idx = data.presets.findIndex(p => p.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'プリセットが見つかりません' });
+    const problems = validatePresetBody(req.body);
+    if (problems.length) return rejectInvalid(res, 'S-11 PUT /presets/:id', req.body, problems);
     data.presets[idx] = { ...data.presets[idx], ...req.body, updated_at: new Date().toISOString() };
     writePresetsData(data);
     res.json(data.presets[idx]);
@@ -531,8 +573,10 @@ async function start() {
 
   api.get('/gallery/recent', (req, res) => {
     try {
-      const days = parseInt(req.query.days) || 0;
-      const limit = parseInt(req.query.limit) || 20;
+      const days = queryInt(req, res, 'days', { min: 0, max: 3650, fallback: 0 }, 'S-12 GET /gallery/recent');
+      if (days === null) return;
+      const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 20 }, 'S-12 GET /gallery/recent');
+      if (limit === null) return;
       const rows = days > 0 ? getRecentByDays(days) : getRecent(limit);
       const images = rows.map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
@@ -576,20 +620,30 @@ async function start() {
     try {
       const { favorite, meta_updated_at } = req.body;
       if (favorite !== 0 && favorite !== 1) return res.status(400).json({ error: 'favorite は 0 または 1' });
-      setFavorite(req.params.hash, favorite, meta_updated_at || undefined);
+      const changed = setFavorite(req.params.hash, favorite, meta_updated_at || undefined);
+      if (changed === 0) {
+        recordInvalid({ kind: 'image-hash-not-found', stage: 'S-13 PUT /gallery/image/:hash/favorite', raw: { hash: req.params.hash, favorite }, reason: '存在しない hash（0 行更新）' });
+        return res.status(404).json({ error: '画像が見つかりません' });
+      }
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   api.get('/gallery/favorites', (req, res) => {
     try {
-      const limit = parseInt(req.query.limit) || 50;
+      const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 50 }, 'S-12 GET /gallery/favorites');
+      if (limit === null) return;
       const images = getFavorites(limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   api.get('/gallery/sync-inventory', (req, res) => {
+    // J-5: pv-sync が呼ぶ経路。応答（既存の範囲の締め方）は変えず、当たらない値は記録だけ
+    for (const [key, opts] of [['offset', { min: 0, max: Number.MAX_SAFE_INTEGER, fallback: 0 }], ['limit', { min: 1, max: 500, fallback: 100 }]]) {
+      const r = parseIntQuery(req.query[key], { name: key, ...opts });
+      if (!r.ok) recordInvalid({ kind: 'query-invalid', stage: 'S-12 GET /gallery/sync-inventory（記録のみ・J-5）', raw: r.problem, reason: `${key}: ${r.problem.reason}（既存の規則で締めて続行）` });
+    }
     const offset = Math.max(0, parseInt(req.query.offset) || 0);
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 100));
     try {
@@ -599,17 +653,20 @@ async function start() {
   });
 
   api.get('/gallery/search', (req, res) => {
-    const { q, limit } = req.query;
+    const { q } = req.query;
     if (!q || !q.trim()) return res.status(400).json({ error: '検索クエリが空です' });
+    const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 50 }, 'S-12 GET /gallery/search');
+    if (limit === null) return;
     try {
-      const images = dbSearch(q.trim(), parseInt(limit) || 50).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
+      const images = dbSearch(q.trim(), limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   api.get('/gallery/by-preset/:presetId', (req, res) => {
     try {
-      const limit = parseInt(req.query.limit) || 50;
+      const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 50 }, 'S-12 GET /gallery/by-preset');
+      if (limit === null) return;
       const images = getByPreset(req.params.presetId, limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -618,7 +675,13 @@ async function start() {
   api.put('/gallery/image/:hash/meta', (req, res) => {
     try {
       const { preset_id, created_at } = req.body || {};
-      updateSyncMeta(req.params.hash, { preset_id, created_at });
+      const changed = updateSyncMeta(req.params.hash, { preset_id, created_at });
+      // J-5: pv-sync が呼ぶ経路。応答は変えず記録だけ
+      if (changed === null) {
+        recordInvalid({ kind: 'sync-meta-nothing-to-update', stage: 'S-13 PUT /gallery/image/:hash/meta（記録のみ・J-5）', raw: { hash: req.params.hash, body: req.body }, reason: 'preset_id・created_at のどちらもない' });
+      } else if (changed === 0) {
+        recordInvalid({ kind: 'image-hash-not-found', stage: 'S-13 PUT /gallery/image/:hash/meta（記録のみ・J-5）', raw: { hash: req.params.hash, body: req.body }, reason: '存在しない hash（0 行更新）' });
+      }
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -627,7 +690,11 @@ async function start() {
     try {
       const { caption, captionConfig, meta_updated_at } = req.body;
       if (typeof caption !== 'string') return res.status(400).json({ error: 'caption は文字列' });
-      setCaption(req.params.hash, caption, meta_updated_at || undefined);
+      const changed = setCaption(req.params.hash, caption, meta_updated_at || undefined);
+      if (changed === 0) {
+        recordInvalid({ kind: 'image-hash-not-found', stage: 'S-13 PUT /gallery/image/:hash/caption', raw: { hash: req.params.hash, caption }, reason: '存在しない hash（0 行更新）' });
+        return res.status(404).json({ error: '画像が見つかりません' });
+      }
       if (captionConfig !== undefined) setCaptionConfig(req.params.hash, JSON.stringify(captionConfig));
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -635,9 +702,11 @@ async function start() {
 
   api.get('/gallery/by-card', (req, res) => {
     try {
-      const { positive, limit = 4 } = req.query;
+      const { positive } = req.query;
       if (!positive) return res.json({ images: [], total: 0 });
-      const images = getGalleryByCard(positive, parseInt(limit) || 4)
+      const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 4 }, 'S-12 GET /gallery/by-card');
+      if (limit === null) return;
+      const images = getGalleryByCard(positive, limit)
         .map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       const total = getTotalByCard(positive);
       res.json({ images, total });

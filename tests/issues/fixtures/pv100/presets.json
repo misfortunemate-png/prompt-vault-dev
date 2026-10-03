@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "p_00001",
+      "name": "Preset 1",
+      "tags": [
+        "t1"
+      ],
+      "cards": {
+        "s_aaaa1": "c_00001",
+        "s_bbbb2": null
+      },
+      "updated_at": "2026-09-11T19:32:13.334Z",
+      "slotOrder": [
+        "s_bbbb2",
+        "s_aaaa1"
+      ],
+      "folder": "s_aaaa1",
+      "filename": [
+        "s_aaaa1"
+      ],
+      "childCards": {
+        "s_aaaa1": null
+      }
+    },
+    {
+      "id": "p_00002",
+      "name": "Preset 2",
+      "tags": [],
+      "cards": {
+        "s_bbbb2": "c_d7601848-e9a1-4f0b-a12b-450c4c8fd768"
+      },
+      "slotOrder": [],
+      "folder": null,
+      "filename": [],
+      "childCards": {},
+      "updated_at": "2026-09-11T19:32:13.334Z"
+    },
+    {
+      "id": "p_00003",
+      "name": "Preset 3 (old shape)",
+      "tags": [],
+      "cards": {},
+      "updated_at": "2026-09-11T19:32:13.334Z"
+    }
+  ]
+}

@@ -27,7 +27,7 @@ export function writeLog(level, code, message, detail) {
 }
 
 // 元の字句を文字列にし、長すぎるものは切る（切ったことは残す）
-export function toRaw(value) {
+export function toRaw(value, { full = false } = {}) {
   let s;
   if (typeof value === 'string') s = value === '' ? '""' : value;
   else if (value === undefined) s = 'undefined';
@@ -36,6 +36,7 @@ export function toRaw(value) {
     try { s = JSON.stringify(value); } catch { s = String(value); }
     if (s === undefined) s = String(value);
   }
+  if (full) return s;
   return s.length > RAW_LIMIT ? `${s.slice(0, RAW_LIMIT)}…(+${s.length - RAW_LIMIT}字)` : s;
 }
 
@@ -45,7 +46,8 @@ export function describeSecret(value) {
   return `[secret type=${value === null ? 'null' : typeof value} length=${len}]`;
 }
 
-export function recordInvalid({ kind, stage, raw, reason }) {
+// full: true は raw を切らずに残す（削除前の中身全体など）
+export function recordInvalid({ kind, stage, raw, reason, full = false }) {
   const entry = {
     ts: new Date().toISOString(),
     level: 'warn',
@@ -53,7 +55,7 @@ export function recordInvalid({ kind, stage, raw, reason }) {
     message: `${kind}: ${reason}`,
     kind: String(kind),
     stage: String(stage),
-    raw: toRaw(raw),
+    raw: toRaw(raw, { full }),
     reason: String(reason),
   };
   append(entry);

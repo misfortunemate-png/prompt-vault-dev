@@ -151,7 +151,7 @@ export function closeDb() {
 
 export function setFavorite(hash, flag, metaUpdatedAt) {
   const ts = metaUpdatedAt || new Date().toISOString();
-  getDb().prepare('UPDATE images SET favorite = ?, meta_updated_at = ? WHERE hash = ?').run(flag, ts, hash);
+  return getDb().prepare('UPDATE images SET favorite = ?, meta_updated_at = ? WHERE hash = ?').run(flag, ts, hash).changes;
 }
 
 export function getFavorites(limit = 50) {
@@ -177,7 +177,7 @@ export function getByPreset(presetId, limit = 50) {
 
 export function setCaption(hash, text, metaUpdatedAt) {
   const ts = metaUpdatedAt || new Date().toISOString();
-  getDb().prepare('UPDATE images SET caption = ?, meta_updated_at = ? WHERE hash = ?').run(text, ts, hash);
+  return getDb().prepare('UPDATE images SET caption = ?, meta_updated_at = ? WHERE hash = ?').run(text, ts, hash).changes;
 }
 
 export function setCaptionConfig(hash, configJson) {
@@ -189,9 +189,9 @@ export function updateSyncMeta(hash, { preset_id, created_at }) {
   const vals = [];
   if (preset_id !== undefined && preset_id !== null) { sets.push('preset_id = ?'); vals.push(preset_id); }
   if (created_at !== undefined && created_at !== null) { sets.push('created_at = ?'); vals.push(created_at); }
-  if (sets.length === 0) return;
+  if (sets.length === 0) return null; // 更新するものがない
   vals.push(hash);
-  getDb().prepare(`UPDATE images SET ${sets.join(', ')} WHERE hash = ?`).run(...vals);
+  return getDb().prepare(`UPDATE images SET ${sets.join(', ')} WHERE hash = ?`).run(...vals).changes;
 }
 
 export function getGalleryByCard(positive, limit = 4) {

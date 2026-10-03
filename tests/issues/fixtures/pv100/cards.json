@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "slots": [
+    {
+      "id": "s_aaaa1",
+      "name": "Slot A",
+      "updated_at": "2026-09-11T19:32:13.334Z",
+      "order": 0,
+      "useAsFolder": true,
+      "useInFilename": false
+    },
+    {
+      "id": "s_bbbb2",
+      "name": "Slot B",
+      "order": 1,
+      "useAsFolder": false,
+      "useInFilename": true,
+      "updated_at": "2026-09-11T19:32:13.334Z"
+    }
+  ],
+  "cards": [
+    {
+      "id": "c_00001",
+      "name": "Card 1",
+      "positive": "tag_a, tag_b",
+      "negative": "",
+      "updated_at": "2026-09-11T19:32:13.334Z",
+      "slotId": "s_aaaa1",
+      "parentId": null
+    },
+    {
+      "id": "c_00002",
+      "name": "Card 1 child",
+      "positive": "tag_c",
+      "negative": "tag_d",
+      "updated_at": "2026-09-11T19:32:13.334Z",
+      "slotId": "s_aaaa1",
+      "parentId": "c_00001"
+    },
+    {
+      "id": "c_d7601848-e9a1-4f0b-a12b-450c4c8fd768",
+      "slotId": "s_bbbb2",
+      "name": "Card 3",
+      "positive": "",
+      "negative": "",
+      "parentId": null,
+      "updated_at": "2026-09-11T19:32:13.334Z"
+    }
+  ]
+}

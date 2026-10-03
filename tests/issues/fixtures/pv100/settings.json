@@ -1,0 +1,23 @@
+{
+  "generation": {
+    "model": "nai-diffusion-4-5-full",
+    "width": 832,
+    "height": 1216,
+    "steps": 28,
+    "sampler": "k_euler_ancestral",
+    "scale": 5,
+    "seed": -1,
+    "maxResults": 5
+  },
+  "guard": {
+    "intervalMin": 2,
+    "intervalMax": 5,
+    "maxPerJob": 100
+  },
+  "captionStyle": {
+    "mode": "margin",
+    "fontSize": "medium",
+    "color": "#ffffff",
+    "outline": true
+  }
+}

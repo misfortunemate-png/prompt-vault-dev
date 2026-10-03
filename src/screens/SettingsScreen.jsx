@@ -272,7 +272,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
       setVaultKeyId('vault:v1');
       setVaultImportVal('');
       addToast('success', 'vault鍵をインポートしました');
-    } catch { addToast('error', 'インポートに失敗しました'); }
+    } catch (e) { addToast('error', `インポートに失敗しました: ${e?.message || e}`); }
   }, [addToast, vaultImportVal]);
 
   const handleDeleteKey = useCallback(() => {

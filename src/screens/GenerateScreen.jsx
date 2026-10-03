@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { getConnection, resolveTmpImgUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
 import { generateAndUploadThumb } from '../lib/thumbGen';
+import { parseTaskResult } from '../lib/queueResult';
 
 const MODELS = [
   { value: 'nai-diffusion-5-full',       label: 'V5 Full ⚡' },
@@ -155,7 +156,9 @@ function ResultCard({ item, onSave, onPreview }) {
       gap: '12px',
       alignItems: 'flex-start',
     }}>
-      {item.expired ? (
+      {item.invalid ? (
+        <div title={item.invalidReason} style={{ width: 72, height: 72, borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>結果を読めない</div>
+      ) : item.expired ? (
         <div style={{ width: 72, height: 72, borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>期限切れ</div>
       ) : (
         <img
@@ -172,9 +175,14 @@ function ResultCard({ item, onSave, onPreview }) {
         <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {label}
         </div>
+        {item.invalid && (
+          <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            {item.invalidReason}（設定 → デバッグ・接続に記録）
+          </div>
+        )}
         <button
           onClick={onSave}
-          disabled={item.saved}
+          disabled={item.saved || item.invalid}
           style={{
             padding: '6px 14px',
             background: item.saved ? 'transparent' : 'var(--accent)',
@@ -499,24 +507,9 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     const isCloud = conn.route === 'cloud';
     newDone.forEach(async (task) => {
       addedTaskIdsRef.current.add(task.id);
-      let parsedResult = task.result;
-      if (typeof parsedResult === 'string') {
-        try { parsedResult = JSON.parse(parsedResult); } catch { return; }
-      }
-      if (!parsedResult) return;
-      const parseSegArr = (raw) => {
-        if (Array.isArray(raw)) return raw;
-        if (typeof raw === 'string') { try { return JSON.parse(raw); } catch {} }
-        return [];
-      };
-      const entry = {
-        ...parsedResult,
-        task_id: task.id,
-        folderSegments: parseSegArr(task.folder_segments ?? task.folderSegments),
-        filenameSegments: parseSegArr(task.filename_segments ?? task.filenameSegments),
-        saved: !!task.saved,
-      };
-      if (isCloud) {
+      // §4.3 #6: 解析できない result は捨てずに invalid の項目として一覧に出す（集約先にも残る）
+      const entry = parseTaskResult(task);
+      if (isCloud && !entry.invalid) {
         try {
           const { expired, plain } = await fetchTaskImage(conn, task.id);
           if (expired) entry.expired = true;

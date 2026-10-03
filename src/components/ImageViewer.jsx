@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { api } from '../lib/api';
 import { getConnection, resolveThumbUrl, resolveFullImgUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
+import { recordInvalid } from '../lib/invalidLog';
 
 const FONT_SIZE_MAP = { small: '14px', medium: '20px', large: '28px' };
 const DEFAULT_CAPTION_CFG = { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true, x: 50, y: 20 };
@@ -235,10 +236,13 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
     try {
       await api.setFavorite(img.hash, newVal);
       if (onFavoriteToggle) onFavoriteToggle(img.hash, newVal);
-    } catch {
+    } catch (err) {
       setFavoriteMap(m => ({ ...m, [img.hash]: newVal !== 1 }));
+      // §4.3 #11: 黙って戻さず、集約先とトーストに出す（利用者の操作の失敗・J-4）
+      recordInvalid({ kind: 'favorite-save-failed', stage: '§4.3 #11 ImageViewer.toggleFavorite', raw: { hash: img.hash, favorite: newVal, error: err?.message || String(err) }, reason: err?.message || String(err) });
+      if (addToast) addToast('error', `お気に入りの保存に失敗しました: ${err?.message || err}`);
     }
-  }, [img, favoriteMap, onFavoriteToggle]);
+  }, [img, favoriteMap, onFavoriteToggle, addToast]);
 
   const saveCaption = useCallback(async () => {
     if (!img || captionEdit === null) return;
@@ -254,9 +258,13 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
         : { caption: saved, caption_config: JSON.stringify(savedCfg) }
       );
       setCaptionEdit(null);
-    } catch {}
+    } catch (err) {
+      // §4.3 #12: 黙って捨てず、集約先とトーストに出す（利用者の操作の失敗・J-4）
+      recordInvalid({ kind: 'caption-save-failed', stage: '§4.3 #12 ImageViewer.saveCaption', raw: { hash: img.hash, caption: captionEdit, error: err?.message || String(err) }, reason: err?.message || String(err) });
+      if (addToast) addToast('error', `セリフの保存に失敗しました: ${err?.message || err}`);
+    }
     setCaptionSaving(false);
-  }, [img, captionEdit, captionCfg, onCaptionSave]);
+  }, [img, captionEdit, captionCfg, onCaptionSave, addToast]);
 
   const openCardDialog = useCallback(async () => {
     try {
