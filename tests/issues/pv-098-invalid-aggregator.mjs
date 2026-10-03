@@ -89,6 +89,20 @@ export default {
           capped.length === limit && !raws.includes('n=0') && raws.includes(`n=${limit + 4}`) && !capped.some(e => e.kind === 'test-kind'),
           `length=${capped.length} first=${raws[0]} last=${raws[raws.length - 1]}`));
 
+        // J-2: コードが定めて扱う結果（接続先の切替で古い応答を捨てた・未接続で取得しない）は残余にしない
+        store.removeItem('pv-invalid-log');
+        const stale = Object.assign(new Error('接続先が変更されたため古い応答を破棄しました: /x'), { code: 'STALE_CONNECTION' });
+        const { api } = await freshImport('src/lib/api.js');
+        let offlineErr = null;
+        try { await api.getCards(); } catch (e) { offlineErr = e; } // localStorage に接続設定がない → offline
+        m2.recordFailure('pv98.verify', 'test-failure', stale);
+        if (offlineErr) m2.recordFailure('pv98.verify', 'test-failure', offlineErr);
+        const afterDefined = m2.getInvalidLog();
+        checks.push(check('AC-2 (J-2): StaleConnectionError and the offline refusal are not recorded as residue',
+          !!offlineErr && afterDefined.length === 0, `offlineErr=${offlineErr?.message} code=${offlineErr?.code} log=${JSON.stringify(afterDefined).slice(0, 300)}`));
+        m2.recordFailure('pv98.verify', 'test-failure', Object.assign(new Error('サーバーエラー (500)'), { status: 500 }));
+        checks.push(check('AC-2 control: other failures are recorded', m2.getInvalidLog().length === 1, JSON.stringify(m2.getInvalidLog()).slice(0, 200)));
+
         // 保存領域そのものが壊れていても黙って空にしない
         store.setItem('pv-invalid-log', 'not json');
         const m3 = await freshImport(modPath);

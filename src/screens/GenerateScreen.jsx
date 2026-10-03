@@ -535,7 +535,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         setQueueData(d);
       } catch (e) {
         // §4.3 #5: ポーリングの失敗は記録だけ（トーストを連発しない・J-4）
-        recordInvalid({ kind: 'queue-poll-failed', stage: '§4.3 #5 GenerateScreen.queuePolling', raw: e?.message || String(e), reason: e?.message || String(e) });
+        recordFailure('§4.3 #5 GenerateScreen.queuePolling', 'queue-poll-failed', e);
       }
     }, 2000);
     return () => clearInterval(id);
