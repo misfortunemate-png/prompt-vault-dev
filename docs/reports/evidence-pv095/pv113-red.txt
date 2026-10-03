@@ -1,0 +1,14 @@
+[INVALID] vault-key-id-mismatch F-12 crypto.decrypt 暗号文の鍵 id が手元の鍵と違う（復号は試みる） ciphertext keyId="v1" local keyId="vault:v1"
+[INVALID] vault-key-id-mismatch F-12 crypto.decrypt 暗号文の鍵 id が手元の鍵と違う（復号は試みる） ciphertext keyId="vault:v2" local keyId="vault:v1"
+[INVALID] vault-key-id-mismatch F-12 crypto.decrypt 暗号文の鍵 id が手元の鍵と違う（復号は試みる） ciphertext keyId="v2" local keyId="vault:v1"
+repository_sha=f8404326ab899886fa381345b15aa48db82b6929
+
+pv#113 [AUTO_FAILURE_INJECTION] gate=true Ciphertext keyId 'v1' is the same key as 'vault:v1' (defined branch); other mismatches are still recorded
+  VERIFIER tests/issues/pv-113-key-id-alias.mjs sha256=24cc382bbae18873e93e9a47763704d9adb8da16eeacb18f7cd318a039931bbb
+  FAIL    'v1' ciphertext decrypts and is not recorded (defined branch) — {"plain":"hello v1","entries":[{"ts":"2026-10-03T12:59:16.271Z","lastTs":"2026-10-03T12:59:16.271Z","kind":"vault-key-id-mismatch","stage":"F-12 crypto.decrypt","raw":"ciphertext keyId=\"v1\" local keyId=\"vault:v1\"","reason":"暗号文の鍵 id が手元の鍵と違う（復号は試みる）","count":1}]}
+  PASS    control: 'vault:v1' ciphertext decrypts and is not recorded
+  PASS    another keyId ('vault:v2') is still recorded (J-8) and decryption is still attempted
+  PASS    'v2' is not treated as an alias (only 'v1' is)
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=3 fail=1 gated_fail=1 not_run=0 waived=0 unknown=0
