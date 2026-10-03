@@ -1,0 +1,235 @@
+[INVALID] test-kind pv98.verify verifier injected {"v":"odd-value"}
+[INVALID] test-kind pv98.verify again {"v":"odd-value"}
+[INVALID] flood pv98.verify flood n=0
+[INVALID] flood pv98.verify flood n=1
+[INVALID] flood pv98.verify flood n=2
+[INVALID] flood pv98.verify flood n=3
+[INVALID] flood pv98.verify flood n=4
+[INVALID] flood pv98.verify flood n=5
+[INVALID] flood pv98.verify flood n=6
+[INVALID] flood pv98.verify flood n=7
+[INVALID] flood pv98.verify flood n=8
+[INVALID] flood pv98.verify flood n=9
+[INVALID] flood pv98.verify flood n=10
+[INVALID] flood pv98.verify flood n=11
+[INVALID] flood pv98.verify flood n=12
+[INVALID] flood pv98.verify flood n=13
+[INVALID] flood pv98.verify flood n=14
+[INVALID] flood pv98.verify flood n=15
+[INVALID] flood pv98.verify flood n=16
+[INVALID] flood pv98.verify flood n=17
+[INVALID] flood pv98.verify flood n=18
+[INVALID] flood pv98.verify flood n=19
+[INVALID] flood pv98.verify flood n=20
+[INVALID] flood pv98.verify flood n=21
+[INVALID] flood pv98.verify flood n=22
+[INVALID] flood pv98.verify flood n=23
+[INVALID] flood pv98.verify flood n=24
+[INVALID] flood pv98.verify flood n=25
+[INVALID] flood pv98.verify flood n=26
+[INVALID] flood pv98.verify flood n=27
+[INVALID] flood pv98.verify flood n=28
+[INVALID] flood pv98.verify flood n=29
+[INVALID] flood pv98.verify flood n=30
+[INVALID] flood pv98.verify flood n=31
+[INVALID] flood pv98.verify flood n=32
+[INVALID] flood pv98.verify flood n=33
+[INVALID] flood pv98.verify flood n=34
+[INVALID] flood pv98.verify flood n=35
+[INVALID] flood pv98.verify flood n=36
+[INVALID] flood pv98.verify flood n=37
+[INVALID] flood pv98.verify flood n=38
+[INVALID] flood pv98.verify flood n=39
+[INVALID] flood pv98.verify flood n=40
+[INVALID] flood pv98.verify flood n=41
+[INVALID] flood pv98.verify flood n=42
+[INVALID] flood pv98.verify flood n=43
+[INVALID] flood pv98.verify flood n=44
+[INVALID] flood pv98.verify flood n=45
+[INVALID] flood pv98.verify flood n=46
+[INVALID] flood pv98.verify flood n=47
+[INVALID] flood pv98.verify flood n=48
+[INVALID] flood pv98.verify flood n=49
+[INVALID] flood pv98.verify flood n=50
+[INVALID] flood pv98.verify flood n=51
+[INVALID] flood pv98.verify flood n=52
+[INVALID] flood pv98.verify flood n=53
+[INVALID] flood pv98.verify flood n=54
+[INVALID] flood pv98.verify flood n=55
+[INVALID] flood pv98.verify flood n=56
+[INVALID] flood pv98.verify flood n=57
+[INVALID] flood pv98.verify flood n=58
+[INVALID] flood pv98.verify flood n=59
+[INVALID] flood pv98.verify flood n=60
+[INVALID] flood pv98.verify flood n=61
+[INVALID] flood pv98.verify flood n=62
+[INVALID] flood pv98.verify flood n=63
+[INVALID] flood pv98.verify flood n=64
+[INVALID] flood pv98.verify flood n=65
+[INVALID] flood pv98.verify flood n=66
+[INVALID] flood pv98.verify flood n=67
+[INVALID] flood pv98.verify flood n=68
+[INVALID] flood pv98.verify flood n=69
+[INVALID] flood pv98.verify flood n=70
+[INVALID] flood pv98.verify flood n=71
+[INVALID] flood pv98.verify flood n=72
+[INVALID] flood pv98.verify flood n=73
+[INVALID] flood pv98.verify flood n=74
+[INVALID] flood pv98.verify flood n=75
+[INVALID] flood pv98.verify flood n=76
+[INVALID] flood pv98.verify flood n=77
+[INVALID] flood pv98.verify flood n=78
+[INVALID] flood pv98.verify flood n=79
+[INVALID] flood pv98.verify flood n=80
+[INVALID] flood pv98.verify flood n=81
+[INVALID] flood pv98.verify flood n=82
+[INVALID] flood pv98.verify flood n=83
+[INVALID] flood pv98.verify flood n=84
+[INVALID] flood pv98.verify flood n=85
+[INVALID] flood pv98.verify flood n=86
+[INVALID] flood pv98.verify flood n=87
+[INVALID] flood pv98.verify flood n=88
+[INVALID] flood pv98.verify flood n=89
+[INVALID] flood pv98.verify flood n=90
+[INVALID] flood pv98.verify flood n=91
+[INVALID] flood pv98.verify flood n=92
+[INVALID] flood pv98.verify flood n=93
+[INVALID] flood pv98.verify flood n=94
+[INVALID] flood pv98.verify flood n=95
+[INVALID] flood pv98.verify flood n=96
+[INVALID] flood pv98.verify flood n=97
+[INVALID] flood pv98.verify flood n=98
+[INVALID] flood pv98.verify flood n=99
+[INVALID] flood pv98.verify flood n=100
+[INVALID] flood pv98.verify flood n=101
+[INVALID] flood pv98.verify flood n=102
+[INVALID] flood pv98.verify flood n=103
+[INVALID] flood pv98.verify flood n=104
+[INVALID] flood pv98.verify flood n=105
+[INVALID] flood pv98.verify flood n=106
+[INVALID] flood pv98.verify flood n=107
+[INVALID] flood pv98.verify flood n=108
+[INVALID] flood pv98.verify flood n=109
+[INVALID] flood pv98.verify flood n=110
+[INVALID] flood pv98.verify flood n=111
+[INVALID] flood pv98.verify flood n=112
+[INVALID] flood pv98.verify flood n=113
+[INVALID] flood pv98.verify flood n=114
+[INVALID] flood pv98.verify flood n=115
+[INVALID] flood pv98.verify flood n=116
+[INVALID] flood pv98.verify flood n=117
+[INVALID] flood pv98.verify flood n=118
+[INVALID] flood pv98.verify flood n=119
+[INVALID] flood pv98.verify flood n=120
+[INVALID] flood pv98.verify flood n=121
+[INVALID] flood pv98.verify flood n=122
+[INVALID] flood pv98.verify flood n=123
+[INVALID] flood pv98.verify flood n=124
+[INVALID] flood pv98.verify flood n=125
+[INVALID] flood pv98.verify flood n=126
+[INVALID] flood pv98.verify flood n=127
+[INVALID] flood pv98.verify flood n=128
+[INVALID] flood pv98.verify flood n=129
+[INVALID] flood pv98.verify flood n=130
+[INVALID] flood pv98.verify flood n=131
+[INVALID] flood pv98.verify flood n=132
+[INVALID] flood pv98.verify flood n=133
+[INVALID] flood pv98.verify flood n=134
+[INVALID] flood pv98.verify flood n=135
+[INVALID] flood pv98.verify flood n=136
+[INVALID] flood pv98.verify flood n=137
+[INVALID] flood pv98.verify flood n=138
+[INVALID] flood pv98.verify flood n=139
+[INVALID] flood pv98.verify flood n=140
+[INVALID] flood pv98.verify flood n=141
+[INVALID] flood pv98.verify flood n=142
+[INVALID] flood pv98.verify flood n=143
+[INVALID] flood pv98.verify flood n=144
+[INVALID] flood pv98.verify flood n=145
+[INVALID] flood pv98.verify flood n=146
+[INVALID] flood pv98.verify flood n=147
+[INVALID] flood pv98.verify flood n=148
+[INVALID] flood pv98.verify flood n=149
+[INVALID] flood pv98.verify flood n=150
+[INVALID] flood pv98.verify flood n=151
+[INVALID] flood pv98.verify flood n=152
+[INVALID] flood pv98.verify flood n=153
+[INVALID] flood pv98.verify flood n=154
+[INVALID] flood pv98.verify flood n=155
+[INVALID] flood pv98.verify flood n=156
+[INVALID] flood pv98.verify flood n=157
+[INVALID] flood pv98.verify flood n=158
+[INVALID] flood pv98.verify flood n=159
+[INVALID] flood pv98.verify flood n=160
+[INVALID] flood pv98.verify flood n=161
+[INVALID] flood pv98.verify flood n=162
+[INVALID] flood pv98.verify flood n=163
+[INVALID] flood pv98.verify flood n=164
+[INVALID] flood pv98.verify flood n=165
+[INVALID] flood pv98.verify flood n=166
+[INVALID] flood pv98.verify flood n=167
+[INVALID] flood pv98.verify flood n=168
+[INVALID] flood pv98.verify flood n=169
+[INVALID] flood pv98.verify flood n=170
+[INVALID] flood pv98.verify flood n=171
+[INVALID] flood pv98.verify flood n=172
+[INVALID] flood pv98.verify flood n=173
+[INVALID] flood pv98.verify flood n=174
+[INVALID] flood pv98.verify flood n=175
+[INVALID] flood pv98.verify flood n=176
+[INVALID] flood pv98.verify flood n=177
+[INVALID] flood pv98.verify flood n=178
+[INVALID] flood pv98.verify flood n=179
+[INVALID] flood pv98.verify flood n=180
+[INVALID] flood pv98.verify flood n=181
+[INVALID] flood pv98.verify flood n=182
+[INVALID] flood pv98.verify flood n=183
+[INVALID] flood pv98.verify flood n=184
+[INVALID] flood pv98.verify flood n=185
+[INVALID] flood pv98.verify flood n=186
+[INVALID] flood pv98.verify flood n=187
+[INVALID] flood pv98.verify flood n=188
+[INVALID] flood pv98.verify flood n=189
+[INVALID] flood pv98.verify flood n=190
+[INVALID] flood pv98.verify flood n=191
+[INVALID] flood pv98.verify flood n=192
+[INVALID] flood pv98.verify flood n=193
+[INVALID] flood pv98.verify flood n=194
+[INVALID] flood pv98.verify flood n=195
+[INVALID] flood pv98.verify flood n=196
+[INVALID] flood pv98.verify flood n=197
+[INVALID] flood pv98.verify flood n=198
+[INVALID] flood pv98.verify flood n=199
+[INVALID] flood pv98.verify flood n=200
+[INVALID] flood pv98.verify flood n=201
+[INVALID] flood pv98.verify flood n=202
+[INVALID] flood pv98.verify flood n=203
+[INVALID] flood pv98.verify flood n=204
+[INVALID] test-failure pv98.verify 接続先が変更されたため古い応答を破棄しました: /x {"error":"接続先が変更されたため古い応答を破棄しました: /x","status":null}
+[INVALID] test-failure pv98.verify オフライン: サーバーに接続できません {"error":"オフライン: サーバーに接続できません","status":null}
+[INVALID] test-failure pv98.verify サーバーエラー (500) {"error":"サーバーエラー (500)","status":500}
+repository_sha=534f64dc4d1bce1caea131d606e5425e8dbccb84
+
+pv#98 [AUTO_FAILURE_INJECTION] gate=true One aggregation point for invalid residue (Fran logs/ INVALID + front store + settings debug view)
+  VERIFIER tests/issues/pv-098-invalid-aggregator.mjs sha256=b6c3ca12596995bf369d9b4c2d3f59002a407cda4824b71c03ab6972a4e723ac
+  PASS    AC-1: Fran test instance starts
+  PASS    AC-1: GET /settings response is unchanged for an unparseable settings.json (500, J-5)
+  PASS    AC-1: logs/ has code INVALID with kind/stage/raw/reason for the residue
+  PASS    AC-1: raw keeps the original text
+  PASS    AC-1: /debug/errors returns the INVALID entry
+  PASS    AC-1 (S-20): /debug/errors keeps an unparseable log line as INVALID with its raw text
+  PASS    AC-2: recordInvalid stores kind/stage/raw/reason
+  PASS    AC-2: entries survive a reload
+  PASS    AC-2: same kind/stage/raw is merged with count
+  PASS    AC-2: a numeric upper limit exists
+  PASS    AC-2: over the limit, the oldest entries drop first
+  FAIL    AC-2 (J-2): StaleConnectionError and the offline refusal are not recorded as residue — offlineErr=オフライン: サーバーに接続できません code=undefined log=[{"ts":"2026-10-03T00:48:04.620Z","lastTs":"2026-10-03T00:48:04.620Z","kind":"test-failure","stage":"pv98.verify","raw":"{\"error\":\"接続先が変更されたため古い応答を破棄しました: /x\",\"status\":null}","reason":"接続先が変更されたため古い応答を破棄しました: /x","count":1},{"ts":"2026-10-03T00:48:04.620Z","lastTs":"2026-10-03T00:48:04.620Z","
+  FAIL    AC-2 control: other failures are recorded — [{"ts":"2026-10-03T00:48:04.620Z","lastTs":"2026-10-03T00:48:04.620Z","kind":"test-failure","stage":"pv98.verify","raw":"{\"error\":\"接続先が変更されたため古い応答を破棄しました: /x\",\"status\":null}","reason":"接続先が変更された
+  PASS    AC-2: a corrupted store is itself reported, not silently emptied
+  PASS    AC-2: settings debug imports the front aggregation store
+  PASS    AC-2: the front list is rendered without a route condition (visible offline)
+  PASS    AC-2: the route /debug/errors list is shown next to it
+  PASS    AC-3: no parallel ErrorCode/createError mechanism remains
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=16 fail=2 gated_fail=2 not_run=0 waived=0 unknown=0

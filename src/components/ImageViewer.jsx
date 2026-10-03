@@ -249,7 +249,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
     } catch (err) {
       setFavoriteMap(m => ({ ...m, [img.hash]: newVal !== 1 }));
       // §4.3 #11: 黙って戻さず、集約先とトーストに出す（利用者の操作の失敗・J-4）
-      recordInvalid({ kind: 'favorite-save-failed', stage: '§4.3 #11 ImageViewer.toggleFavorite', raw: { hash: img.hash, favorite: newVal, error: err?.message || String(err) }, reason: err?.message || String(err) });
+      recordFailure('§4.3 #11 ImageViewer.toggleFavorite', 'favorite-save-failed', err, { hash: img.hash, favorite: newVal });
       if (addToast) addToast('error', `お気に入りの保存に失敗しました: ${err?.message || err}`);
     }
   }, [img, favoriteMap, onFavoriteToggle, addToast]);
@@ -270,7 +270,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
       setCaptionEdit(null);
     } catch (err) {
       // §4.3 #12: 黙って捨てず、集約先とトーストに出す（利用者の操作の失敗・J-4）
-      recordInvalid({ kind: 'caption-save-failed', stage: '§4.3 #12 ImageViewer.saveCaption', raw: { hash: img.hash, caption: captionEdit, error: err?.message || String(err) }, reason: err?.message || String(err) });
+      recordFailure('§4.3 #12 ImageViewer.saveCaption', 'caption-save-failed', err, { hash: img.hash, caption: captionEdit });
       if (addToast) addToast('error', `セリフの保存に失敗しました: ${err?.message || err}`);
     }
     setCaptionSaving(false);

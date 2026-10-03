@@ -37,7 +37,10 @@ async function request(path, opts = {}) {
   } else if (conn.route === 'cloud') {
     base = conn.cloudUrl;
   } else {
-    throw new Error('オフライン: サーバーに接続できません');
+    // 未接続で取得しないことはコードが定めた結果（J-2）。code で見分けられるようにする
+    const err = new Error('オフライン: サーバーに接続できません');
+    err.code = 'OFFLINE';
+    throw err;
   }
 
   // Bodyless reads do not need an application/json content type.

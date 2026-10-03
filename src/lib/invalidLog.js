@@ -92,8 +92,13 @@ export function recordInvalid({ kind, stage, raw, reason }) {
   return entry;
 }
 
+// コードが定めて扱う結果（J-2）: 接続先の切替で古い応答を捨てた（STALE_CONNECTION）・未接続で取得しない（OFFLINE）。
+// これらは当たる枝なので残余として記録しない
+export const DEFINED_FAILURE_CODES = ['STALE_CONNECTION', 'OFFLINE'];
+
 // 取得・保存の失敗を記録する簡易形（kind・stage と、例外の message・status・追加の情報）
 export function recordFailure(stage, kind, err, extra = {}) {
+  if (DEFINED_FAILURE_CODES.includes(err?.code)) return null;
   const message = err?.message || String(err);
   return recordInvalid({ kind, stage, raw: { ...extra, error: message, status: err?.status ?? null }, reason: message });
 }
