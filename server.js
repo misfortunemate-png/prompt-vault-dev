@@ -288,9 +288,15 @@ async function start() {
     if (ALLOWED_ORIGINS.includes(origin)) return true;
     return ALLOWED_ORIGIN_PATTERNS.some(re => re.test(origin));
   }
+  // S-15: 許可外の Origin は応答を変えず（許可ヘッダを付けない）、Origin ごとに一度だけ記録する
+  const reportedOrigins = new Set();
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     res.setHeader('Vary', 'Origin');
+    if (origin && !isAllowedOrigin(origin) && !reportedOrigins.has(origin)) {
+      reportedOrigins.add(origin);
+      recordInvalid({ kind: 'cors-origin-rejected', stage: 'S-15 CORS', raw: { origin, method: req.method, path: req.originalUrl }, reason: 'ALLOWED_ORIGINS・prompt-vault-6gr.pages.dev のどれにも当たらない Origin（許可ヘッダを付けない）' });
+    }
     if (origin && isAllowedOrigin(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -1052,6 +1058,12 @@ async function start() {
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // S-14: 未定義の /api/* はメソッドを問わず JSON の 404（Vite の SPA フォールバックより先に受ける）
+  api.use((req, res) => {
+    recordInvalid({ kind: 'api-route-undefined', stage: 'S-14 /api fallback', raw: { method: req.method, path: req.originalUrl }, reason: '定義されていない API' });
+    res.status(404).json({ error: '未定義の API です', method: req.method, path: req.originalUrl });
   });
 
   app.use('/api', api);

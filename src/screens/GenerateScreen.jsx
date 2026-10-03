@@ -24,6 +24,23 @@ const RESOLUTIONS = [
 ];
 
 const SAMPLERS = ['k_euler_ancestral', 'k_euler', 'k_dpmpp_2m_sde'];
+const RESOLUTION_VALUES = [...RESOLUTIONS.map(r => r.value), 'random'];
+
+// F-10: 復元・既定値の model・sampler・resolution が一覧にないときは、寄せずにその値のまま持ち、記録する
+function noteUnlisted(field, value, source) {
+  const lists = { model: MODELS.map(m => m.value), sampler: SAMPLERS, resolution: RESOLUTION_VALUES };
+  if (lists[field].includes(value)) return;
+  recordInvalid({ kind: 'generate-option-unlisted', stage: `F-10 GenerateScreen.${source}`, raw: { [field]: value }, reason: `${field} が選択肢の一覧にない（その値のまま表示し、生成時にサーバが判定する）` });
+}
+
+// F-10: シード欄。空はランダム（未指定）。数でない入力を乱数に寄せない
+function parseSeed(seed) {
+  if (seed === '' || seed === null || seed === undefined) return { ok: true, value: null };
+  const n = Number(seed);
+  if (Number.isInteger(n)) return { ok: true, value: n };
+  recordInvalid({ kind: 'generate-seed-invalid', stage: 'F-10 GenerateScreen.parseSeed', raw: { seed }, reason: '整数でない（ランダムに寄せない）' });
+  return { ok: false, value: null };
+}
 
 const fieldStyle = {
   width: '100%',
@@ -67,7 +84,13 @@ async function fetchTaskImage(conn, taskId) {
   const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
   const r = await fetch(conn.cloudUrl + `/queue/task/${encodeURIComponent(taskId)}/data`, { headers });
   if (r.status === 404) return { expired: true, plain: null };
-  if (!r.ok) return { expired: false, plain: null };
+  if (!r.ok) {
+    // F-06: 401・403・5xx などを黙って捨てない（呼び出し側が表示・記録する）
+    recordInvalid({ kind: 'task-image-fetch-status', stage: 'F-06 GenerateScreen.fetchTaskImage', raw: { task_id: taskId, status: r.status }, reason: `2xx・404 以外（${r.status}）` });
+    const err = new Error(`生成画像を取得できません (${r.status})`);
+    err.status = r.status;
+    throw err;
+  }
   return { expired: false, plain: await decrypt(await r.arrayBuffer()) };
 }
 
@@ -332,14 +355,16 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     try {
       const stored = JSON.parse(localStorage.getItem('pv3-last-prompt'));
       if (stored) {
-        if (stored.model) setModel(stored.model);
-        if (stored.resolution) setResolution(stored.resolution);
+        if (stored.model) { noteUnlisted('model', stored.model, 'restore'); setModel(stored.model); }
+        if (stored.resolution) { noteUnlisted('resolution', stored.resolution, 'restore'); setResolution(stored.resolution); }
         if (stored.steps != null) setSteps(stored.steps);
         if (stored.scale != null) setScale(stored.scale);
-        if (stored.sampler) setSampler(stored.sampler);
+        if (stored.sampler) { noteUnlisted('sampler', stored.sampler, 'restore'); setSampler(stored.sampler); }
         promptApplied.current = stored;
       }
-    } catch {}
+    } catch (e) {
+      recordInvalid({ kind: 'last-prompt-unparseable', stage: 'F-10 GenerateScreen.restore', raw: (() => { try { return localStorage.getItem('pv3-last-prompt'); } catch { return null; } })(), reason: `前回のプロンプトを解析できない: ${e.message}` });
+    }
   }, []);
 
   // #7: カード選択の永続化 — 復元
@@ -473,7 +498,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         } else {
           setQueueData({ state: 'idle', tasks: [], currentIndex: null, startedAt: null });
           const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
-          if (settings.generation?.model && !promptApplied.current) setModel(settings.generation.model);
+          if (settings.generation?.model && !promptApplied.current) { noteUnlisted('model', settings.generation.model, 'settingsDefault'); setModel(settings.generation.model); }
           const ready = !!info.vaultRoot;
           setVaultReady(ready);
           if (ready) {
@@ -778,7 +803,21 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const pickResolution = () => resolution === 'random'
     ? RESOLUTIONS[Math.floor(Math.random() * RESOLUTIONS.length)]
-    : (RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0]);
+    : RESOLUTIONS.find(r => r.value === resolution);
+
+  // F-10: 一覧にない解像度・整数でないシードでは生成・キュー追加をしない（Portrait・乱数に寄せない）
+  const checkGenerateInputs = () => {
+    if (resolution !== 'random' && !RESOLUTIONS.some(r => r.value === resolution)) {
+      noteUnlisted('resolution', resolution, 'checkGenerateInputs');
+      addToast('error', `解像度「${resolution}」は一覧にない値です。選び直してください`);
+      return false;
+    }
+    if (!parseSeed(seed).ok) {
+      addToast('error', `シード「${seed}」は整数でありません。空（ランダム）か整数にしてください`);
+      return false;
+    }
+    return true;
+  };
 
   const buildSingleTask = () => {
     const res = pickResolution();
@@ -864,7 +903,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     return {
       positive: pos,
       negative: neg,
-      params: { model, width: res.width, height: res.height, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null },
+      params: { model, width: res.width, height: res.height, steps, scale, sampler, seed: parseSeed(seed).value },
       folderSegments,
       filenameSegments,
       preset_id: selectedPresetId || null,
@@ -874,6 +913,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const handleAddToQueue = async () => {
     if (!vaultReady) { addToast('error', 'VAULT_ROOTが未設定です'); return; }
+    if (!checkGenerateInputs()) return;
     const task = buildSingleTask();
     try {
       const r = await api.queueAdd([task]);
@@ -886,7 +926,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   };
 
   const buildCartesianTasks = () => {
-    const baseParams = { model, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null };
+    const baseParams = { model, steps, scale, sampler, seed: parseSeed(seed).value };
     const allCards = cardsData?.cards || [];
     const enabledSlots = sortedSlots.filter(s => slotEnabledMap[s.id] !== false);
     const slotOptions = enabledSlots.map(slot => {
@@ -958,6 +998,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const handleAddCartesian = async () => {
     if (!vaultReady) { addToast('error', 'VAULT_ROOTが未設定です'); return; }
+    if (!checkGenerateInputs()) return;
     const tasks = buildCartesianTasks();
     if (tasks.length === 0) { addToast('error', '展開するタスクがありません'); return; }
     try {
@@ -994,7 +1035,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   // ── Generation / Save ──
 
   const handleGenerate = async () => {
-    if (steps > 28 && !window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
+    if (!checkGenerateInputs()) return;
+    if (steps > 28 &&!window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
     setGenerating(true);
     const routeAtFetch = connectionRoute;
     const revisionAtFetch = connectionRevision;
@@ -1083,7 +1125,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         prompt: pos,
         negative_prompt: neg,
         model, width: res.width, height: res.height, steps, scale, sampler,
-        seed: seed !== '' ? parseInt(seed, 10) : null,
+        seed: parseSeed(seed).value,
         folderSegments,
         filenameSegments,
         preset_id: selectedPresetId || null,
@@ -1382,6 +1424,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               <label style={labelStyle}>モデル</label>
               <select value={model} onChange={e => setModel(e.target.value)} style={fieldStyle}>
                 {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                {!MODELS.some(m => m.value === model) && <option value={model}>一覧にない値: {String(model)}</option>}
               </select>
             </div>
             <div>
@@ -1389,6 +1432,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               <select value={resolution} onChange={e => setResolution(e.target.value)} style={fieldStyle}>
                 {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 <option value="random">ランダム</option>
+                {!RESOLUTION_VALUES.includes(resolution) && <option value={resolution}>一覧にない値: {String(resolution)}</option>}
               </select>
             </div>
             <div>
@@ -1403,6 +1447,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               <label style={labelStyle}>サンプラー</label>
               <select value={sampler} onChange={e => setSampler(e.target.value)} style={fieldStyle}>
                 {SAMPLERS.map(s => <option key={s} value={s}>{s}</option>)}
+                {!SAMPLERS.includes(sampler) && <option value={sampler}>一覧にない値: {String(sampler)}</option>}
               </select>
             </div>
             <div>

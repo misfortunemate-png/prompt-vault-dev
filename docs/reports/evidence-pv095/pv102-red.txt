@@ -1,0 +1,58 @@
+repository_sha=18258f327fa1d8a1faed6db94d813dc69243ff0a
+
+pv#102 [AUTO_FAILURE_INJECTION] gate=true Route and response classification has a residue type; unknown routes go offline in one place
+  VERIFIER tests/issues/pv-102-route-residue.mjs sha256=f21d6bee76807e886855ab2c9cce368627cbb7f377c9e859ba497bd764891158
+  FAIL    AC-11 F-01/F-02 unparseable pv-connection: handled and recorded — conn={"route":"offline","reason":null,"tokenType":"string"} log=[]
+  FAIL    AC-11 F-01/F-02 unparseable pv-connection: recorded once (not on every read) — []
+  PASS    AC-11 J-3 unparseable pv-connection: the token value is not in the aggregator
+  FAIL    AC-11 F-01/F-02 unknown route: handled and recorded — conn={"route":"satellite","reason":null,"tokenType":"string"} log=[]
+  FAIL    AC-11 F-01/F-02 unknown route: recorded once (not on every read) — []
+  PASS    AC-11 J-3 unknown route: the token value is not in the aggregator
+  FAIL    AC-11 F-01/F-02 token not a string: handled and recorded — conn={"route":"offline","reason":null,"tokenType":"number"} log=[]
+  FAIL    AC-11 F-01/F-02 token not a string: recorded once (not on every read) — []
+  PASS    AC-11 J-3 token not a string: the token value is not in the aggregator
+  FAIL    AC-11 F-01/F-02 unknown cloudOfflineReason: handled and recorded — conn={"route":"offline","reason":"weird","tokenType":"string"} log=[]
+  FAIL    AC-11 F-01/F-02 unknown cloudOfflineReason: recorded once (not on every read) — []
+  PASS    AC-11 J-3 unknown cloudOfflineReason: the token value is not in the aggregator
+  FAIL    AC-11 J-11: an unknown route resolves to offline in one place (getConnection, snapshot, stored value) — ["satellite","satellite","satellite"]
+  FAIL    AC-11 J-11: no other module re-folds an unknown route (connection.js holds the only ROUTES list) — ROUTES list missing in connection.js
+  FAIL    AC-11 F-03 stored timeout non-numeric: not passed through; recorded with the raw value — value=NaN log=[]
+  FAIL    AC-11 F-03 stored timeout zero: not passed through; recorded with the raw value — value=0 log=[]
+  FAIL    AC-11 F-03 stored timeout negative: not passed through; recorded with the raw value — value=-5 log=[]
+  FAIL    AC-11 F-03 updateSettings(timeoutMs: 0) does not store 0 and is recorded — stored=0
+  PASS    AC-11 F-03 control: a valid timeout is stored
+  FAIL    AC-11 F-04 Cloud /healthz 401 → auth-failed — route=offline reason=null log=[]
+  FAIL    AC-11 F-04 Cloud /healthz 403 → auth-failed — route=offline reason=null log=[]
+  FAIL    AC-11 F-04 Fran network failure: reason recorded — route=offline reason=null log=[]
+  FAIL    AC-11 F-04 Fran non-2xx: status recorded — route=offline reason=null log=[]
+  FAIL    AC-11 F-04 Fran timeout: reason recorded — route=offline reason=null log=[]
+  FAIL    AC-11 F-04 Cloud /settings 503: cloud-error with the status recorded — route=offline reason=cloud-error log=[]
+  PASS    AC-11 F-04 control: Cloud ok → cloud
+  FAIL    AC-11 F-05: a 2xx non-JSON body raises an error carrying path/route/status — Unexpected token '<'
+  FAIL    AC-11 F-05: recorded with Content-Type and the head of the body
+  FAIL    AC-11 F-06: fetchTaskImage records non-2xx/non-404 and does not return a silent empty result — async function fetchTaskImage(conn, taskId) {
+  const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
+  const r = await fetch(conn.cloudUrl + `/queue/task/${encodeURIComponent(taskId)}/data`, { headers });
+  if (r.status === 404) return { expired: true, plain: null };
+  if (!r.ok) return { expired: false, plain: null };
+  return { expired: false, plain: await decrypt(
+  FAIL    AC-11 F-07: warn and warning are defined toast types (J-2) — warn/warning styles missing
+  FAIL    AC-11 F-07: an unknown toast type is recorded — unknown toast type not recorded
+  FAIL    AC-11 F-10: restored model/sampler/resolution outside the lists are recorded and shown as-is — F-10 handling missing
+  FAIL    AC-11 F-10: an unparseable seed is not folded into random — seed NaN handling missing
+  FAIL    AC-11 F-11 (J-14): a saved model not in the list is shown as-is and recorded — F-11 handling missing
+  PASS    Fran test instance (dev/Vite) starts
+  FAIL    AC-12 S-14 GET undefined /api/*: JSON 404 and recorded — status=200 type=text/html body=<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <script type="module">import { injectIntoGlobalHook } from "/@react-refres
+  FAIL    AC-12 S-14 POST undefined /api/*: JSON 404 and recorded — status=404 type= body=
+  FAIL    AC-12 S-14 PUT undefined /api/*: JSON 404 and recorded — status=404 type= body=
+  FAIL    AC-12 S-14 DELETE undefined /api/*: JSON 404 and recorded — status=404 type= body=
+  PASS    AC-12 S-14 control: defined /api/healthz still 200
+  FAIL    AC-12 S-15: a disallowed Origin is recorded on the server — []
+  PASS    AC-12 S-15: response for a disallowed Origin is unchanged (no allow header)
+  PASS    AC-12 S-15 control: an allowed Origin is not recorded
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=10 fail=33 gated_fail=33 not_run=0 waived=0 unknown=0

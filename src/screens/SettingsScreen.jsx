@@ -3,12 +3,12 @@ import { api } from '../lib/api';
 import { clearAll as clearThumbDb } from '../lib/thumbDb';
 import { FONT_REGISTRY, DISPLAY_DEFAULTS } from '../App';
 import {
-  getConnection, checkReachability, switchRoute, clearManual, updateSettings, getTimeoutSetting,
+  getConnection, checkReachability, switchRoute, clearManual, updateSettings, getTimeoutSetting, isValidTimeout,
 } from '../lib/connection';
 import {
   hasVaultKey, getVaultKey, setVaultKey, clearVaultKey, generateVaultKey,
 } from '../lib/crypto';
-import { getInvalidLog, clearInvalidLog, subscribeInvalidLog } from '../lib/invalidLog';
+import { getInvalidLog, clearInvalidLog, subscribeInvalidLog, recordInvalid } from '../lib/invalidLog';
 
 const SAMPLER_OPTIONS = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2m_sde'];
 
@@ -171,6 +171,9 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
   useEffect(() => {
     setLoadedRoute(connectionState.route);
     api.getSettings().then(s => {
+      if (s.generation && !MODEL_OPTIONS.some(m => m.value === s.generation.model)) {
+        recordInvalid({ kind: 'settings-model-unlisted', stage: 'F-11 SettingsScreen.load', raw: { model: s.generation.model }, reason: '既定モデルが設定画面の選択肢にない（その値のまま表示・保存する）' });
+      }
       setGen(s.generation);
       setGuard(s.guard);
       setCaptionStyle(s.captionStyle || { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true });
@@ -210,9 +213,10 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     if (onConnectionChange) onConnectionChange(updated);
   }, [conn, onConnectionChange]);
 
-  const handleTimeoutChange = useCallback((val) => {
-    setTimeoutMs(val);
-    updateSettings({ timeoutMs: val });
+  // F-03: 入力中の値はそのまま見せ、500〜30000 の整数のときだけ保存する（空や 0 を保存しない）
+  const handleTimeoutChange = useCallback((text) => {
+    setTimeoutMs(text);
+    if (isValidTimeout(text)) updateSettings({ timeoutMs: Number(text) });
   }, []);
 
   const handleRecheck = useCallback(async () => {
@@ -470,6 +474,8 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
                 {MODEL_OPTIONS.map(m => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
+                {/* F-11・J-14: 一覧にない保存値（V5 系など）はその値のまま見せる（選択肢は変えない） */}
+                {!MODEL_OPTIONS.some(m => m.value === gen.model) && <option value={gen.model}>一覧にない値: {String(gen.model)}</option>}
               </select>
             </div>
 
@@ -876,9 +882,14 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
               value={timeoutMs}
               min={500}
               max={30000}
-              onChange={e => handleTimeoutChange(Number(e.target.value))}
+              onChange={e => handleTimeoutChange(e.target.value)}
               style={inputStyle}
             />
+            {!isValidTimeout(timeoutMs) && (
+              <div style={{ fontSize: 'var(--fs-label)', color: '#c0392b', marginTop: '4px' }}>
+                500〜30000 の整数を入れてください（この値は保存されていません）
+              </div>
+            )}
           </div>
 
           {/* vault鍵管理 */}

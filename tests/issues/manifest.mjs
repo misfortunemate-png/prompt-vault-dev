@@ -19,6 +19,7 @@ import pv098 from './pv-098-invalid-aggregator.mjs';
 import pv099 from './pv-099-checker-residue.mjs';
 import pv100 from './pv-100-write-guard.mjs';
 import pv101 from './pv-101-paid-call-guard.mjs';
+import pv102 from './pv-102-route-residue.mjs';
 
 export const issueVerifiers = Object.freeze({
   [pv005.issue]: pv005,
@@ -42,4 +43,5 @@ export const issueVerifiers = Object.freeze({
   [pv099.issue]: pv099,
   [pv100.issue]: pv100,
   [pv101.issue]: pv101,
+  [pv102.issue]: pv102,
 });
