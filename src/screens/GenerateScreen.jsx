@@ -5,6 +5,8 @@ import { getConnection, resolveTmpImgUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
 import { generateAndUploadThumb } from '../lib/thumbGen';
 import { parseTaskResult } from '../lib/queueResult';
+import { recordInvalid } from '../lib/invalidLog';
+import { checkTaskStatus, checkQueueState } from '../lib/queueStatus';
 
 const MODELS = [
   { value: 'nai-diffusion-5-full',       label: 'V5 Full ⚡' },
@@ -78,6 +80,15 @@ async function uploadThumbAfterSave(blobUrl, hash, conn) {
 
 const STATUS_ICONS = { pending: '⏳', running: '🔄', done: '✅', error: '❌', skipped: '⏭' };
 
+// §4.3 #2: 一覧の行で result を解析できないものは、行ごとに一度だけ集約先に残す（描画のたびに数えない）
+const reportedRowResults = new Set();
+function reportRowResultOnce(task, err) {
+  const key = `${task.id}|${String(task.result).slice(0, 100)}`;
+  if (reportedRowResults.has(key)) return;
+  reportedRowResults.add(key);
+  recordInvalid({ kind: 'queue-task-result-unparseable', stage: '§4.3 #2 GenerateScreen.QueueTaskRow', raw: { task_id: task.id, result: task.result }, reason: err?.message || String(err) });
+}
+
 function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
   const conn = getConnection();
   const isCloud = conn.route === 'cloud';
@@ -87,7 +98,7 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
   const parsedResult = (() => {
     if (!task.result) return null;
     if (typeof task.result === 'object') return task.result;
-    try { return JSON.parse(task.result); } catch { return null; }
+    try { return JSON.parse(task.result); } catch (e) { reportRowResultOnce(task, e); return null; }
   })();
 
   useEffect(() => {
@@ -103,7 +114,10 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
         url = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
         setBlobUrl(url);
       })
-      .catch(() => {});
+      .catch((e) => {
+        // §4.3 #1: 裏の取得なのでトーストは出さず、集約先に残す（J-4）
+        recordInvalid({ kind: 'queue-task-image-fetch-failed', stage: '§4.3 #1 GenerateScreen.QueueTaskRow', raw: { task_id: task.id, error: e?.message || String(e) }, reason: e?.message || String(e) });
+      });
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
   }, [task.status, task.id, isCloud, conn.cloudUrl, conn.token]);
 
@@ -123,7 +137,7 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
       ) : task.status === 'done' && expired ? (
         <span style={{ fontSize: '10px', flexShrink: 0, width: 36, textAlign: 'center', color: 'var(--text-secondary)' }}>期限切れ</span>
       ) : (
-        <span style={{ fontSize: '14px', flexShrink: 0, width: 36, textAlign: 'center' }}>{STATUS_ICONS[task.status] || '?'}</span>
+        <span title={String(task.status)} style={{ fontSize: '14px', flexShrink: 0, width: 36, textAlign: 'center' }}>{checkTaskStatus(task.status, task.id) ? STATUS_ICONS[task.status] : `?${String(task.status)}`}</span>
       )}
       <span style={{ flex: 1, fontSize: 'var(--fs-label)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: task.status === 'error' ? '#c0392b' : 'var(--text-primary)' }}>
         {task.label}
@@ -488,7 +502,13 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   useEffect(() => {
     if (queueData.state !== 'running') return;
     const id = setInterval(async () => {
-      try { const d = await api.getQueue(); setQueueData(d); } catch {}
+      try {
+        const d = await api.getQueue();
+        setQueueData(d);
+      } catch (e) {
+        // §4.3 #5: ポーリングの失敗は記録だけ（トーストを連発しない・J-4）
+        recordInvalid({ kind: 'queue-poll-failed', stage: '§4.3 #5 GenerateScreen.queuePolling', raw: e?.message || String(e), reason: e?.message || String(e) });
+      }
     }, 2000);
     return () => clearInterval(id);
   }, [queueData.state]);
@@ -514,7 +534,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           const { expired, plain } = await fetchTaskImage(conn, task.id);
           if (expired) entry.expired = true;
           else if (plain) entry.blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
-        } catch {}
+        } catch (e) {
+          // §4.3 #7: 裏の取得なのでトーストは出さず、集約先に残す（J-4）
+          recordInvalid({ kind: 'queue-result-image-fetch-failed', stage: '§4.3 #7 GenerateScreen.queueCompletion', raw: { task_id: task.id, error: e?.message || String(e) }, reason: e?.message || String(e) });
+        }
       }
       setResults(prev => [entry, ...prev].slice(0, maxResults));
     });
@@ -1072,11 +1095,19 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         const taskId = result.task_id ?? result.image.task_id;
         let blobUrl = null;
         let expired = false;
+        if (!taskId) {
+          // F-09: task_id がない応答は期限切れとして出すが、黙らずに残す
+          recordInvalid({ kind: 'generate-response-shape-unknown', stage: 'F-09 GenerateScreen.handleGenerate', raw: { route: conn.route, result }, reason: 'Cloud の応答に task_id がない（期限切れとして表示）' });
+        }
         try {
           const got = taskId ? await fetchTaskImage(conn, taskId) : { expired: true, plain: null };
           expired = got.expired;
           if (got.plain) blobUrl = URL.createObjectURL(new Blob([got.plain], { type: 'image/png' }));
-        } catch {}
+        } catch (e) {
+          // §4.3 #8: 利用者の生成操作の結果なので、集約先とトーストに出す（J-4）
+          recordInvalid({ kind: 'generate-image-fetch-failed', stage: '§4.3 #8 GenerateScreen.handleGenerate', raw: { task_id: taskId, error: e?.message || String(e) }, reason: e?.message || String(e) });
+          addToast('error', `生成画像の取得に失敗しました: ${e?.message || e}`);
+        }
         if (getConnection().revision !== revisionAtFetch) return;
         if (getConnection().route !== routeAtFetch) return;
         if (result.task_id) addedTaskIdsRef.current.add(result.task_id);
@@ -1084,11 +1115,15 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false, blobUrl, expired }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
-      } else {
+      } else if (conn.route === 'fran' && result.image?.filename) {
         setResults(prev => {
           const next = [{ ...result.image, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
+      } else {
+        // F-09: 経路に合う形でない応答を Fran の扱いに寄せない
+        recordInvalid({ kind: 'generate-response-shape-unknown', stage: 'F-09 GenerateScreen.handleGenerate', raw: { route: conn.route, result }, reason: 'cloud なら image.hash、fran なら image.filename が要る' });
+        addToast('error', '生成結果の形が想定外のため表示できません（設定 → デバッグ・接続に記録）');
       }
       savePromptToStorage();
     } catch (e) {
@@ -1453,7 +1488,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                 </div>
               )}
               <span style={{ fontSize: 'var(--fs-label)', color: queueData.state === 'running' ? 'var(--accent)' : 'var(--text-secondary)' }}>
-                {queueData.state === 'running' ? '実行中' : queueData.state === 'paused' ? '中断' : ''}
+                {queueData.state === 'running' ? '実行中' : queueData.state === 'paused' ? '中断' : checkQueueState(queueData.state) ? '' : `不明な状態: ${String(queueData.state)}`}
               </span>
             </div>
 

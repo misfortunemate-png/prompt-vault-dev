@@ -8,8 +8,10 @@ import { execSync } from 'node:child_process';
 import { getByHash, listFolders, listByFolder, getRecent, getRecentByDays, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, getImagePath, removeImageRow, getGalleryByCard, getTotalByCard, updateSyncMeta, getSyncInventory } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
-import { writeLog, recordInvalid, logFileFor } from './server/log.js';
+import { writeLog, recordInvalid, recordEvent, logFileFor } from './server/log.js';
 import { validateSettings, validateCardsDoc, validatePresetsDoc, validateSlotBody, validateCardBody, validatePresetBody, parseIntQuery } from './server/validate.js';
+import { checkGenerateBody, checkQueueTasks } from './server/genParams.js';
+import { classifyNovelAiStatus } from './server/providers/novelai.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -760,11 +762,17 @@ async function start() {
   // ── 生成 ──
 
   api.post('/generate', requireVaultRoot, async (req, res) => {
-    const { prompt, negative_prompt, model, width, height, steps, scale, sampler, seed } = req.body;
+    // S-03・S-04・J-9: 当たらない値は NovelAI を呼ばずに 400
+    const chk = checkGenerateBody(req.body);
+    if (chk.problems.length) {
+      recordInvalid({ kind: 'generate-params-invalid', stage: 'S-03/S-04 POST /generate', raw: { problems: chk.problems, body: req.body }, reason: chk.problems.slice(0, 5).map(p => `${p.path}: ${p.reason}`).join(' / ') });
+      return res.status(400).json({ error: `生成パラメータが当たらないため生成しません: ${chk.problems.map(p => `${p.path}: ${p.reason}`).join(' / ')}`, problems: chk.problems });
+    }
+    const { prompt, negative_prompt } = req.body;
     try {
       const result = await executeGenerate({
-        prompt, negativePrompt: negative_prompt, model, width, height, steps, scale, sampler, seed,
-        vaultRoot: process.env.VAULT_ROOT,
+        prompt, negativePrompt: negative_prompt, ...chk.params,
+        vaultRoot: process.env.VAULT_ROOT, origin: 'single',
       });
       res.json({ success: true, image: result });
     } catch (e) {
@@ -913,7 +921,12 @@ async function start() {
       });
       if (resp.ok) return res.json({ ok: true, message: 'NovelAI API 疎通OK' });
       const text = await resp.text();
-      writeLog('error', 'API_AUTH_FAILED', `疎通テスト失敗: ${resp.status}`, text);
+      // S-05: 認証の失敗だけを API_AUTH_FAILED（既存の code）とし、他は種別で分ける
+      const cls = classifyNovelAiStatus(resp.status);
+      const raw = `status=${resp.status} body=${text.slice(0, 300)}`;
+      if (cls === 'auth') writeLog('error', 'API_AUTH_FAILED', `疎通テスト失敗: ${resp.status}`, text);
+      else if (cls) recordEvent({ code: 'NOVELAI_FAILED', kind: `novelai-${cls}`, stage: 'S-05 /debug/test-api', raw, reason: `疎通テスト失敗: ${resp.status}` });
+      else recordInvalid({ kind: 'novelai-unexpected-status', stage: 'S-05 /debug/test-api', raw, reason: '401/402/403/429/5xx のどれでもない 2xx 以外' });
       res.json({ ok: false, error: `ステータス ${resp.status}: ${text.slice(0, 200)}` });
     } catch (e) {
       writeLog('error', 'API_NETWORK', 'NovelAI疎通テスト接続失敗', e.message);
@@ -966,6 +979,12 @@ async function start() {
     const { tasks } = req.body;
     if (!Array.isArray(tasks) || tasks.length === 0) {
       return res.status(400).json({ error: 'tasksは1件以上の配列が必要です' });
+    }
+    // S-19: 未知の欄・型違い・当たらない生成パラメータは追加しない（既定に寄せない・捨てない）
+    const problems = checkQueueTasks(tasks);
+    if (problems.length) {
+      recordInvalid({ kind: 'queue-task-invalid', stage: 'S-19 POST /queue/add', raw: { problems: problems.slice(0, 10), tasks }, reason: problems.slice(0, 5).map(p => `${p.path}: ${p.reason}`).join(' / ') });
+      return res.status(400).json({ error: `キューに追加できない値があります: ${problems.map(p => `${p.path}: ${p.reason}`).join(' / ')}`, problems });
     }
     try {
       const added = addTasks(tasks);

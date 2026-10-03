@@ -41,9 +41,9 @@ const GENERATION_FIELDS = {
   model: [isNonEmptyStr, '空でない文字列'],
   width: [v => isInt(v, 64, 16384), '64〜16384 の整数'],
   height: [v => isInt(v, 64, 16384), '64〜16384 の整数'],
-  steps: [v => isInt(v, 1, 100), '1〜100 の整数'],
+  steps: [v => isInt(v, 1, 50), '1〜50 の整数'],
   sampler: [isNonEmptyStr, '空でない文字列'],
-  scale: [v => isNum(v, 0, 100), '0〜100 の数'],
+  scale: [v => isNum(v, 0, 10), '0〜10 の数'],
   seed: [v => isInt(v, -1, 4294967295), '-1〜4294967295 の整数'],
   maxResults: [v => isInt(v, 1, 100), '1〜100 の整数'],
 };

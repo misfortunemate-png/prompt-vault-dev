@@ -1,23 +1,27 @@
 import { randomBytes } from 'crypto';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { executeGenerate } from './generate.js';
+import { checkGuard, resolveGenParams, InvalidInputError } from './genParams.js';
+import { recordInvalid, writeLog } from './log.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SETTINGS_PATH = join(__dirname, '..', 'data', 'settings.json');
 
-function readGuard() {
+// S-18・J-9: ガード値が当たらないときは既定値で走らせない（呼び出し側が止める）。理由は集約先に残す
+function readGuard(stage) {
+  let text = null;
   try {
-    const s = JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'));
-    return {
-      intervalMin: s?.guard?.intervalMin ?? 2,
-      intervalMax: s?.guard?.intervalMax ?? 5,
-      maxPerJob: s?.guard?.maxPerJob ?? 100,
-    };
-  } catch {
-    return { intervalMin: 2, intervalMax: 5, maxPerJob: 100 };
+    if (existsSync(SETTINGS_PATH)) text = readFileSync(SETTINGS_PATH, 'utf8');
+  } catch (e) {
+    const g = { ok: false, raw: SETTINGS_PATH, reason: `settings.json を読めない: ${e.message}` };
+    recordInvalid({ kind: 'queue-guard-invalid', stage, raw: g.raw, reason: g.reason });
+    return g;
   }
+  const g = checkGuard(text);
+  if (!g.ok) recordInvalid({ kind: 'queue-guard-invalid', stage, raw: g.raw, reason: g.reason });
+  return g;
 }
 
 function generateId() {
@@ -45,7 +49,9 @@ export function getTask(id) {
 }
 
 export function addTasks(tasks) {
-  const { maxPerJob } = readGuard();
+  const g = readGuard('S-18 queue.addTasks');
+  if (!g.ok) throw new Error(`ガード設定が当たらないためキューに追加しません: ${g.reason}`);
+  const { maxPerJob } = g.guard;
   if (q.tasks.length + tasks.length > maxPerJob) {
     throw new Error(`キュー上限（${maxPerJob}件）を超えます（現在${q.tasks.length}件 + 追加${tasks.length}件）`);
   }
@@ -85,6 +91,8 @@ export function startQueue(vaultRoot) {
   if (q.state === 'running') throw new Error('既に実行中です');
   const firstPending = q.tasks.findIndex(t => t.status === 'pending');
   if (firstPending === -1) throw new Error('実行できるタスクがありません');
+  const g = readGuard('S-18 queue.startQueue');
+  if (!g.ok) throw new Error(`ガード設定が当たらないためキューを開始しません: ${g.reason}`);
   q.state = 'running';
   q._stopRequested = false;
   q.currentIndex = firstPending;
@@ -109,17 +117,24 @@ async function runLoop(vaultRoot) {
     task.status = 'running';
 
     try {
+      // S-04・J-9: 追加時に検査済み。走らせる直前にも確かめ、既定値は未指定の欄だけに使う
+      const { problems, params } = resolveGenParams(task.params, `tasks[${task.id}].params`);
+      if (problems.length) throw new InvalidInputError('S-04 queue.runLoop', problems, task.params);
       const result = await executeGenerate({
         prompt: task.positive,
         negativePrompt: task.negative,
-        ...task.params,
+        ...params,
         vaultRoot,
+        origin: 'queue',
       });
       task.status = 'done';
       task.result = { filename: result.filename, seed: result.seed, width: result.width, height: result.height };
     } catch (e) {
       task.status = 'error';
       task.error = e.message;
+      // J-10: キューの失敗も集約先に残す（NovelAI の応答は novelai.js で種別付きで記録済み）
+      if (e.invalid) recordInvalid({ kind: 'generate-params-invalid', stage: e.stage, raw: { task_id: task.id, problems: e.problems }, reason: e.message });
+      else if (!e.novelaiRecorded) writeLog('error', 'GENERATE_FAILED', e.message, { origin: 'queue', task_id: task.id });
       for (let i = q.currentIndex + 1; i < q.tasks.length; i++) {
         if (q.tasks[i].status === 'pending') q.tasks[i].status = 'skipped';
       }
@@ -137,7 +152,14 @@ async function runLoop(vaultRoot) {
 
     const hasPending = q.tasks.slice(q.currentIndex).some(t => t.status === 'pending');
     if (hasPending) {
-      const { intervalMin, intervalMax } = readGuard();
+      const g = readGuard('S-18 queue.runLoop');
+      if (!g.ok) {
+        // 走行中にガード値が当たらなくなった: 既定値で続けず中断する
+        q.state = 'paused';
+        q._stopRequested = false;
+        return;
+      }
+      const { intervalMin, intervalMax } = g.guard;
       const wait = (intervalMin + Math.random() * (intervalMax - intervalMin)) * 1000;
       console.log(`[Queue] 次のタスクまで ${(wait / 1000).toFixed(1)}s 待機`);
       await sleep(wait);

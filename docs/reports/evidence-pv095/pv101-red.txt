@@ -1,0 +1,111 @@
+repository_sha=001c4e7f4e194b417f0b5472c657b1defaa8a058
+
+pv#101 [AUTO_FAILURE_INJECTION] gate=true Paid NovelAI calls are not made with unmatched values; failure kinds are recorded on both paths
+  VERIFIER tests/issues/pv-101-paid-call-guard.mjs sha256=a671f155ae4e2beb6229c5aa686c445c1374d09c9519f1c08a9db383dbf6b7ab
+  PASS    Fran test instance starts
+  FAIL    AC-8 S-03 unknown model: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235208_fd119563.png","seed":1394368911,"width":832,"height":1216}}
+  FAIL    AC-8 S-03 unknown model: NovelAI (mock) not called — calls 0 -> 1
+  FAIL    AC-8 S-03 unknown model: recorded as INVALID — []
+  FAIL    AC-8 S-04 width non-numeric string: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235214_d0764dbf.png","seed":3105192641,"width":"abc","height":1216}}
+  FAIL    AC-8 S-04 width non-numeric string: NovelAI (mock) not called — calls 1 -> 2
+  FAIL    AC-8 S-04 width non-numeric string: recorded as INVALID — []
+  FAIL    AC-8 S-04 width 0: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235219_74c92bac.png","seed":3890866980,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 width 0: NovelAI (mock) not called — calls 2 -> 3
+  FAIL    AC-8 S-04 width 0: recorded as INVALID — []
+  FAIL    AC-8 S-04 width not a multiple of 64: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235224_d4bad645.png","seed":3849868396,"width":833,"height":1216}}
+  FAIL    AC-8 S-04 width not a multiple of 64: NovelAI (mock) not called — calls 3 -> 4
+  FAIL    AC-8 S-04 width not a multiple of 64: recorded as INVALID — []
+  FAIL    AC-8 S-04 steps 0: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235228_2486f0d0.png","seed":2718604102,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 steps 0: NovelAI (mock) not called — calls 4 -> 5
+  FAIL    AC-8 S-04 steps 0: recorded as INVALID — []
+  FAIL    AC-8 S-04 steps 60: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235233_b18592d9.png","seed":2756189282,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 steps 60: NovelAI (mock) not called — calls 5 -> 6
+  FAIL    AC-8 S-04 steps 60: recorded as INVALID — []
+  FAIL    AC-8 S-04 unknown sampler: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235237_c0624282.png","seed":1415707370,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 unknown sampler: NovelAI (mock) not called — calls 6 -> 7
+  FAIL    AC-8 S-04 unknown sampler: recorded as INVALID — []
+  FAIL    AC-8 S-04 scale as string: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235242_d345f2b3.png","seed":2507295755,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 scale as string: NovelAI (mock) not called — calls 7 -> 8
+  FAIL    AC-8 S-04 scale as string: recorded as INVALID — []
+  FAIL    AC-8 S-04 negative seed other than -1: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235246_a2815d5a.png","seed":4222697812,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 negative seed other than -1: NovelAI (mock) not called — calls 8 -> 9
+  FAIL    AC-8 S-04 negative seed other than -1: recorded as INVALID — []
+  FAIL    AC-8 S-04 fractional seed: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235250_3f22106d.png","seed":1.5,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 fractional seed: NovelAI (mock) not called — calls 9 -> 10
+  FAIL    AC-8 S-04 fractional seed: recorded as INVALID — []
+  FAIL    AC-8 S-04 prompt not a string: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235254_bfafd9e6.png","seed":306826588,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 prompt not a string: NovelAI (mock) not called — calls 10 -> 11
+  FAIL    AC-8 S-04 prompt not a string: recorded as INVALID — []
+  FAIL    AC-8 S-04 unknown body key: rejected with 4xx — status=200 body={"success":true,"image":{"filename":"tmp_1790986235258_d6122ecc.png","seed":3541852849,"width":832,"height":1216}}
+  FAIL    AC-8 S-04 unknown body key: NovelAI (mock) not called — calls 11 -> 12
+  FAIL    AC-8 S-04 unknown body key: recorded as INVALID — []
+  PASS    AC-8 unspecified (only prompt) uses defaults and calls once
+  PASS    AC-8 unspecified (null / empty values) uses defaults and calls once
+  PASS    AC-8 control model nai-diffusion-5-full: accepted and called once
+  PASS    AC-8 control model nai-diffusion-5-curated: accepted and called once
+  PASS    AC-8 control model nai-diffusion-4-5-full: accepted and called once
+  PASS    AC-8 control model nai-diffusion-4-5-curated: accepted and called once
+  PASS    AC-8 control model nai-diffusion-4-full: accepted and called once
+  PASS    AC-8 control model nai-diffusion-3: accepted and called once
+  PASS    AC-8 control sampler k_euler_ancestral: accepted and called once
+  PASS    AC-8 control sampler k_euler: accepted and called once
+  PASS    AC-8 control sampler k_dpmpp_2m_sde: accepted and called once
+  PASS    AC-8 control resolution 832x1216: accepted and called once
+  PASS    AC-8 control resolution 1216x832: accepted and called once
+  PASS    AC-8 control resolution 1024x1024: accepted and called once
+  PASS    AC-8 control seed -1: accepted and called once
+  PASS    AC-8 control seed 4294967295: accepted and called once
+  PASS    AC-8 control settings default model (fixture): accepted and called once
+  FAIL    AC-8 S-19 unknown model in params: 4xx, nothing queued, recorded — status=200 tasks=1 body={"success":true,"added":1,"total":1}
+  FAIL    AC-8 S-19 unknown task field: 4xx, nothing queued, recorded — status=200 tasks=2 body={"success":true,"added":1,"total":2}
+  FAIL    AC-8 S-19 steps as string: 4xx, nothing queued, recorded — status=200 tasks=3 body={"success":true,"added":1,"total":3}
+  FAIL    AC-8 S-19 folderSegments not an array: 4xx, nothing queued, recorded — status=200 tasks=4 body={"success":true,"added":1,"total":4}
+  FAIL    AC-8 S-19 unknown params key: 4xx, nothing queued, recorded — status=200 tasks=5 body={"success":true,"added":1,"total":5}
+  PASS    AC-8 S-19 control: front task shapes are queued
+  FAIL    AC-9 S-18 intervalMin is a string: queue is not started — add=200 start=200 state=idle statuses=done,done
+  FAIL    AC-9 S-18 intervalMin is a string: NovelAI (mock) not called — calls=2
+  FAIL    AC-9 S-18 intervalMin is a string: reason on screen (response) and in the aggregator — body={"ok":true} inv=[]
+  FAIL    AC-9 S-18 intervalMax below intervalMin: queue is not started — add=200 start=200 state=running statuses=done,pending
+  FAIL    AC-9 S-18 intervalMax below intervalMin: NovelAI (mock) not called — calls=1
+  FAIL    AC-9 S-18 intervalMax below intervalMin: reason on screen (response) and in the aggregator — body={"ok":true} inv=[]
+  FAIL    AC-9 S-18 intervalMin negative: queue is not started — add=200 start=200 state=running statuses=done,pending
+  FAIL    AC-9 S-18 intervalMin negative: NovelAI (mock) not called — calls=1
+  FAIL    AC-9 S-18 intervalMin negative: reason on screen (response) and in the aggregator — body={"ok":true} inv=[]
+  FAIL    AC-10 single status:401: recorded with kind novelai-auth — status=500 added=[{"ts":"2026-10-03T00:10:40.586Z","level":"error","code":"GENERATE_FAILED","message":"NovelAI API 401: mock error body 401","detail":""}]
+  PASS    AC-10 single status:401: no retry (called exactly once)
+  FAIL    AC-10 single status:401: raw keeps the status and body head
+  FAIL    AC-10 single status:402: recorded with kind novelai-payment — status=500 added=[{"ts":"2026-10-03T00:10:40.592Z","level":"error","code":"GENERATE_FAILED","message":"NovelAI API 402: mock error body 402","detail":""}]
+  PASS    AC-10 single status:402: no retry (called exactly once)
+  FAIL    AC-10 single status:402: raw keeps the status and body head
+  FAIL    AC-10 single status:429: recorded with kind novelai-rate-limit — status=500 added=[{"ts":"2026-10-03T00:10:40.597Z","level":"error","code":"GENERATE_FAILED","message":"NovelAI API 429: mock error body 429","detail":""}]
+  PASS    AC-10 single status:429: no retry (called exactly once)
+  FAIL    AC-10 single status:429: raw keeps the status and body head
+  FAIL    AC-10 single status:503: recorded with kind novelai-server-error — status=500 added=[{"ts":"2026-10-03T00:10:40.602Z","level":"error","code":"GENERATE_FAILED","message":"NovelAI API 503: mock error body 503","detail":""}]
+  PASS    AC-10 single status:503: no retry (called exactly once)
+  FAIL    AC-10 single status:503: raw keeps the status and body head
+  FAIL    AC-10 single status:418: recorded with kind novelai-unexpected-status — status=500 added=[{"ts":"2026-10-03T00:10:40.608Z","level":"error","code":"GENERATE_FAILED","message":"NovelAI API 418: mock error body 418","detail":""}]
+  PASS    AC-10 single status:418: no retry (called exactly once)
+  FAIL    AC-10 single status:418: raw keeps the status and body head
+  FAIL    AC-10 single html: recorded with kind novelai-response-format — status=500 added=[{"ts":"2026-10-03T00:10:40.613Z","level":"error","code":"GENERATE_FAILED","message":"ZIPレスポンス内にPNGが見つかりません","detail":""}]
+  PASS    AC-10 single html: no retry (called exactly once)
+  FAIL    AC-10 S-02: raw keeps Content-Type and the head of the body
+  FAIL    AC-10 single throw: recorded with kind novelai-network — status=500 added=[{"ts":"2026-10-03T00:10:40.618Z","level":"error","code":"GENERATE_FAILED","message":"mock network failure","detail":""}]
+  PASS    AC-10 single throw: no retry (called exactly once)
+  FAIL    AC-10: kinds are all distinct — [null,null,null,null,null,null,null]
+  FAIL    AC-10 queue 429: recorded in the aggregator (not only task.error) — state=paused added=[]
+  FAIL    AC-10 S-05: test-api 429 is recorded as rate-limit, not API_AUTH_FAILED — [{"ts":"2026-10-03T00:10:40.628Z","level":"error","code":"API_AUTH_FAILED","message":"疎通テスト失敗: 429","detail":"mock error body 429"}]
+  PASS    AC-10 S-05 control: test-api 401 keeps API_AUTH_FAILED (existing code)
+  FAIL    AC-10 F-08: queue status module exists — src/lib/queueStatus.js not found
+  FAIL    AC-10 §4.3 #1: GenerateScreen records the residue — §4.3 #1 stage not found
+  FAIL    AC-10 §4.3 #2: GenerateScreen records the residue — §4.3 #2 stage not found
+  FAIL    AC-10 §4.3 #5: GenerateScreen records the residue — §4.3 #5 stage not found
+  FAIL    AC-10 §4.3 #7: GenerateScreen records the residue — §4.3 #7 stage not found
+  FAIL    AC-10 §4.3 #8: GenerateScreen records the residue — §4.3 #8 stage not found
+  FAIL    AC-10 F-09: GenerateScreen records the residue — F-09 stage not found
+  FAIL    AC-10 F-08: GenerateScreen classifies task status and queue state via queueStatus — checkTaskStatus/checkQueueState not used
+  FAIL    AC-10 #1/#7/#8: no silent catch around the task image fetch — silent catch remains
+  FAIL    AC-10 #5: queue polling failure is not silent — silent polling catch remains
+  FAIL    AC-10 #2: QueueTaskRow does not fold an unparseable result into null silently — silent parse remains
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=27 fail=77 gated_fail=77 not_run=0 waived=0 unknown=0

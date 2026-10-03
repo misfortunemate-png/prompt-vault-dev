@@ -46,12 +46,12 @@ export function describeSecret(value) {
   return `[secret type=${value === null ? 'null' : typeof value} length=${len}]`;
 }
 
-// full: true は raw を切らずに残す（削除前の中身全体など）
-export function recordInvalid({ kind, stage, raw, reason, full = false }) {
+// 種別・段・元の字句・理由を付けて残す。INVALID（当たらなかったもの）以外に、定めた失敗の種別（NOVELAI_FAILED 等）にも使う
+export function recordEvent({ code, level = 'error', kind, stage, raw, reason, full = false }) {
   const entry = {
     ts: new Date().toISOString(),
-    level: 'warn',
-    code: 'INVALID',
+    level,
+    code,
     message: `${kind}: ${reason}`,
     kind: String(kind),
     stage: String(stage),
@@ -60,4 +60,9 @@ export function recordInvalid({ kind, stage, raw, reason, full = false }) {
   };
   append(entry);
   return entry;
+}
+
+// full: true は raw を切らずに残す（削除前の中身全体など）
+export function recordInvalid({ kind, stage, raw, reason, full = false }) {
+  return recordEvent({ code: 'INVALID', level: 'warn', kind, stage, raw, reason, full });
 }
