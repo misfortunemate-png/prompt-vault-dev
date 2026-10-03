@@ -8,7 +8,7 @@ import {
 import {
   hasVaultKey, getVaultKey, setVaultKey, clearVaultKey, generateVaultKey,
 } from '../lib/crypto';
-import { getInvalidLog, clearInvalidLog, subscribeInvalidLog, recordInvalid } from '../lib/invalidLog';
+import { getInvalidLog, clearInvalidLog, subscribeInvalidLog, recordInvalid, recordFailure } from '../lib/invalidLog';
 
 const SAMPLER_OPTIONS = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2m_sde'];
 
@@ -178,7 +178,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
       setGuard(s.guard);
       setCaptionStyle(s.captionStyle || { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true });
     }).catch(() => addToast('error', '設定の読み込みに失敗しました'));
-    api.getSystemInfo().then(setSystemInfo).catch(() => {});
+    api.getSystemInfo().then(setSystemInfo).catch(e => recordFailure('§4.3 #26 SettingsScreen.systemInfo', 'system-info-failed', e));
   }, [addToast, connectionState.route]);
 
   const handleSave = async () => {
@@ -292,7 +292,10 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     try {
       const h = await api.healthz();
       setVersion(h.version);
-    } catch {}
+    } catch (e) {
+      recordFailure('§4.3 #26 SettingsScreen.version', 'version-fetch-failed', e);
+      setVersion(`取得できません: ${e?.message || e}`);
+    }
     try {
       const e = await api.getErrors();
       setErrors(Array.isArray(e) ? e : []);
@@ -300,6 +303,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     } catch (err) {
       setErrors([]);
       setErrorsFailure(err?.message || String(err));
+      recordFailure('§4.3 #26 SettingsScreen.errors', 'debug-errors-fetch-failed', err);
     }
   }, []);
 

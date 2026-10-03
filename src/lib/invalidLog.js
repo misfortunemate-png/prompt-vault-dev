@@ -92,6 +92,12 @@ export function recordInvalid({ kind, stage, raw, reason }) {
   return entry;
 }
 
+// 取得・保存の失敗を記録する簡易形（kind・stage と、例外の message・status・追加の情報）
+export function recordFailure(stage, kind, err, extra = {}) {
+  const message = err?.message || String(err);
+  return recordInvalid({ kind, stage, raw: { ...extra, error: message, status: err?.status ?? null }, reason: message });
+}
+
 export function getInvalidLog() {
   return load();
 }

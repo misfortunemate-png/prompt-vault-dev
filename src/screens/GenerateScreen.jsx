@@ -5,7 +5,7 @@ import { getConnection, resolveTmpImgUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
 import { generateAndUploadThumb } from '../lib/thumbGen';
 import { parseTaskResult } from '../lib/queueResult';
-import { recordInvalid } from '../lib/invalidLog';
+import { recordInvalid, recordFailure } from '../lib/invalidLog';
 import { checkTaskStatus, checkQueueState } from '../lib/queueStatus';
 
 const MODELS = [
@@ -471,7 +471,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     if (!tabRefreshed.current) { tabRefreshed.current = true; return; }
     if (activeTab !== 'generate' || !connectionRoute || connectionRoute === 'offline') return;
     refreshCardsData();
-    api.getPresets().then(pd => setPresetsData(pd)).catch(() => {});
+    // §4.3 #3: タブ復帰時の再取得（裏の取得なので記録だけ）
+    api.getPresets().then(pd => setPresetsData(pd)).catch(e => recordFailure('§4.3 #3 GenerateScreen.presetsRefetch', 'presets-refetch-failed', e));
   }, [activeTab]);
 
   useEffect(() => {
@@ -493,6 +494,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               setQueueData(qd);
             }
           } catch (e) {
+            // §4.3 #4: Cloud の初回読込の失敗はすべて記録する（トーストは従来どおり認証エラーのみ）
+            recordFailure('§4.3 #4 GenerateScreen.cloudInitialLoad', 'cloud-initial-load-failed', e);
             if (e.message?.includes('認証エラー')) addToast('error', e.message);
           }
         } else {
@@ -934,6 +937,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         return { slot, options: [null], isRandom: true };
       }
       const mode = cartesianMode[slot.id] ?? 'fixed';
+      if (mode !== 'fixed' && mode !== 'expand') {
+        // F-17: 直積モードの未知の値は fixed として扱うが、記録する
+        recordInvalid({ kind: 'cartesian-mode-unknown', stage: 'F-17 GenerateScreen.buildCartesianTasks', raw: { slotId: slot.id, mode }, reason: 'fixed/expand のどれでもない（fixed として扱う）' });
+      }
       if (mode === 'expand') {
         const rootCards = allCards.filter(c => c.slotId === slot.id && !c.parentId);
         return { slot, options: rootCards.length > 0 ? rootCards : [null] };
@@ -1190,7 +1197,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       if (getConnection().revision !== revisionAtFetch) return;
       if (connectionRoute !== routeAtFetch) return;
       setResults(prev => prev.map((r, i) => i === idx ? { ...r, saved: true } : r));
-      if (conn.route === 'cloud') uploadThumbAfterSave(item.blobUrl, item.hash, conn).catch(() => {});
+      // §4.3 #9: 保存後のサムネイル作成・アップロードの失敗（裏の処理なので記録だけ）
+      if (conn.route === 'cloud') uploadThumbAfterSave(item.blobUrl, item.hash, conn).catch(e => recordFailure('§4.3 #9 GenerateScreen.handleSave', 'thumb-upload-failed', e, { hash: item.hash }));
     } catch (e) {
       addToast('error', '保存に失敗しました: ' + (e.message || ''));
     }
@@ -1552,7 +1560,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                           await api.queueTaskSave(task.id);
                           let hash = null;
                           try { hash = (typeof task.result === 'string' ? JSON.parse(task.result) : task.result)?.hash; } catch {}
-                          uploadThumbAfterSave(rowBlobUrl, hash, getConnection()).catch(() => {});
+                          uploadThumbAfterSave(rowBlobUrl, hash, getConnection()).catch(e => recordFailure('§4.3 #9 GenerateScreen.queueRowSave', 'thumb-upload-failed', e, { hash }));
                           setQueueData(await api.getQueue()); addToast('success', '保存しました');
                         }
                         catch (e) { addToast('error', e.message); }

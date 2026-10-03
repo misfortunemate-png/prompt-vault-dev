@@ -5,6 +5,7 @@ import { getConnection, resolveThumbUrl } from '../lib/connection';
 import { decrypt, hasVaultKey } from '../lib/crypto';
 import { generateAndUploadThumb } from '../lib/thumbGen';
 import { getThumb, putThumb } from '../lib/thumbDb';
+import { recordInvalid, recordFailure } from '../lib/invalidLog';
 
 const thumbCache = new Map();
 
@@ -119,10 +120,13 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
           thumbCache.set(image.hash, url);
           setBlobUrl(url);
           // thumb_ok=1 の webp だけ IndexedDB に保存（フルPNGは保存しない）
-          if (image.thumb_ok) putThumb(image.hash, plain).catch(() => {});
-          if (!image.thumb_ok && isCloud) generateAndUploadThumb(plain, image.hash, conn).catch(() => {});
-        } catch {
+          // §4.3 #16: IndexedDB への保存・サムネイル作成の失敗（裏の処理なので記録だけ）
+          if (image.thumb_ok) putThumb(image.hash, plain).catch(e => recordFailure('§4.3 #16 AlbumScreen.putThumb', 'thumb-cache-save-failed', e, { hash: image.hash }));
+          if (!image.thumb_ok && isCloud) generateAndUploadThumb(plain, image.hash, conn).catch(e => recordFailure('§4.3 #16 AlbumScreen.generateThumb', 'thumb-upload-failed', e, { hash: image.hash }));
+        } catch (e) {
           releaseSlot();
+          // §4.3 #15: サムネイル取得（再試行の後）・復号の失敗（⟳ のまま。記録だけ）
+          recordFailure('§4.3 #15 AlbumScreen.thumb', 'album-thumb-failed', e, { hash: image.hash });
         }
       })();
     }, { rootMargin: '200px' });
@@ -193,15 +197,20 @@ function PreviewThumb({ hash }) {
     const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
     let blobUrl = null;
     let cancelled = false;
+    // §4.3 #17: フォルダのプレビュー画像。2xx 以外を null に寄せず記録する
     fetch(conn.cloudUrl + `/thumbs/${hash}`, { headers })
-      .then(r => r.ok ? r.arrayBuffer() : null)
+      .then(r => {
+        if (r.ok) return r.arrayBuffer();
+        recordInvalid({ kind: 'folder-preview-fetch-status', stage: '§4.3 #17 AlbumScreen.folderPreview', raw: { hash, status: r.status }, reason: `2xx 以外（${r.status}）` });
+        return null;
+      })
       .then(buf => buf ? decrypt(buf) : null)
       .then(plain => {
         if (cancelled || !plain) return;
         blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
         setSrc(blobUrl);
       })
-      .catch(() => {});
+      .catch(e => recordFailure('§4.3 #17 AlbumScreen.folderPreview', 'folder-preview-failed', e, { hash }));
     return () => { cancelled = true; if (blobUrl) URL.revokeObjectURL(blobUrl); };
   }, [hash]);
   if (!src) return <Placeholder />;
@@ -300,7 +309,9 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
       setRecentImages(recent.images || []);
       setPresets(presetsData.presets || []);
     } catch (e) {
-      if (!e.message?.includes('400')) addToast('error', `ギャラリーの読み込みに失敗しました: ${e.message}`);
+      // §4.3 #18: 黙ってよいのは VAULT_ROOT 未設定（400）だけ。それ以外の 400 も含めて記録し、トーストを出す
+      recordFailure('§4.3 #18 AlbumScreen.loadRoot', 'gallery-root-load-failed', e);
+      if (!(e.status === 400 && e.message?.includes('VAULT_ROOT未設定'))) addToast('error', `ギャラリーの読み込みに失敗しました: ${e.message}`);
       setGalleryData({ tree: [], totalImages: 0, totalFolders: 0 });
       setRecentImages([]);
       setPresets([]);
@@ -390,13 +401,17 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
             pollRef.current = null;
             setScanning(false);
             addToast('success', `リスキャン完了: 新規${status.newCount}枚、移動${status.movedCount}枚、削除${status.deletedCount}枚`);
+            // S-07: 読めなかったものがあった走査（incomplete）は削除をしていない。そのことを知らせる（詳細は Fran の /debug/errors）
+            if (status.incomplete) addToast('warn', 'リスキャン: 読めないファイル・フォルダがありました（削除は行っていません。設定 → デバッグ・接続）');
             if (path) await loadFolder(path);
             else await loadRoot();
           }
-        } catch {
+        } catch (e) {
           clearInterval(pollRef.current);
           pollRef.current = null;
           setScanning(false);
+          // §4.3 #19: ポーリングの失敗で止めたことを記録する（裏の取得なのでトーストは出さない）
+          recordFailure('§4.3 #19 AlbumScreen.rescanPolling', 'rescan-poll-failed', e);
         }
       }, 3000);
     } catch {

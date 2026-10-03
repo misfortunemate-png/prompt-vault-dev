@@ -175,7 +175,11 @@ export const api = {
       const plain = await decrypt(await res.arrayBuffer());
       if (!isConnectionSnapshotCurrent(snapshot)) return null;
       return URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
-    } catch { return null; }
+    } catch (e) {
+      // §4.3 #21: null（サムネなし）に寄せる前に記録する
+      recordInvalidLater({ kind: 'thumb-fetch-failed', stage: '§4.3 #21 api.getThumb', raw: { hash, error: e?.message || String(e) }, reason: e?.message || String(e) });
+      return null;
+    }
   },
 
   // Queue M5

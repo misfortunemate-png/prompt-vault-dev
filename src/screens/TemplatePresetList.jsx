@@ -2,6 +2,16 @@ import { useState, useEffect } from 'react';
 import TemplatePresetEdit from './TemplatePresetEdit';
 import { api } from '../lib/api';
 import { getConnection } from '../lib/connection';
+import { recordInvalid, recordFailure } from '../lib/invalidLog';
+
+// F-15: 寄せたことを描画のたびに数えないよう一度だけ記録する
+const reportedNav = new Set();
+function reportNavOnce(raw, reason) {
+  const key = JSON.stringify(raw);
+  if (reportedNav.has(key)) return;
+  reportedNav.add(key);
+  recordInvalid({ kind: 'template-nav-unknown', stage: 'F-15 TemplatePresetList', raw, reason: `${reason}（一覧の最上位へ寄せる）` });
+}
 
 const btnStyle = (danger) => ({
   background: 'none',
@@ -30,7 +40,7 @@ function ThumbCell({ hash }) {
       }
       blobUrl = isCloud ? result : null;
       setSrc(result);
-    }).catch(() => {});
+    }).catch(e => recordFailure('§4.3 #20 TemplatePresetList.ThumbCell', 'template-thumb-failed', e, { hash }));
     return () => {
       cancelled = true;
       if (blobUrl) URL.revokeObjectURL(blobUrl);
@@ -82,7 +92,11 @@ export default function TemplatePresetList({ addToast, connectionRoute }) {
         try {
           const r = await api.getByPreset(preset.id, 4);
           results[preset.id] = r.images || [];
-        } catch { results[preset.id] = []; }
+        } catch (e) {
+          // §4.3 #22: 0 件に寄せる前に記録する
+          recordFailure('§4.3 #22 TemplatePresetList.galleryByPreset', 'template-gallery-failed', e, { presetId: preset.id });
+          results[preset.id] = [];
+        }
       }));
       if (!cancelled) setPresetThumbs(results);
     };
@@ -150,6 +164,8 @@ export default function TemplatePresetList({ addToast, connectionRoute }) {
       .filter(Boolean)
       .join(' ／ ');
   };
+
+  if (!['list', 'edit'].includes(nav.view)) reportNavOnce({ view: nav.view }, '未知の nav.view');
 
   if (nav.view === 'edit') {
     return (

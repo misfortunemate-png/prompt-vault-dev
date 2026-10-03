@@ -2,6 +2,16 @@ import { useState, useEffect } from 'react';
 import TemplateCardEdit from './TemplateCardEdit';
 import { api } from '../lib/api';
 import { getConnection } from '../lib/connection';
+import { recordInvalid, recordFailure } from '../lib/invalidLog';
+
+// F-15: 寄せたことを描画のたびに数えないよう一度だけ記録する
+const reportedNav = new Set();
+function reportNavOnce(raw, reason) {
+  const key = JSON.stringify(raw);
+  if (reportedNav.has(key)) return;
+  reportedNav.add(key);
+  recordInvalid({ kind: 'template-nav-unknown', stage: 'F-15 TemplateCardList', raw, reason: `${reason}（一覧の最上位へ寄せる）` });
+}
 
 const btnStyle = (danger) => ({
   background: 'none',
@@ -30,7 +40,7 @@ function ThumbCell({ hash }) {
       }
       blobUrl = isCloud ? result : null;
       setSrc(result);
-    }).catch(() => {});
+    }).catch(e => recordFailure('§4.3 #20 TemplateCardList.ThumbCell', 'template-thumb-failed', e, { hash }));
     return () => {
       cancelled = true;
       if (blobUrl) URL.revokeObjectURL(blobUrl);
@@ -87,7 +97,11 @@ export default function TemplateCardList({ addToast, connectionRoute }) {
           if (!card.positive) { results[card.id] = { images: [], total: 0 }; return; }
           const r = await api.getGalleryByCard(card.positive, 4);
           results[card.id] = r;
-        } catch { results[card.id] = { images: [], total: 0 }; }
+        } catch (e) {
+          // §4.3 #22: 0 件に寄せる前に記録する
+          recordFailure('§4.3 #22 TemplateCardList.galleryByCard', 'template-gallery-failed', e, { cardId: card.id });
+          results[card.id] = { images: [], total: 0 };
+        }
       }));
       if (!cancelled) setCardThumbs(results);
     };
@@ -146,6 +160,9 @@ export default function TemplateCardList({ addToast, connectionRoute }) {
       await refresh();
     } catch (e) { addToast('error', e.message); }
   };
+
+  if (!['slots', 'cards', 'edit'].includes(nav.view)) reportNavOnce({ view: nav.view }, '未知の nav.view');
+  else if (nav.view === 'cards' && !currentSlot) reportNavOnce({ view: nav.view, selectedSlot: nav.selectedSlot }, '選んだスロットが見つからない');
 
   // ────── Card edit view ──────
   if (nav.view === 'edit') {

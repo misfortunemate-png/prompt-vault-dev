@@ -18,12 +18,19 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // --env-file で読まれていなければ .env から不足変数を補完
 const _envPath = join(__dirname, '.env');
+const _envSkipped = [];
+let _envLineNo = 0;
 if (existsSync(_envPath)) {
   for (const line of readFileSync(_envPath, 'utf8').split('\n')) {
+    _envLineNo++;
     const t = line.trim();
     if (!t || t.startsWith('#')) continue;
     const eq = t.indexOf('=');
-    if (eq < 0) continue;
+    if (eq < 0) {
+      // S-16: = のない行は読み飛ばすが記録する（中身は秘密を含みうるので行番号と長さだけ・J-3）
+      _envSkipped.push(`line ${_envLineNo} length=${t.length}`);
+      continue;
+    }
     const k = t.slice(0, eq).trim();
     const v = t.slice(eq + 1).trim();
     if (!process.env[k]) process.env[k] = v;
@@ -41,7 +48,16 @@ try {
   }).trim();
 } catch {}
 const THUMBS_DIR = join(__dirname, 'data', 'thumbs');
+for (const raw of _envSkipped) {
+  recordInvalid({ kind: 'env-line-without-equals', stage: 'S-16 server.js .env', raw, reason: '= のない行（読み飛ばす）' });
+}
+// S-16: 起動できない PORT は起動を止めて理由を出す
 const PORT = process.env.PORT || 8789;
+if (!/^\d+$/.test(String(PORT)) || Number(PORT) < 1 || Number(PORT) > 65535) {
+  recordInvalid({ kind: 'port-invalid', stage: 'S-16 server.js PORT', raw: String(PORT), reason: '1〜65535 の整数でないため起動しない' });
+  console.error(`[起動停止] PORT=${JSON.stringify(String(PORT))} は 1〜65535 の整数ではありません（.env または環境変数を直してください）`);
+  process.exit(1);
+}
 
 mkdirSync(join(__dirname, 'data'), { recursive: true });
 mkdirSync(join(__dirname, 'logs'), { recursive: true });
@@ -144,11 +160,25 @@ function loadDanbooruTags() {
   try {
     const content = readFileSync(csvPath, 'utf8');
     const tags = [];
-    for (const line of content.trim().split('\n')) {
+    // S-21: 3 列未満・先頭が空の行、件数が整数でない行は数えて記録する（行は読み飛ばす・件数は 0）
+    const skipped = [];
+    const badCount = [];
+    content.trim().split('\n').forEach((line, i) => {
       const parts = line.split(',');
       if (parts.length >= 3 && parts[0]) {
+        const countText = parts[2].trim();
+        if (!/^\d+$/.test(countText)) badCount.push(`${i + 1}: ${line.slice(0, 80)}`);
         tags.push({ tag: parts[0].trim(), count: parseInt(parts[2]) || 0 });
+      } else {
+        skipped.push(`${i + 1}: ${line.slice(0, 80)}`);
       }
+    });
+    if (skipped.length || badCount.length) {
+      recordInvalid({
+        kind: 'danbooru-csv-rows', stage: 'S-21 loadDanbooruTags',
+        raw: { skipped: skipped.length, skippedSamples: skipped.slice(0, 5), badCount: badCount.length, badCountSamples: badCount.slice(0, 5) },
+        reason: `列が足りない・先頭が空の行 ${skipped.length} 件を読み飛ばし、件数が整数でない行 ${badCount.length} 件を 0 として読んだ`,
+      });
     }
     tags.sort((a, b) => b.count - a.count);
     danbooruTags = tags;
@@ -174,7 +204,14 @@ function runMigration(vaultRoot) {
     m2 = JSON.parse(readFileSync(m2Path, 'utf8'));
   } catch (e) {
     console.warn('[Migration] presets.json 解析失敗:', e.message);
+    // S-22: 記録するだけ。移行の振る舞い（印を付けず毎起動やり直す）は変えない
+    recordInvalid({ kind: 'm2-presets-unparseable', stage: 'S-22 runMigration', raw: readFileSync(m2Path, 'utf8').slice(0, 300), reason: `M2 の presets.json を解析できないため移行しない: ${e.message}` });
     return;
+  }
+  for (const k of ['characters', 'outfits', 'situations', 'extras', 'presets']) {
+    if (k in m2 && !Array.isArray(m2[k])) {
+      recordInvalid({ kind: 'm2-presets-field-not-array', stage: 'S-22 runMigration', raw: { field: k, value: m2[k] }, reason: '配列でないため読み飛ばす' });
+    }
   }
 
   const cards = createInitialCards();
@@ -225,10 +262,15 @@ function runMigration(vaultRoot) {
 function initVaultStructure() {
   const vaultRoot = process.env.VAULT_ROOT;
   if (vaultRoot) {
+    // S-16: 存在しない VAULT_ROOT は記録して起動を続ける
+    if (!existsSync(vaultRoot)) {
+      recordInvalid({ kind: 'vault-root-missing', stage: 'S-16 initVaultStructure', raw: vaultRoot, reason: 'VAULT_ROOT が存在しない（起動は続ける）' });
+    }
     try {
       mkdirSync(join(vaultRoot, '.tmp'), { recursive: true });
     } catch (e) {
       console.error('VAULT_ROOT .tmp 初期化エラー:', e.message);
+      recordInvalid({ kind: 'vault-tmp-init-failed', stage: 'S-16 initVaultStructure', raw: { vaultRoot, error: e.message }, reason: 'VAULT_ROOT/.tmp を作れない' });
     }
     try {
       const tmpDir = join(vaultRoot, '.tmp');
@@ -791,8 +833,16 @@ async function start() {
 
   api.post('/save', requireVaultRoot, (req, res) => {
     const { filename, seed, folderSegments = [], filenameSegments = [], preset_id } = req.body;
+    // S-09: 保存先の名前で寄せるもの（seed がない・整数でない → 0000000000、文字列でない断片 → 文字列化）は記録する。保存の振る舞いは変えない
+    const folded = [];
+    if (!(Number.isInteger(seed) && seed >= 0)) folded.push({ path: 'seed', raw: seed === undefined ? 'undefined' : JSON.stringify(seed), reason: '0 以上の整数でない（0000000000 として名付ける）' });
+    for (const [name, segs] of [['folderSegments', folderSegments], ['filenameSegments', filenameSegments]]) {
+      if (Array.isArray(segs)) segs.forEach((s, i) => { if (s != null && typeof s !== 'string') folded.push({ path: `${name}[${i}]`, raw: JSON.stringify(s), reason: '文字列でない（文字列にして使う）' }); });
+    }
+    if (folded.length) recordInvalid({ kind: 'save-name-folded', stage: 'S-09 POST /save', raw: { filename, problems: folded }, reason: folded.map(f => `${f.path}: ${f.reason}`).join(' / ') });
     try {
       const saved = executeSave(process.env.VAULT_ROOT, { filename, seed, folderSegments, filenameSegments, preset_id });
+      if (saved.metaResidue?.length) recordInvalid({ kind: 'png-meta-unread', stage: 'S-06 POST /save', raw: { file: saved.saved_path, residue: saved.metaResidue }, reason: saved.metaResidue.map(r => r.reason).join(' / ') });
       res.json({ success: true, saved_path: saved.saved_path, warning: saved.warning ?? null });
     } catch (e) {
       writeLog('error', 'SAVE_FAILED', e.message, '');

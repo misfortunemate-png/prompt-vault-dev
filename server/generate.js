@@ -58,10 +58,12 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
 
   let hash = null;
   let dbWarning = null;
+  let metaResidue = [];
   try {
     const buf = readFileSync(finalPath);
     hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
     const meta = parsePngMeta(buf);
+    metaResidue = meta.residue || [];
     const charJson = meta.char_prompts ? JSON.stringify({ base_positive: meta.prompt || '', base_negative: meta.negative || '', chars: meta.char_prompts }) : null;
     const searchPrompt = meta.char_prompts
       ? [meta.prompt, ...meta.char_prompts.map(c => c.positive)].filter(Boolean).join(', ')
@@ -98,5 +100,5 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
     dbWarning = dbErr.message;
   }
 
-  return { saved_path: `${folderPath}/${finalFilename}`, filename: finalFilename, folder: folderPath, hash, warning: dbWarning };
+  return { saved_path: `${folderPath}/${finalFilename}`, filename: finalFilename, folder: folderPath, hash, warning: dbWarning, metaResidue };
 }

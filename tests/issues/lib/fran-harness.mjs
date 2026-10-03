@@ -70,7 +70,8 @@ globalThis.fetch = async (url, init) => {
 `;
 
 // data: { 'settings.json': object|string, ... }（data/ に置く）
-export async function startFran({ name, data = {}, env = {}, dev = false, envFile = null, keepVault = false } = {}) {
+// files: { '相対パス': 内容 }（写しの直下に置く）／ vaultFiles: { '相対パス': 内容 }（VAULT_ROOT の下に置く）
+export async function startFran({ name, data = {}, env = {}, dev = false, envFile = null, files = {}, vaultFiles = {} } = {}) {
   const root = makeTempRoot(name);
   copyFileSync(join(repoRoot, 'server.js'), join(root, 'server.js'));
   cpSync(join(repoRoot, 'server'), join(root, 'server'), { recursive: true });
@@ -82,6 +83,14 @@ export async function startFran({ name, data = {}, env = {}, dev = false, envFil
   if (envFile != null) writeFileSync(join(root, '.env'), envFile);
   const vault = join(root, 'vault');
   mkdirSync(join(vault, '.tmp'), { recursive: true });
+  for (const [rel, content] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    writeFileSync(join(root, rel), content);
+  }
+  for (const [rel, content] of Object.entries(vaultFiles)) {
+    mkdirSync(dirname(join(vault, rel)), { recursive: true });
+    writeFileSync(join(vault, rel), content);
+  }
   const callsPath = join(root, 'nai-calls.jsonl');
   const modePath = join(root, 'nai-mode.txt');
   writeFileSync(callsPath, '');

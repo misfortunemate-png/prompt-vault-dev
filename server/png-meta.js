@@ -1,8 +1,19 @@
-export function parsePngMeta(buffer) {
-  const result = { prompt: null, negative: null, char_prompts: null, seed: null, model: null, steps: null, scale: null, sampler: null, width: null, height: null };
+// S-06: 読もうとして読めなかったもの（PNG でない・Description/Comment が zTXt や圧縮 iTXt・Comment の JSON が壊れている・
+// チャンクが途中で切れている）は result.residue に残す。呼び出し側（scanner・POST /save）が集約先に記録する。
+// Description・Comment 以外のキーワードは対象外の正常な入力として明示的に読み飛ばす（記録しない・J-17）
+const TARGET_KEYWORDS = ['Description', 'Comment'];
 
-  if (!Buffer.isBuffer(buffer) || buffer.length < 8) return result;
-  if (buffer[0] !== 0x89 || buffer[1] !== 0x50 || buffer[2] !== 0x4e || buffer[3] !== 0x47) return result;
+export function parsePngMeta(buffer) {
+  const result = { prompt: null, negative: null, char_prompts: null, seed: null, model: null, steps: null, scale: null, sampler: null, width: null, height: null, residue: [] };
+
+  if (!Buffer.isBuffer(buffer) || buffer.length < 8) {
+    result.residue.push({ chunk: null, reason: 'PNG でない（短すぎる）', head: Buffer.isBuffer(buffer) ? buffer.subarray(0, 16).toString('hex') : typeof buffer });
+    return result;
+  }
+  if (buffer[0] !== 0x89 || buffer[1] !== 0x50 || buffer[2] !== 0x4e || buffer[3] !== 0x47) {
+    result.residue.push({ chunk: null, reason: 'PNG の署名がない', head: buffer.subarray(0, 16).toString('hex') });
+    return result;
+  }
 
   // IHDR is always first chunk: sig(8) + length(4) + type(4) → width at 16, height at 20
   if (buffer.length >= 24) {
@@ -13,7 +24,10 @@ export function parsePngMeta(buffer) {
   let offset = 8;
   while (offset + 12 <= buffer.length) {
     const length = buffer.readUInt32BE(offset);
-    if (length < 0 || offset + 12 + length > buffer.length) break;
+    if (length < 0 || offset + 12 + length > buffer.length) {
+      result.residue.push({ chunk: buffer.slice(offset + 4, offset + 8).toString('latin1'), reason: `チャンクが途中で切れている（offset ${offset}・length ${length}）` });
+      break;
+    }
     const type = buffer.slice(offset + 4, offset + 8).toString('latin1');
     const dataStart = offset + 8;
     const dataEnd = dataStart + length;
@@ -24,8 +38,12 @@ export function parsePngMeta(buffer) {
       if (nullIdx !== -1) {
         const keyword = data.slice(0, nullIdx).toString('utf8');
         const text = data.slice(nullIdx + 1).toString('utf8');
-        parseNovelAiChunk(keyword, text, result);
+        parseNovelAiChunk(keyword, text, result, 'tEXt');
       }
+    } else if (type === 'zTXt' && length > 0) {
+      const data = buffer.slice(dataStart, dataEnd);
+      const keyword = data.slice(0, Math.max(0, data.indexOf(0))).toString('utf8');
+      if (TARGET_KEYWORDS.includes(keyword)) result.residue.push({ chunk: 'zTXt', keyword, reason: '圧縮テキスト（zTXt）の Description/Comment は読まない' });
     } else if (type === 'iTXt' && length > 0) {
       const data = buffer.slice(dataStart, dataEnd);
       const nullIdx = data.indexOf(0);
@@ -40,9 +58,11 @@ export function parsePngMeta(buffer) {
             const transNull = rest2.indexOf(0);
             if (transNull !== -1) {
               const text = rest2.slice(transNull + 1).toString('utf8');
-              parseNovelAiChunk(keyword, text, result);
+              parseNovelAiChunk(keyword, text, result, 'iTXt');
             }
           }
+        } else if (TARGET_KEYWORDS.includes(keyword)) {
+          result.residue.push({ chunk: 'iTXt', keyword, reason: `圧縮 iTXt（flag ${compressionFlag}）の Description/Comment は読まない` });
         }
       }
     }
@@ -54,7 +74,7 @@ export function parsePngMeta(buffer) {
   return result;
 }
 
-function parseNovelAiChunk(keyword, text, result) {
+function parseNovelAiChunk(keyword, text, result, chunkType) {
   if (keyword === 'Description') {
     if (text) result.prompt = text;
   } else if (keyword === 'Comment') {
@@ -83,6 +103,9 @@ function parseNovelAiChunk(keyword, text, result) {
         })).filter(c => c.positive || c.negative);
         if (!result.char_prompts.length) result.char_prompts = null;
       }
-    } catch {}
+    } catch (e) {
+      result.residue.push({ chunk: chunkType, keyword: 'Comment', reason: `Comment を JSON として解析できない: ${e.message}`, head: text.slice(0, 120) });
+    }
   }
+  // それ以外のキーワード（Software・Source・Title など）は対象外として読み飛ばす
 }
