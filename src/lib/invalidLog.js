@@ -103,6 +103,32 @@ export function recordFailure(stage, kind, err, extra = {}) {
   return recordInvalid({ kind, stage, raw: { ...extra, error: message, status: err?.status ?? null }, reason: message });
 }
 
+// 一覧をクリップボード用の文字列にする（発注者の指示・2026-10-03）。新しいものから並べる
+export function formatEntriesForCopy(title, entries, meta = {}) {
+  const lines = [`# ${title}`];
+  for (const [k, v] of Object.entries(meta)) lines.push(`${k}: ${v}`);
+  lines.push(`件数: ${entries.length}`, '');
+  entries.slice().reverse().forEach((e, i) => {
+    if (!e || typeof e !== 'object') {
+      lines.push(`${i + 1}. ${String(e)}`, '');
+      return;
+    }
+    if (e.code === 'INVALID' || e.kind) {
+      const when = e.lastTs ?? e.ts ?? '時刻不明';
+      lines.push(`${i + 1}. [${e.code ?? 'INVALID'}: ${e.kind}] ${e.reason ?? ''}`);
+      lines.push(`   時刻: ${when}${e.count > 1 ? ` ×${e.count}（初回 ${e.ts}）` : ''}`);
+      lines.push(`   段: ${e.stage}`);
+      lines.push(`   raw: ${e.raw}`);
+    } else {
+      lines.push(`${i + 1}. [${e.code}] ${e.message ?? ''}`);
+      lines.push(`   時刻: ${e.ts ?? '時刻不明'}`);
+      if (e.detail) lines.push(`   detail: ${typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)}`);
+    }
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
 export function getInvalidLog() {
   return load();
 }

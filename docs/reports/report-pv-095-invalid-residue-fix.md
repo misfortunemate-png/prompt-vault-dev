@@ -108,7 +108,9 @@
 
 ## 6. 発注者指示による仕様外修正
 
-なし。ただし次は PG の判断で行った（指示書の範囲内と判断したもの）。
+- **発注者の指示により実装（2026-10-03・検収後）**: 設定 →「デバッグ・接続」の「当たらなかった入力（この端末）」と「直近エラー（接続中の経路の /debug/errors）」に、それぞれ「コピー」ボタンを付けた（Pixel で手で写すのが手間なため）。一覧を新しい順に、kind・段・raw・理由（INVALID 以外は code・message・detail）と、見出し（コピーした時刻・接続中の経路・サーバの版・画面のホスト）付きの文字列にしてクリップボードへ書く（`formatEntriesForCopy`）。clipboard API の許可が得られない環境では選択してコピーする方式に切り替え、それも失敗したらトーストと集約先に残す。効果確認: verifier pv#98 に check 2 件（整形の中身・両欄のボタン）を追加して緑、ローカルのビルドをブラウザで開いて「…をコピーしました」が出ることを確認（内蔵ブラウザは clipboard API を拒否するため、切り替えた方式で通った）
+
+次は PG の判断で行った（指示書の範囲内と判断したもの）。
 
 - 公開リポジトリ（PUBLIC）のため、AC-6 の「実物の写し」と Cloud の写しはリポジトリに置かず、`data/`（.gitignore 済み）と `data/test-fixtures/pv100/` から verifier が実行時に読む。リポジトリには形だけ同じ合成 fixture（`tests/issues/fixtures/pv100/`）を置いた。CI などファイルがない環境では該当 check が NOT_RUN になる
 - Cloud の写し（A-1）: 2026-10-02T23:57:11.835Z（UTC）に foundation `.env` の `FA_TOKEN_DEV` で GET `/api/prompt-vault/{settings,cards,presets}` のみ。settings は pv-sync と同じく Fran の `sync.*` キーを合わせる形（いまの Fran の settings.json には `sync.*` がない）。トークンの値は出力・fixture・報告に残していない。証跡と fixture にトークン・実カードの文字列が含まれないことを走査で確かめた（0 件）
