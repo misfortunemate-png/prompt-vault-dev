@@ -12,18 +12,15 @@ function sanitizeSegment(s) {
   return c || 'unnamed';
 }
 
-export async function executeGenerate({ prompt, negativePrompt, model, width, height, steps, scale, sampler, seed, vaultRoot }) {
+// S-03・S-04・J-9: 値の検査と既定値の補完は呼び出し側（POST /generate・キュー）が genParams.js で済ませてから渡す。
+// ここでは既定値に寄せない（以前の `||` による寄せを外した）
+export async function executeGenerate({ prompt, negativePrompt, model, width, height, steps, scale, sampler, seed, vaultRoot, origin = 'single' }) {
   return novelaiGenerate({
-    prompt: prompt || '',
-    negativePrompt: negativePrompt || '',
-    model: model || 'nai-diffusion-4-5-full',
-    width: width || 832,
-    height: height || 1216,
-    steps: steps || 28,
-    scale: scale || 5,
-    sampler: sampler || 'k_euler_ancestral',
-    seed: (seed != null && seed >= 0) ? seed : null,
+    prompt: prompt ?? '',
+    negativePrompt: negativePrompt ?? '',
+    model, width, height, steps, scale, sampler, seed,
     vaultRoot,
+    origin,
   });
 }
 
@@ -61,10 +58,12 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
 
   let hash = null;
   let dbWarning = null;
+  let metaResidue = [];
   try {
     const buf = readFileSync(finalPath);
     hash = createHash('sha256').update(buf).digest('hex').slice(0, 16);
     const meta = parsePngMeta(buf);
+    metaResidue = meta.residue || [];
     const charJson = meta.char_prompts ? JSON.stringify({ base_positive: meta.prompt || '', base_negative: meta.negative || '', chars: meta.char_prompts }) : null;
     const searchPrompt = meta.char_prompts
       ? [meta.prompt, ...meta.char_prompts.map(c => c.positive)].filter(Boolean).join(', ')
@@ -101,5 +100,5 @@ export function executeSave(vaultRoot, { filename, seed, folderSegments = [], fi
     dbWarning = dbErr.message;
   }
 
-  return { saved_path: `${folderPath}/${finalFilename}`, filename: finalFilename, folder: folderPath, hash, warning: dbWarning };
+  return { saved_path: `${folderPath}/${finalFilename}`, filename: finalFilename, folder: folderPath, hash, warning: dbWarning, metaResidue };
 }

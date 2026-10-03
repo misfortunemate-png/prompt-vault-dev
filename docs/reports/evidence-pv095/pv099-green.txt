@@ -1,0 +1,38 @@
+repository_sha=88be9500235de633ee223c5c6e3737881fa00483
+
+pv#99 [AUTO_FAILURE_INJECTION] gate=true Checker scripts must not fold unknown verdicts/values into PASS or defaults
+  VERIFIER tests/issues/pv-099-checker-residue.mjs sha256=c0b895ddd936860697b7115a2af1b763ce8d166c44fb2c9c2c6c5aa38287d2c6
+  PASS    T-01: fx#ERROR (status ERROR) is not judged PASS
+  PASS    T-01: fx#ERROR is counted in the summary
+  PASS    T-01: fx#ERROR makes the exit code non-zero
+  PASS    T-01: fx#ERROR output shows the raw value and a reason
+  PASS    T-01: fx#lower (status pass) is not judged PASS
+  PASS    T-01: fx#lower is counted in the summary
+  PASS    T-01: fx#lower makes the exit code non-zero
+  PASS    T-01: fx#lower output shows the raw value and a reason
+  PASS    T-01: fx#undef (status undefined) is not judged PASS
+  PASS    T-01: fx#undef is counted in the summary
+  PASS    T-01: fx#undef makes the exit code non-zero
+  PASS    T-01: fx#undef output shows the raw value and a reason
+  PASS    T-01: fx#notarray (status {"status":"PASS"}) is not judged PASS
+  PASS    T-01: fx#notarray is counted in the summary
+  PASS    T-01: fx#notarray makes the exit code non-zero
+  PASS    T-01: fx#notarray output shows the raw value and a reason
+  PASS    T-01 control: a PASS-only verifier still passes with exit 0
+  PASS    T-01: an unknown flag is rejected with exit 64 and the raw flag
+  PASS    T-02: HTTP 500 is reported as an anomaly, not "Server not running"
+  PASS    T-02: HTTP 500 output carries the raw response and a reason
+  PASS    T-02: non-JSON 200 is reported as an anomaly, not "Server not running"
+  PASS    T-02: non-JSON 200 output carries the raw response and a reason
+  PASS    T-02: JSON without version is reported as an anomaly, not "Server not running"
+  PASS    T-02: JSON without version output carries the raw response and a reason
+  PASS    T-02: no listener is reported as not running (NOT_RUN) with a reason
+  PASS    T-03: review-doctor --port=abc exits 64 with the raw value and a reason
+  PASS    T-03: review-doctor --port=0 exits 64 with the raw value and a reason
+  PASS    T-03: review-doctor --port=70000 exits 64 with the raw value and a reason
+  PASS    T-03: review-doctor --timeout-ms=abc exits 64 with the raw value and a reason
+  PASS    T-03: review-doctor --timeout-ms=-5 exits 64 with the raw value and a reason
+  PASS    T-03: review-doctor --port= exits 64 with the raw value and a reason
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=31 fail=0 gated_fail=0 not_run=0 waived=0 unknown=0

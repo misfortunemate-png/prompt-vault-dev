@@ -1,4 +1,5 @@
 import { encrypt } from './crypto.js';
+import { recordInvalid } from './invalidLog.js';
 
 const thumbGenerated = new Set();
 
@@ -26,7 +27,15 @@ export async function generateAndUploadThumb(plainBuffer, hash, conn) {
     'Content-Type': 'application/octet-stream',
   } : { 'Content-Type': 'application/octet-stream' };
 
-  await fetch(`${conn.cloudUrl}/thumbs/${hash}`, {
+  const res = await fetch(`${conn.cloudUrl}/thumbs/${hash}`, {
     method: 'PUT', headers, body: encrypted,
   });
+  // §4.3 #10: 応答状態を見る。2xx 以外は記録し、次の機会に作り直せるよう生成済みの印を外して例外にする
+  if (!res.ok) {
+    thumbGenerated.delete(hash);
+    recordInvalid({ kind: 'thumb-put-status', stage: '§4.3 #10 thumbGen.generateAndUploadThumb', raw: { hash, status: res.status }, reason: `サムネイル PUT が 2xx 以外（${res.status}）` });
+    const err = new Error(`サムネイルのアップロードに失敗しました (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
 }

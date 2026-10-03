@@ -1,0 +1,395 @@
+[Save] DB登録失敗: ENOENT: no such file or directory, open 'D:\AI\github\prompt-vault-dev\.phase6b-pv005-Ge1glF\vault-neg\その他\gen_0000000042_001.png'
+[Scanner] 完了: 新規0件 移動0件 削除0件
+[Scanner] 完了: 新規0件 移動0件 削除0件
+[Scanner] ファイル処理失敗 D:\AI\github\prompt-vault-dev\.phase6b-scanner-BGwNpS\vault-file-fail\secret.png: injected:ENOENT
+[Scanner] 完了: 新規0件 移動0件 削除0件
+[Scanner] 完了: 新規0件 移動0件 削除3件
+[INVALID] test-kind pv98.verify verifier injected {"v":"odd-value"}
+[INVALID] test-kind pv98.verify again {"v":"odd-value"}
+[INVALID] flood pv98.verify flood n=0
+[INVALID] flood pv98.verify flood n=1
+[INVALID] flood pv98.verify flood n=2
+[INVALID] flood pv98.verify flood n=3
+[INVALID] flood pv98.verify flood n=4
+[INVALID] flood pv98.verify flood n=5
+[INVALID] flood pv98.verify flood n=6
+[INVALID] flood pv98.verify flood n=7
+[INVALID] flood pv98.verify flood n=8
+[INVALID] flood pv98.verify flood n=9
+[INVALID] flood pv98.verify flood n=10
+[INVALID] flood pv98.verify flood n=11
+[INVALID] flood pv98.verify flood n=12
+[INVALID] flood pv98.verify flood n=13
+[INVALID] flood pv98.verify flood n=14
+[INVALID] flood pv98.verify flood n=15
+[INVALID] flood pv98.verify flood n=16
+[INVALID] flood pv98.verify flood n=17
+[INVALID] flood pv98.verify flood n=18
+[INVALID] flood pv98.verify flood n=19
+[INVALID] flood pv98.verify flood n=20
+[INVALID] flood pv98.verify flood n=21
+[INVALID] flood pv98.verify flood n=22
+[INVALID] flood pv98.verify flood n=23
+[INVALID] flood pv98.verify flood n=24
+[INVALID] flood pv98.verify flood n=25
+[INVALID] flood pv98.verify flood n=26
+[INVALID] flood pv98.verify flood n=27
+[INVALID] flood pv98.verify flood n=28
+[INVALID] flood pv98.verify flood n=29
+[INVALID] flood pv98.verify flood n=30
+[INVALID] flood pv98.verify flood n=31
+[INVALID] flood pv98.verify flood n=32
+[INVALID] flood pv98.verify flood n=33
+[INVALID] flood pv98.verify flood n=34
+[INVALID] flood pv98.verify flood n=35
+[INVALID] flood pv98.verify flood n=36
+[INVALID] flood pv98.verify flood n=37
+[INVALID] flood pv98.verify flood n=38
+[INVALID] flood pv98.verify flood n=39
+[INVALID] flood pv98.verify flood n=40
+[INVALID] flood pv98.verify flood n=41
+[INVALID] flood pv98.verify flood n=42
+[INVALID] flood pv98.verify flood n=43
+[INVALID] flood pv98.verify flood n=44
+[INVALID] flood pv98.verify flood n=45
+[INVALID] flood pv98.verify flood n=46
+[INVALID] flood pv98.verify flood n=47
+[INVALID] flood pv98.verify flood n=48
+[INVALID] flood pv98.verify flood n=49
+[INVALID] flood pv98.verify flood n=50
+[INVALID] flood pv98.verify flood n=51
+[INVALID] flood pv98.verify flood n=52
+[INVALID] flood pv98.verify flood n=53
+[INVALID] flood pv98.verify flood n=54
+[INVALID] flood pv98.verify flood n=55
+[INVALID] flood pv98.verify flood n=56
+[INVALID] flood pv98.verify flood n=57
+[INVALID] flood pv98.verify flood n=58
+[INVALID] flood pv98.verify flood n=59
+[INVALID] flood pv98.verify flood n=60
+[INVALID] flood pv98.verify flood n=61
+[INVALID] flood pv98.verify flood n=62
+[INVALID] flood pv98.verify flood n=63
+[INVALID] flood pv98.verify flood n=64
+[INVALID] flood pv98.verify flood n=65
+[INVALID] flood pv98.verify flood n=66
+[INVALID] flood pv98.verify flood n=67
+[INVALID] flood pv98.verify flood n=68
+[INVALID] flood pv98.verify flood n=69
+[INVALID] flood pv98.verify flood n=70
+[INVALID] flood pv98.verify flood n=71
+[INVALID] flood pv98.verify flood n=72
+[INVALID] flood pv98.verify flood n=73
+[INVALID] flood pv98.verify flood n=74
+[INVALID] flood pv98.verify flood n=75
+[INVALID] flood pv98.verify flood n=76
+[INVALID] flood pv98.verify flood n=77
+[INVALID] flood pv98.verify flood n=78
+[INVALID] flood pv98.verify flood n=79
+[INVALID] flood pv98.verify flood n=80
+[INVALID] flood pv98.verify flood n=81
+[INVALID] flood pv98.verify flood n=82
+[INVALID] flood pv98.verify flood n=83
+[INVALID] flood pv98.verify flood n=84
+[INVALID] flood pv98.verify flood n=85
+[INVALID] flood pv98.verify flood n=86
+[INVALID] flood pv98.verify flood n=87
+[INVALID] flood pv98.verify flood n=88
+[INVALID] flood pv98.verify flood n=89
+[INVALID] flood pv98.verify flood n=90
+[INVALID] flood pv98.verify flood n=91
+[INVALID] flood pv98.verify flood n=92
+[INVALID] flood pv98.verify flood n=93
+[INVALID] flood pv98.verify flood n=94
+[INVALID] flood pv98.verify flood n=95
+[INVALID] flood pv98.verify flood n=96
+[INVALID] flood pv98.verify flood n=97
+[INVALID] flood pv98.verify flood n=98
+[INVALID] flood pv98.verify flood n=99
+[INVALID] flood pv98.verify flood n=100
+[INVALID] flood pv98.verify flood n=101
+[INVALID] flood pv98.verify flood n=102
+[INVALID] flood pv98.verify flood n=103
+[INVALID] flood pv98.verify flood n=104
+[INVALID] flood pv98.verify flood n=105
+[INVALID] flood pv98.verify flood n=106
+[INVALID] flood pv98.verify flood n=107
+[INVALID] flood pv98.verify flood n=108
+[INVALID] flood pv98.verify flood n=109
+[INVALID] flood pv98.verify flood n=110
+[INVALID] flood pv98.verify flood n=111
+[INVALID] flood pv98.verify flood n=112
+[INVALID] flood pv98.verify flood n=113
+[INVALID] flood pv98.verify flood n=114
+[INVALID] flood pv98.verify flood n=115
+[INVALID] flood pv98.verify flood n=116
+[INVALID] flood pv98.verify flood n=117
+[INVALID] flood pv98.verify flood n=118
+[INVALID] flood pv98.verify flood n=119
+[INVALID] flood pv98.verify flood n=120
+[INVALID] flood pv98.verify flood n=121
+[INVALID] flood pv98.verify flood n=122
+[INVALID] flood pv98.verify flood n=123
+[INVALID] flood pv98.verify flood n=124
+[INVALID] flood pv98.verify flood n=125
+[INVALID] flood pv98.verify flood n=126
+[INVALID] flood pv98.verify flood n=127
+[INVALID] flood pv98.verify flood n=128
+[INVALID] flood pv98.verify flood n=129
+[INVALID] flood pv98.verify flood n=130
+[INVALID] flood pv98.verify flood n=131
+[INVALID] flood pv98.verify flood n=132
+[INVALID] flood pv98.verify flood n=133
+[INVALID] flood pv98.verify flood n=134
+[INVALID] flood pv98.verify flood n=135
+[INVALID] flood pv98.verify flood n=136
+[INVALID] flood pv98.verify flood n=137
+[INVALID] flood pv98.verify flood n=138
+[INVALID] flood pv98.verify flood n=139
+[INVALID] flood pv98.verify flood n=140
+[INVALID] flood pv98.verify flood n=141
+[INVALID] flood pv98.verify flood n=142
+[INVALID] flood pv98.verify flood n=143
+[INVALID] flood pv98.verify flood n=144
+[INVALID] flood pv98.verify flood n=145
+[INVALID] flood pv98.verify flood n=146
+[INVALID] flood pv98.verify flood n=147
+[INVALID] flood pv98.verify flood n=148
+[INVALID] flood pv98.verify flood n=149
+[INVALID] flood pv98.verify flood n=150
+[INVALID] flood pv98.verify flood n=151
+[INVALID] flood pv98.verify flood n=152
+[INVALID] flood pv98.verify flood n=153
+[INVALID] flood pv98.verify flood n=154
+[INVALID] flood pv98.verify flood n=155
+[INVALID] flood pv98.verify flood n=156
+[INVALID] flood pv98.verify flood n=157
+[INVALID] flood pv98.verify flood n=158
+[INVALID] flood pv98.verify flood n=159
+[INVALID] flood pv98.verify flood n=160
+[INVALID] flood pv98.verify flood n=161
+[INVALID] flood pv98.verify flood n=162
+[INVALID] flood pv98.verify flood n=163
+[INVALID] flood pv98.verify flood n=164
+[INVALID] flood pv98.verify flood n=165
+[INVALID] flood pv98.verify flood n=166
+[INVALID] flood pv98.verify flood n=167
+[INVALID] flood pv98.verify flood n=168
+[INVALID] flood pv98.verify flood n=169
+[INVALID] flood pv98.verify flood n=170
+[INVALID] flood pv98.verify flood n=171
+[INVALID] flood pv98.verify flood n=172
+[INVALID] flood pv98.verify flood n=173
+[INVALID] flood pv98.verify flood n=174
+[INVALID] flood pv98.verify flood n=175
+[INVALID] flood pv98.verify flood n=176
+[INVALID] flood pv98.verify flood n=177
+[INVALID] flood pv98.verify flood n=178
+[INVALID] flood pv98.verify flood n=179
+[INVALID] flood pv98.verify flood n=180
+[INVALID] flood pv98.verify flood n=181
+[INVALID] flood pv98.verify flood n=182
+[INVALID] flood pv98.verify flood n=183
+[INVALID] flood pv98.verify flood n=184
+[INVALID] flood pv98.verify flood n=185
+[INVALID] flood pv98.verify flood n=186
+[INVALID] flood pv98.verify flood n=187
+[INVALID] flood pv98.verify flood n=188
+[INVALID] flood pv98.verify flood n=189
+[INVALID] flood pv98.verify flood n=190
+[INVALID] flood pv98.verify flood n=191
+[INVALID] flood pv98.verify flood n=192
+[INVALID] flood pv98.verify flood n=193
+[INVALID] flood pv98.verify flood n=194
+[INVALID] flood pv98.verify flood n=195
+[INVALID] flood pv98.verify flood n=196
+[INVALID] flood pv98.verify flood n=197
+[INVALID] flood pv98.verify flood n=198
+[INVALID] flood pv98.verify flood n=199
+[INVALID] flood pv98.verify flood n=200
+[INVALID] flood pv98.verify flood n=201
+[INVALID] flood pv98.verify flood n=202
+[INVALID] flood pv98.verify flood n=203
+[INVALID] flood pv98.verify flood n=204
+repository_sha=9db948367c3a429d69ef8245f86342f9bd37d8fe
+
+pv#5 [AUTO_FAILURE_INJECTION] gate=true Same save name+seed must not silently overwrite an existing PNG
+  VERIFIER tests/issues/pv-005-save-overwrite.mjs sha256=ca35b1cef6de8bbedb9167e1ddfe6cc8e2173068f9138d4d6e644e318cc14460
+  PASS    existing PNG bytes are not overwritten by same-name save
+  PASS    save completes and uses a different path than the collision candidate
+  PASS    result saved_path on disk contains the saved image bytes
+  PASS    negative control: collision bypass causes overwrite (old bug reproduced)
+  VERDICT PASS
+
+pv#8 [AUTO_FAILURE_INJECTION] gate=true cards/presets CRUD must advance updated_at so LWW sync keeps Fran edits
+  VERIFIER tests/issues/pv-008-updated-at-lww.mjs sha256=08f8b9434b9867efcc22af43a605878de7acabfcf68ef929e4779fbd02126f17
+  PASS    PUT slot: server-time updated_at overwrites stale body value
+  PASS    PUT card: server-time updated_at overwrites stale body value
+  PASS    PUT preset: server-time updated_at overwrites stale body value
+  PASS    POST slot: new record carries valid updated_at
+  PASS    POST card: new record carries valid updated_at
+  PASS    POST preset: new record carries valid updated_at
+  PASS    LWW picks Fran version when PUT advances updated_at past Cloud version
+  PASS    PUT slot source: updated_at after ...req.body spread
+  PASS    PUT card source: updated_at after ...req.body spread
+  PASS    source: PUT handlers (slot, preset) both set server-side updated_at after body spread
+  PASS    negative control: without server-time advancement Cloud can overwrite Fran edit
+  VERDICT PASS
+
+pv#9 [AUTO_FAILURE_INJECTION] gate=true Image deletion must not remove DB row before filesystem deletion succeeds
+  VERIFIER tests/issues/pv-009-delete-order.mjs sha256=f406190b3f45633d88779d4336e8cf4b5fa6362215daa5cff79bff61c72b69f1
+  PASS    original PNG unlink failure: DB row is preserved
+  PASS    original PNG unlink failure: application metadata unchanged
+  PASS    thumbnail unlink failure: DB row is not pre-deleted
+  PASS    all deletions succeed: DB row is removed
+  PASS    negative control: DB-first order deletes row before file error (old bug reproduced)
+  PASS    source: removeImageRow appears after unlinkSync in delete handler
+  VERDICT PASS
+
+pv#16 [STATIC_CONTRACT] gate=true backend-bound generate results and queue state
+  VERIFIER tests/issues/pv-016-backend-identity.mjs sha256=70640efbe2d1a8b1ddede096cd7ee4058082e4297856dc47e65a7307ea4024a5
+  PASS    route change clears displayed direct results
+  PASS    known stale React-closure guard is not accepted
+  PASS    late generate response has live route guard or persisted backend origin
+  PASS    save is not selected solely by click-time global route
+  PASS    queue state is refreshed/reset on backend route changes
+  VERDICT PASS
+
+pv#20 [STATIC] gate=true Fran save partial failure semantics
+  PASS    primary PNG is copied before DB/index registration
+  PASS    executeSave exposes DB/index failure as warning
+  PASS    rescan can re-index a PNG missing from the DB
+  WAIVED  direct /save does not report DB warning as full success — WAIVED: direct response remains success:true but carries warning; primary PNG is retained and rescan is available
+  PASS    frontend keeps result retryable after DB warning
+  WAIVED  queue save preserves the same partial-failure semantics — WAIVED: queue save does not surface the DB warning; exceptional recovery remains rescan/log based
+  VERDICT PASS_WITH_WAIVER
+
+pv#23 [AUTO] gate=true Cloudflare Pages preview origin CORS
+  PASS    production origin accepted
+  PASS    hash preview accepted
+  PASS    unrelated Pages project rejected
+  PASS    lookalike suffix rejected
+  WAIVED  hyphenated branch alias accepted — WAIVED for N=1 operation: hash preview remains available; origin=https://fix-api.prompt-vault-6gr.pages.dev regex=/^https:\/\/([a-z0-9]+\.)?prompt-vault-6gr\.pages\.dev$/
+  WAIVED  multi-hyphen branch alias accepted — WAIVED for N=1 operation: hash preview remains available; origin=https://feature-long-name.prompt-vault-6gr.pages.dev regex=/^https:\/\/([a-z0-9]+\.)?prompt-vault-6gr\.pages\.dev$/
+  PASS    Private Network Access response header is supported
+  PASS    allowed OPTIONS preflight terminates with 204
+  VERDICT PASS_WITH_WAIVER
+
+pv#40 [AUTO_FAILURE_INJECTION] gate=true Scanner preserves SQLite metadata when the Vault cannot be read
+  VERIFIER tests/issues/pv-040-scanner-read-failure.mjs sha256=396a30aa397246e79fc9329d53699009fb8d80439752de588a752db3f75a8791
+  PASS    unreadable/nonexistent Vault root does not delete an existing image row — row_after_root_fail=present scan={"scanning":false,"total":0,"processed":0,"newCount":0,"movedCount":0,"deletedCount":0,"incomplete":true}
+  PASS    application metadata survives an incomplete scan — favorite=1 caption="must survive unreadable scan" preset_id="p_phase6b"
+  PASS    subdirectory readdir failure does not delete DB rows for that subtree — row_after_subdir_fail=present scan={"scanning":false,"total":0,"processed":0,"newCount":0,"movedCount":0,"deletedCount":0,"incomplete":true}
+  PASS    individual file readFile failure does not delete its DB row — row_after_file_fail=present scan={"scanning":false,"total":1,"processed":1,"newCount":0,"movedCount":0,"deletedCount":0,"incomplete":true}
+  PASS    complete scan still removes a row for a genuinely missing file — row_after_confirmed_empty=deleted scan={"scanning":false,"total":0,"processed":0,"newCount":0,"movedCount":0,"deletedCount":3,"incomplete":false}
+  VERDICT PASS
+
+pv#42 [STATIC_CONTRACT] gate=true Template state and mutations stay bound to one backend
+  VERIFIER tests/issues/pv-042-template-backend-identity.mjs sha256=099b0bef518d1459b6f0d42989eb8956c76f48c0352ae22feafce31111a79703
+  PASS    Template lifecycle is keyed or explicitly route-aware
+  PASS    cards do not rely on a route-blind mount-only refresh
+  PASS    presets do not rely on a route-blind mount-only refresh
+  VERDICT PASS
+
+pv#43 [STATIC_CONTRACT] gate=true Settings values and diagnostics stay bound to current backend
+  VERIFIER tests/issues/pv-043-settings-backend-identity.mjs sha256=71791c3e9beda4de47fce853523dc2cd632cdf426a7cc309fcb3f9f0844c91f2
+  PASS    settings reload/remount when backend route changes
+  PASS    stale loaded settings cannot be saved to another backend
+  PASS    diagnostic/system info is rebound with settings route
+  VERDICT PASS
+
+pv#44 [AUTO] gate=true stale reachability checks must not overwrite newer connection intent
+  VERIFIER tests/issues/pv-044-reachability-race.mjs sha256=0a376558434c68b9d0f47acceab725b97ff965f28d5367e6ed9c18cfeb894a9a
+  PASS    pending probe cannot overwrite later manual switch
+  PASS    older out-of-order probe cannot overwrite newer result
+  VERDICT PASS
+
+pv#45 [STATIC_CONTRACT] gate=true Template Cloud thumbnails use authenticated decryption path
+  VERIFIER tests/issues/pv-045-template-cloud-thumb.mjs sha256=493103bf960d39f2cdbcf098049b0b79750b1cba6c0df512b7a6e8c0b3ca1bac
+  PASS    Cloud thumb API path authenticates and decrypts
+  PASS    Template does not feed raw resolveThumbUrl into image elements
+  PASS    Template uses a JS thumbnail loader/component capable of decrypted blobs
+  VERDICT PASS
+
+pv#47 [STATIC_CONTRACT] gate=true cross-tab connection changes cannot split displayed and request backend
+  VERIFIER tests/issues/pv-047-cross-tab-connection.mjs sha256=082b0ab0fa2e92481d2a4f80364a8b9f74ed9544eec855d53629db5510b0d38d
+  PASS    external storage connection updates are observed
+  PASS    external connection update reaches React connection state
+  PASS    Template/Settings/results are not invalidated by route alone
+  PASS    shared request identity cannot advance beyond displayed backend-scoped state
+  VERDICT PASS
+
+pv#49 [BEHAVIORAL] gate=true Connection revision centrally fences backend-scoped async state
+  VERIFIER tests/issues/pv-049-connection-revision.mjs sha256=ce9660c755022ecf09ca39087b092e9bd6fed9a424b77bf3f9cdcd89cfd7dfd5
+  PASS    route selection creates a backend identity revision
+  PASS    non-identity metadata does not invalidate backend state
+  PASS    timeout preference does not invalidate backend state
+  PASS    authentication principal change invalidates backend state
+  PASS    route change advances backend revision
+  PASS    API layer rejects a response from an obsolete connection snapshot
+  PASS    backend-scoped screens consume the common connection revision
+  PASS    Generate results are invalidated when backend identity (route+token) changes
+  PASS    reachability probe refuses to commit after external connection intent changes
+  PASS    API request path centrally asserts snapshot currency
+  VERDICT PASS
+
+pv#53 [AUTO_FAILURE_INJECTION] gate=true Fran offline must fall through to Cloud probe, not immediately go offline
+  VERIFIER tests/issues/pv-053-cloud-fallback.mjs sha256=ef5b9f97d1ae630119949f9072c6dd1d81bdf9526283270c96f30980eb004c84
+  PASS    Fran network failure falls through to Cloud and sets route=cloud
+  PASS    Cloud fallback does not require Fran to succeed first
+  PASS    Fran network failure + Cloud 401: cloudOfflineReason=auth-failed (not generic)
+  PASS    Both backends network failure: cloudOfflineReason is not auth-failed (distinguishable)
+  PASS    negative control: bypassed Cloud probe causes offline instead of cloud (old bug reproduced)
+  VERDICT PASS
+
+pv#56 [AUTO_FAILURE_INJECTION] gate=true Cloud business API requests must use the canonical Cloud base URL
+  VERIFIER tests/issues/pv-056-cloud-business-api.mjs sha256=0d057ef06a65e041284046d9399dc45c037ca073bd7bbce2790edaddb0e2603d
+  PASS    all business GET requests use canonical Cloud base URL
+  PASS    Cloud business requests carry Authorization header
+  PASS    negative control: empty base causes requests to not use CLOUD_URL (old bug reproduced)
+  VERDICT PASS
+
+pv#70 [STATIC_CONTRACT] gate=true Album async state is scoped to the active backend route
+  VERIFIER tests/issues/pv-070-album-backend-scope.mjs sha256=7c3a04bc23faefeec10582ae2f7072365753e7942b62c2219e9dbcc0565b69b9
+  PASS    Album component is remounted when backend route changes
+  PASS    new Album instance reloads backend-scoped root state
+  PASS    Album polling is cleaned up on unmount
+  VERDICT PASS
+
+pv#81 [BEHAVIORAL] gate=true Unsaved results are fetched by task id, survive offline blips, and thumbs upload only after save
+  VERIFIER tests/issues/pv-081-result-fetch-by-task.mjs sha256=7f45c9f0378b73c93c808ffcf29300c88bf5cedbc57ae94e19f590e9bc40133f
+  PASS    AC-2: GenerateScreen no longer uses /gallery/image/<hash>/data for just-generated results
+  PASS    AC-2: task-id fetch helper hits /queue/task/<id>/data
+  PASS    AC-2: all three sites (QueueTaskRow / queue completion / single generate) use the helper
+  PASS    AC-2: QueueTaskRow keys the fetch by task.id
+  PASS    AC-8: helper maps 404 to expired (no throw)
+  PASS    AC-8: ResultCard and QueueTaskRow render 期限切れ for expired items
+  PASS    AC-9: generateAndUploadThumb is called only from the after-save helper
+  PASS    AC-9: handleSave uploads the thumb after a successful cloud save
+  PASS    AC-9: queue row save uploads the thumb after queueTaskSave succeeds
+  PASS    AC-5: cloud→offline→cloud (same token) keeps results; cloud↔fran and token change clear
+  PASS    AC-5: results are no longer wiped on every revision change
+  PASS    S-3: results are not persisted to web storage
+  VERDICT PASS
+
+pv#98 [AUTO_FAILURE_INJECTION] gate=true One aggregation point for invalid residue (Fran logs/ INVALID + front store + settings debug view)
+  VERIFIER tests/issues/pv-098-invalid-aggregator.mjs sha256=858b1187c3c3bfa5f0db49a8827ce72bf86d71ddd4436b13a1a5d0efb64fe17a
+  PASS    AC-1: Fran test instance starts
+  PASS    AC-1: GET /settings response is unchanged for an unparseable settings.json (500, J-5)
+  PASS    AC-1: logs/ has code INVALID with kind/stage/raw/reason for the residue
+  PASS    AC-1: raw keeps the original text
+  PASS    AC-1: /debug/errors returns the INVALID entry
+  PASS    AC-1 (S-20): /debug/errors keeps an unparseable log line as INVALID with its raw text
+  PASS    AC-2: recordInvalid stores kind/stage/raw/reason
+  PASS    AC-2: entries survive a reload
+  PASS    AC-2: same kind/stage/raw is merged with count
+  PASS    AC-2: a numeric upper limit exists
+  PASS    AC-2: over the limit, the oldest entries drop first
+  PASS    AC-2: a corrupted store is itself reported, not silently emptied
+  PASS    AC-2: settings debug imports the front aggregation store
+  PASS    AC-2: the front list is rendered without a route condition (visible offline)
+  PASS    AC-2: the route /debug/errors list is shown next to it
+  PASS    AC-3: no parallel ErrorCode/createError mechanism remains
+  VERDICT PASS
+
+SUMMARY issues=18 gated=18 pass=105 fail=0 gated_fail=0 not_run=0 waived=4

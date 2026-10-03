@@ -1,6 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync, appendFileSync, unlinkSync, readdirSync, renameSync, statSync, rmSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync, mkdirSync, existsSync, unlinkSync, readdirSync, renameSync, statSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
@@ -8,18 +8,29 @@ import { execSync } from 'node:child_process';
 import { getByHash, listFolders, listByFolder, getRecent, getRecentByDays, getStats, getAllPreviewHashes, setFavorite, getFavorites, search as dbSearch, getByPreset, setCaption, setCaptionConfig, getImagePath, removeImageRow, getGalleryByCard, getTotalByCard, updateSyncMeta, getSyncInventory } from './server/db.js';
 import { startScan, getScanStatus } from './server/scanner.js';
 import { executeGenerate, executeSave } from './server/generate.js';
+import { writeLog, recordInvalid, recordEvent, logFileFor } from './server/log.js';
+import { validateSettings, validateCardsDoc, validatePresetsDoc, validateSlotBody, validateCardBody, validatePresetBody, parseIntQuery } from './server/validate.js';
+import { checkGenerateBody, checkQueueTasks } from './server/genParams.js';
+import { classifyNovelAiStatus } from './server/providers/novelai.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // --env-file で読まれていなければ .env から不足変数を補完
 const _envPath = join(__dirname, '.env');
+const _envSkipped = [];
+let _envLineNo = 0;
 if (existsSync(_envPath)) {
   for (const line of readFileSync(_envPath, 'utf8').split('\n')) {
+    _envLineNo++;
     const t = line.trim();
     if (!t || t.startsWith('#')) continue;
     const eq = t.indexOf('=');
-    if (eq < 0) continue;
+    if (eq < 0) {
+      // S-16: = のない行は読み飛ばすが記録する（中身は秘密を含みうるので行番号と長さだけ・J-3）
+      _envSkipped.push(`line ${_envLineNo} length=${t.length}`);
+      continue;
+    }
     const k = t.slice(0, eq).trim();
     const v = t.slice(eq + 1).trim();
     if (!process.env[k]) process.env[k] = v;
@@ -37,7 +48,16 @@ try {
   }).trim();
 } catch {}
 const THUMBS_DIR = join(__dirname, 'data', 'thumbs');
+for (const raw of _envSkipped) {
+  recordInvalid({ kind: 'env-line-without-equals', stage: 'S-16 server.js .env', raw, reason: '= のない行（読み飛ばす）' });
+}
+// S-16: 起動できない PORT は起動を止めて理由を出す
 const PORT = process.env.PORT || 8789;
+if (!/^\d+$/.test(String(PORT)) || Number(PORT) < 1 || Number(PORT) > 65535) {
+  recordInvalid({ kind: 'port-invalid', stage: 'S-16 server.js PORT', raw: String(PORT), reason: '1〜65535 の整数でないため起動しない' });
+  console.error(`[起動停止] PORT=${JSON.stringify(String(PORT))} は 1〜65535 の整数ではありません（.env または環境変数を直してください）`);
+  process.exit(1);
+}
 
 mkdirSync(join(__dirname, 'data'), { recursive: true });
 mkdirSync(join(__dirname, 'logs'), { recursive: true });
@@ -68,9 +88,20 @@ function generateId(prefix) {
   return prefix + randomBytes(4).toString('hex').slice(0, 5);
 }
 
+// S-17: data/*.json が解析できないときは INVALID に残してから例外を上げる（応答は従来どおり 500）
+function parseDataFile(path, stage) {
+  const text = readFileSync(path, 'utf8');
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    recordInvalid({ kind: 'data-file-unparseable', stage, raw: text, reason: `JSON として解析できない: ${e.message}` });
+    throw e;
+  }
+}
+
 function readSettings() {
   if (!existsSync(SETTINGS_PATH)) writeFileSync(SETTINGS_PATH, JSON.stringify(DEFAULT_SETTINGS, null, 2));
-  return JSON.parse(readFileSync(SETTINGS_PATH, 'utf8'));
+  return parseDataFile(SETTINGS_PATH, 'S-17 readSettings');
 }
 
 function readCardsData() {
@@ -79,7 +110,7 @@ function readCardsData() {
     writeFileSync(CARDS_PATH, JSON.stringify(initial, null, 2));
     return initial;
   }
-  return JSON.parse(readFileSync(CARDS_PATH, 'utf8'));
+  return parseDataFile(CARDS_PATH, 'S-17 readCardsData');
 }
 
 function atomicWriteJson(filePath, data) {
@@ -103,7 +134,7 @@ function readPresetsData() {
     writeFileSync(PRESETS_DATA_PATH, JSON.stringify(initial, null, 2));
     return initial;
   }
-  return JSON.parse(readFileSync(PRESETS_DATA_PATH, 'utf8'));
+  return parseDataFile(PRESETS_DATA_PATH, 'S-17 readPresetsData');
 }
 
 function writePresetsData(data) {
@@ -124,22 +155,30 @@ function createInitialCards() {
   };
 }
 
-function writeLog(level, code, message, detail) {
-  const d = new Date();
-  const entry = JSON.stringify({ ts: d.toISOString(), level, code, message, detail });
-  appendFileSync(join(__dirname, 'logs', `${d.toISOString().slice(0, 10)}.log`), entry + '\n');
-}
-
 function loadDanbooruTags() {
   const csvPath = join(__dirname, 'docs', 'supplied', 'danbooru-filtered.csv');
   try {
     const content = readFileSync(csvPath, 'utf8');
     const tags = [];
-    for (const line of content.trim().split('\n')) {
+    // S-21: 3 列未満・先頭が空の行、件数が整数でない行は数えて記録する（行は読み飛ばす・件数は 0）
+    const skipped = [];
+    const badCount = [];
+    content.trim().split('\n').forEach((line, i) => {
       const parts = line.split(',');
       if (parts.length >= 3 && parts[0]) {
+        const countText = parts[2].trim();
+        if (!/^\d+$/.test(countText)) badCount.push(`${i + 1}: ${line.slice(0, 80)}`);
         tags.push({ tag: parts[0].trim(), count: parseInt(parts[2]) || 0 });
+      } else {
+        skipped.push(`${i + 1}: ${line.slice(0, 80)}`);
       }
+    });
+    if (skipped.length || badCount.length) {
+      recordInvalid({
+        kind: 'danbooru-csv-rows', stage: 'S-21 loadDanbooruTags',
+        raw: { skipped: skipped.length, skippedSamples: skipped.slice(0, 5), badCount: badCount.length, badCountSamples: badCount.slice(0, 5) },
+        reason: `列が足りない・先頭が空の行 ${skipped.length} 件を読み飛ばし、件数が整数でない行 ${badCount.length} 件を 0 として読んだ`,
+      });
     }
     tags.sort((a, b) => b.count - a.count);
     danbooruTags = tags;
@@ -165,7 +204,14 @@ function runMigration(vaultRoot) {
     m2 = JSON.parse(readFileSync(m2Path, 'utf8'));
   } catch (e) {
     console.warn('[Migration] presets.json 解析失敗:', e.message);
+    // S-22: 記録するだけ。移行の振る舞い（印を付けず毎起動やり直す）は変えない
+    recordInvalid({ kind: 'm2-presets-unparseable', stage: 'S-22 runMigration', raw: readFileSync(m2Path, 'utf8').slice(0, 300), reason: `M2 の presets.json を解析できないため移行しない: ${e.message}` });
     return;
+  }
+  for (const k of ['characters', 'outfits', 'situations', 'extras', 'presets']) {
+    if (k in m2 && !Array.isArray(m2[k])) {
+      recordInvalid({ kind: 'm2-presets-field-not-array', stage: 'S-22 runMigration', raw: { field: k, value: m2[k] }, reason: '配列でないため読み飛ばす' });
+    }
   }
 
   const cards = createInitialCards();
@@ -216,10 +262,15 @@ function runMigration(vaultRoot) {
 function initVaultStructure() {
   const vaultRoot = process.env.VAULT_ROOT;
   if (vaultRoot) {
+    // S-16: 存在しない VAULT_ROOT は記録して起動を続ける
+    if (!existsSync(vaultRoot)) {
+      recordInvalid({ kind: 'vault-root-missing', stage: 'S-16 initVaultStructure', raw: vaultRoot, reason: 'VAULT_ROOT が存在しない（起動は続ける）' });
+    }
     try {
       mkdirSync(join(vaultRoot, '.tmp'), { recursive: true });
     } catch (e) {
       console.error('VAULT_ROOT .tmp 初期化エラー:', e.message);
+      recordInvalid({ kind: 'vault-tmp-init-failed', stage: 'S-16 initVaultStructure', raw: { vaultRoot, error: e.message }, reason: 'VAULT_ROOT/.tmp を作れない' });
     }
     try {
       const tmpDir = join(vaultRoot, '.tmp');
@@ -235,6 +286,26 @@ function initVaultStructure() {
   // Ensure cards.json and presets.json exist
   readCardsData();
   readPresetsData();
+}
+
+// J-6: 当たらない本文は書き込まずに 400 で拒み、INVALID に残す
+function rejectInvalid(res, stage, body, problems) {
+  recordInvalid({
+    kind: 'request-body-invalid',
+    stage,
+    raw: { problems: problems.slice(0, 10), body },
+    reason: problems.slice(0, 5).map(p => `${p.path}: ${p.reason}`).join(' / '),
+  });
+  return res.status(400).json({ error: '当たらない入力のため保存しませんでした', problems });
+}
+
+// S-12: クエリの数値。未指定は既定値、指定されて当たらなければ 400 と INVALID（null を返す）
+function queryInt(req, res, key, opts, stage) {
+  const r = parseIntQuery(req.query[key], { name: key, ...opts });
+  if (r.ok) return r.value;
+  recordInvalid({ kind: 'query-invalid', stage, raw: r.problem, reason: `${key}: ${r.problem.reason}` });
+  res.status(400).json({ error: `${key} が当たらない値です`, problems: [r.problem] });
+  return null;
 }
 
 function requireVaultRoot(req, res, next) {
@@ -259,9 +330,15 @@ async function start() {
     if (ALLOWED_ORIGINS.includes(origin)) return true;
     return ALLOWED_ORIGIN_PATTERNS.some(re => re.test(origin));
   }
+  // S-15: 許可外の Origin は応答を変えず（許可ヘッダを付けない）、Origin ごとに一度だけ記録する
+  const reportedOrigins = new Set();
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     res.setHeader('Vary', 'Origin');
+    if (origin && !isAllowedOrigin(origin) && !reportedOrigins.has(origin)) {
+      reportedOrigins.add(origin);
+      recordInvalid({ kind: 'cors-origin-rejected', stage: 'S-15 CORS', raw: { origin, method: req.method, path: req.originalUrl }, reason: 'ALLOWED_ORIGINS・prompt-vault-6gr.pages.dev のどれにも当たらない Origin（許可ヘッダを付けない）' });
+    }
     if (origin && isAllowedOrigin(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -281,6 +358,8 @@ async function start() {
 
   api.get('/settings', (_req, res) => res.json(readSettings()));
   api.put('/settings', (req, res) => {
+    const problems = validateSettings(req.body);
+    if (problems.length) return rejectInvalid(res, 'S-10 PUT /settings', req.body, problems);
     atomicWriteJson(SETTINGS_PATH, req.body);
     res.json({ ok: true });
   });
@@ -303,6 +382,8 @@ async function start() {
 
   api.put('/cards', (req, res) => {
     const data = req.body;
+    const problems = validateCardsDoc(data);
+    if (problems.length) return rejectInvalid(res, 'S-10 PUT /cards', data, problems);
     const now = new Date().toISOString();
     if (Array.isArray(data.slots)) for (const s of data.slots) { if (!s.updated_at) s.updated_at = now; }
     if (Array.isArray(data.cards)) for (const c of data.cards) { if (!c.updated_at) c.updated_at = now; }
@@ -311,6 +392,8 @@ async function start() {
   });
 
   api.post('/cards/slot', (req, res) => {
+    const problems = validateSlotBody(req.body, { create: true });
+    if (problems.length) return rejectInvalid(res, 'S-11 POST /cards/slot', req.body, problems);
     const data = readCardsData();
     const { name } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'スロット名は必須です' });
@@ -332,6 +415,8 @@ async function start() {
     const data = readCardsData();
     const idx = data.slots.findIndex(s => s.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'スロットが見つかりません' });
+    const problems = validateSlotBody(req.body, { create: false });
+    if (problems.length) return rejectInvalid(res, 'S-11 PUT /cards/slot/:id', req.body, problems);
     const { name } = req.body;
     if (name !== undefined && !name.trim()) return res.status(400).json({ error: 'スロット名は必須です' });
     if (name && name.trim() !== data.slots[idx].name && data.slots.some(s => s.name === name.trim())) {
@@ -354,6 +439,8 @@ async function start() {
 
   api.post('/cards/card', (req, res) => {
     const data = readCardsData();
+    const problems = validateCardBody(req.body, new Set(data.slots.map(s => s.id)));
+    if (problems.length) return rejectInvalid(res, 'S-11 POST /cards/card', req.body, problems);
     const { slotId, name, positive = '', negative = '', parentId = null } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'カード名は必須です' });
     if (!data.slots.some(s => s.id === slotId)) return res.status(400).json({ error: 'スロットが見つかりません' });
@@ -376,6 +463,8 @@ async function start() {
     const data = readCardsData();
     const idx = data.cards.findIndex(c => c.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'カードが見つかりません' });
+    const problems = validateCardBody(req.body, new Set(data.slots.map(s => s.id)));
+    if (problems.length) return rejectInvalid(res, 'S-11 PUT /cards/card/:id', req.body, problems);
     const { name, slotId } = req.body;
     if (name !== undefined && !name.trim()) return res.status(400).json({ error: 'カード名は必須です' });
     const targetSlotId = slotId || data.cards[idx].slotId;
@@ -426,10 +515,15 @@ async function start() {
   api.get('/presets', (_req, res) => res.json(readPresetsData()));
 
   api.post('/presets', (req, res) => {
+    const problems = validatePresetBody(req.body);
+    if (problems.length) return rejectInvalid(res, 'S-11 POST /presets', req.body, problems);
     const data = readPresetsData();
     const { name, tags = [], cards = {} } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'プリセット名は必須です' });
-    const preset = { id: generateId('p_'), name: name.trim(), tags, cards, updated_at: new Date().toISOString() };
+    const preset = { id: generateId('p_'), name: name.trim(), tags, cards };
+    // フロントが送る既知の欄（slotOrder・folder・filename・childCards）は黙って捨てずに保存する
+    for (const k of ['slotOrder', 'folder', 'filename', 'childCards']) if (k in req.body) preset[k] = req.body[k];
+    preset.updated_at = new Date().toISOString();
     data.presets.push(preset);
     writePresetsData(data);
     res.json(preset);
@@ -437,6 +531,8 @@ async function start() {
 
   api.put('/presets', (req, res) => {
     const data = req.body;
+    const problems = validatePresetsDoc(data);
+    if (problems.length) return rejectInvalid(res, 'S-10 PUT /presets', data, problems);
     const now = new Date().toISOString();
     if (Array.isArray(data.presets)) for (const p of data.presets) { if (!p.updated_at) p.updated_at = now; }
     writePresetsData(data);
@@ -447,6 +543,8 @@ async function start() {
     const data = readPresetsData();
     const idx = data.presets.findIndex(p => p.id === req.params.id);
     if (idx === -1) return res.status(404).json({ error: 'プリセットが見つかりません' });
+    const problems = validatePresetBody(req.body);
+    if (problems.length) return rejectInvalid(res, 'S-11 PUT /presets/:id', req.body, problems);
     data.presets[idx] = { ...data.presets[idx], ...req.body, updated_at: new Date().toISOString() };
     writePresetsData(data);
     res.json(data.presets[idx]);
@@ -525,8 +623,10 @@ async function start() {
 
   api.get('/gallery/recent', (req, res) => {
     try {
-      const days = parseInt(req.query.days) || 0;
-      const limit = parseInt(req.query.limit) || 20;
+      const days = queryInt(req, res, 'days', { min: 0, max: 3650, fallback: 0 }, 'S-12 GET /gallery/recent');
+      if (days === null) return;
+      const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 20 }, 'S-12 GET /gallery/recent');
+      if (limit === null) return;
       const rows = days > 0 ? getRecentByDays(days) : getRecent(limit);
       const images = rows.map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
@@ -570,20 +670,30 @@ async function start() {
     try {
       const { favorite, meta_updated_at } = req.body;
       if (favorite !== 0 && favorite !== 1) return res.status(400).json({ error: 'favorite は 0 または 1' });
-      setFavorite(req.params.hash, favorite, meta_updated_at || undefined);
+      const changed = setFavorite(req.params.hash, favorite, meta_updated_at || undefined);
+      if (changed === 0) {
+        recordInvalid({ kind: 'image-hash-not-found', stage: 'S-13 PUT /gallery/image/:hash/favorite', raw: { hash: req.params.hash, favorite }, reason: '存在しない hash（0 行更新）' });
+        return res.status(404).json({ error: '画像が見つかりません' });
+      }
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   api.get('/gallery/favorites', (req, res) => {
     try {
-      const limit = parseInt(req.query.limit) || 50;
+      const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 50 }, 'S-12 GET /gallery/favorites');
+      if (limit === null) return;
       const images = getFavorites(limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   api.get('/gallery/sync-inventory', (req, res) => {
+    // J-5: pv-sync が呼ぶ経路。応答（既存の範囲の締め方）は変えず、当たらない値は記録だけ
+    for (const [key, opts] of [['offset', { min: 0, max: Number.MAX_SAFE_INTEGER, fallback: 0 }], ['limit', { min: 1, max: 500, fallback: 100 }]]) {
+      const r = parseIntQuery(req.query[key], { name: key, ...opts });
+      if (!r.ok) recordInvalid({ kind: 'query-invalid', stage: 'S-12 GET /gallery/sync-inventory（記録のみ・J-5）', raw: r.problem, reason: `${key}: ${r.problem.reason}（既存の規則で締めて続行）` });
+    }
     const offset = Math.max(0, parseInt(req.query.offset) || 0);
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 100));
     try {
@@ -593,17 +703,20 @@ async function start() {
   });
 
   api.get('/gallery/search', (req, res) => {
-    const { q, limit } = req.query;
+    const { q } = req.query;
     if (!q || !q.trim()) return res.status(400).json({ error: '検索クエリが空です' });
+    const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 50 }, 'S-12 GET /gallery/search');
+    if (limit === null) return;
     try {
-      const images = dbSearch(q.trim(), parseInt(limit) || 50).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
+      const images = dbSearch(q.trim(), limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   api.get('/gallery/by-preset/:presetId', (req, res) => {
     try {
-      const limit = parseInt(req.query.limit) || 50;
+      const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 50 }, 'S-12 GET /gallery/by-preset');
+      if (limit === null) return;
       const images = getByPreset(req.params.presetId, limit).map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       res.json({ images });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -612,7 +725,13 @@ async function start() {
   api.put('/gallery/image/:hash/meta', (req, res) => {
     try {
       const { preset_id, created_at } = req.body || {};
-      updateSyncMeta(req.params.hash, { preset_id, created_at });
+      const changed = updateSyncMeta(req.params.hash, { preset_id, created_at });
+      // J-5: pv-sync が呼ぶ経路。応答は変えず記録だけ
+      if (changed === null) {
+        recordInvalid({ kind: 'sync-meta-nothing-to-update', stage: 'S-13 PUT /gallery/image/:hash/meta（記録のみ・J-5）', raw: { hash: req.params.hash, body: req.body }, reason: 'preset_id・created_at のどちらもない' });
+      } else if (changed === 0) {
+        recordInvalid({ kind: 'image-hash-not-found', stage: 'S-13 PUT /gallery/image/:hash/meta（記録のみ・J-5）', raw: { hash: req.params.hash, body: req.body }, reason: '存在しない hash（0 行更新）' });
+      }
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
@@ -621,7 +740,11 @@ async function start() {
     try {
       const { caption, captionConfig, meta_updated_at } = req.body;
       if (typeof caption !== 'string') return res.status(400).json({ error: 'caption は文字列' });
-      setCaption(req.params.hash, caption, meta_updated_at || undefined);
+      const changed = setCaption(req.params.hash, caption, meta_updated_at || undefined);
+      if (changed === 0) {
+        recordInvalid({ kind: 'image-hash-not-found', stage: 'S-13 PUT /gallery/image/:hash/caption', raw: { hash: req.params.hash, caption }, reason: '存在しない hash（0 行更新）' });
+        return res.status(404).json({ error: '画像が見つかりません' });
+      }
       if (captionConfig !== undefined) setCaptionConfig(req.params.hash, JSON.stringify(captionConfig));
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -629,9 +752,11 @@ async function start() {
 
   api.get('/gallery/by-card', (req, res) => {
     try {
-      const { positive, limit = 4 } = req.query;
+      const { positive } = req.query;
       if (!positive) return res.json({ images: [], total: 0 });
-      const images = getGalleryByCard(positive, parseInt(limit) || 4)
+      const limit = queryInt(req, res, 'limit', { min: 1, max: 1000, fallback: 4 }, 'S-12 GET /gallery/by-card');
+      if (limit === null) return;
+      const images = getGalleryByCard(positive, limit)
         .map(r => ({ ...r, thumbUrl: `/api/thumbs/${r.hash}.webp` }));
       const total = getTotalByCard(positive);
       res.json({ images, total });
@@ -685,11 +810,17 @@ async function start() {
   // ── 生成 ──
 
   api.post('/generate', requireVaultRoot, async (req, res) => {
-    const { prompt, negative_prompt, model, width, height, steps, scale, sampler, seed } = req.body;
+    // S-03・S-04・J-9: 当たらない値は NovelAI を呼ばずに 400
+    const chk = checkGenerateBody(req.body);
+    if (chk.problems.length) {
+      recordInvalid({ kind: 'generate-params-invalid', stage: 'S-03/S-04 POST /generate', raw: { problems: chk.problems, body: req.body }, reason: chk.problems.slice(0, 5).map(p => `${p.path}: ${p.reason}`).join(' / ') });
+      return res.status(400).json({ error: `生成パラメータが当たらないため生成しません: ${chk.problems.map(p => `${p.path}: ${p.reason}`).join(' / ')}`, problems: chk.problems });
+    }
+    const { prompt, negative_prompt } = req.body;
     try {
       const result = await executeGenerate({
-        prompt, negativePrompt: negative_prompt, model, width, height, steps, scale, sampler, seed,
-        vaultRoot: process.env.VAULT_ROOT,
+        prompt, negativePrompt: negative_prompt, ...chk.params,
+        vaultRoot: process.env.VAULT_ROOT, origin: 'single',
       });
       res.json({ success: true, image: result });
     } catch (e) {
@@ -702,8 +833,16 @@ async function start() {
 
   api.post('/save', requireVaultRoot, (req, res) => {
     const { filename, seed, folderSegments = [], filenameSegments = [], preset_id } = req.body;
+    // S-09: 保存先の名前で寄せるもの（seed がない・整数でない → 0000000000、文字列でない断片 → 文字列化）は記録する。保存の振る舞いは変えない
+    const folded = [];
+    if (!(Number.isInteger(seed) && seed >= 0)) folded.push({ path: 'seed', raw: seed === undefined ? 'undefined' : JSON.stringify(seed), reason: '0 以上の整数でない（0000000000 として名付ける）' });
+    for (const [name, segs] of [['folderSegments', folderSegments], ['filenameSegments', filenameSegments]]) {
+      if (Array.isArray(segs)) segs.forEach((s, i) => { if (s != null && typeof s !== 'string') folded.push({ path: `${name}[${i}]`, raw: JSON.stringify(s), reason: '文字列でない（文字列にして使う）' }); });
+    }
+    if (folded.length) recordInvalid({ kind: 'save-name-folded', stage: 'S-09 POST /save', raw: { filename, problems: folded }, reason: folded.map(f => `${f.path}: ${f.reason}`).join(' / ') });
     try {
       const saved = executeSave(process.env.VAULT_ROOT, { filename, seed, folderSegments, filenameSegments, preset_id });
+      if (saved.metaResidue?.length) recordInvalid({ kind: 'png-meta-unread', stage: 'S-06 POST /save', raw: { file: saved.saved_path, residue: saved.metaResidue }, reason: saved.metaResidue.map(r => r.reason).join(' / ') });
       res.json({ success: true, saved_path: saved.saved_path, warning: saved.warning ?? null });
     } catch (e) {
       writeLog('error', 'SAVE_FAILED', e.message, '');
@@ -805,11 +944,26 @@ async function start() {
 
   // ── デバッグ ──
 
+  // S-20: 解析できない行は捨てず、その位置に INVALID として出す（元の行を raw に残す）
   api.get('/debug/errors', (_req, res) => {
-    const logFile = join(__dirname, 'logs', `${new Date().toISOString().slice(0, 10)}.log`);
+    const logFile = logFileFor();
     if (!existsSync(logFile)) return res.json([]);
-    const lines = readFileSync(logFile, 'utf8').trim().split('\n').filter(Boolean);
-    res.json(lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean).slice(-20));
+    const lines = readFileSync(logFile, 'utf8').split('\n').filter(l => l.trim());
+    const entries = lines.map((l, i) => {
+      try {
+        const e = JSON.parse(l);
+        if (e && typeof e === 'object' && !Array.isArray(e)) return e;
+        throw new Error('オブジェクトでない');
+      } catch (err) {
+        return {
+          ts: null, level: 'warn', code: 'INVALID', message: 'log-line-unparseable',
+          kind: 'log-line-unparseable', stage: `S-20 /debug/errors line ${i + 1}`,
+          raw: l.length > 500 ? `${l.slice(0, 500)}…(+${l.length - 500}字)` : l,
+          reason: `ログ行が JSON のオブジェクトとして解析できない: ${err.message}`,
+        };
+      }
+    });
+    res.json(entries.slice(-50));
   });
 
   api.post('/debug/test-api', async (_req, res) => {
@@ -823,7 +977,12 @@ async function start() {
       });
       if (resp.ok) return res.json({ ok: true, message: 'NovelAI API 疎通OK' });
       const text = await resp.text();
-      writeLog('error', 'API_AUTH_FAILED', `疎通テスト失敗: ${resp.status}`, text);
+      // S-05: 認証の失敗だけを API_AUTH_FAILED（既存の code）とし、他は種別で分ける
+      const cls = classifyNovelAiStatus(resp.status);
+      const raw = `status=${resp.status} body=${text.slice(0, 300)}`;
+      if (cls === 'auth') writeLog('error', 'API_AUTH_FAILED', `疎通テスト失敗: ${resp.status}`, text);
+      else if (cls) recordEvent({ code: 'NOVELAI_FAILED', kind: `novelai-${cls}`, stage: 'S-05 /debug/test-api', raw, reason: `疎通テスト失敗: ${resp.status}` });
+      else recordInvalid({ kind: 'novelai-unexpected-status', stage: 'S-05 /debug/test-api', raw, reason: '401/402/403/429/5xx のどれでもない 2xx 以外' });
       res.json({ ok: false, error: `ステータス ${resp.status}: ${text.slice(0, 200)}` });
     } catch (e) {
       writeLog('error', 'API_NETWORK', 'NovelAI疎通テスト接続失敗', e.message);
@@ -876,6 +1035,12 @@ async function start() {
     const { tasks } = req.body;
     if (!Array.isArray(tasks) || tasks.length === 0) {
       return res.status(400).json({ error: 'tasksは1件以上の配列が必要です' });
+    }
+    // S-19: 未知の欄・型違い・当たらない生成パラメータは追加しない（既定に寄せない・捨てない）
+    const problems = checkQueueTasks(tasks);
+    if (problems.length) {
+      recordInvalid({ kind: 'queue-task-invalid', stage: 'S-19 POST /queue/add', raw: { problems: problems.slice(0, 10), tasks }, reason: problems.slice(0, 5).map(p => `${p.path}: ${p.reason}`).join(' / ') });
+      return res.status(400).json({ error: `キューに追加できない値があります: ${problems.map(p => `${p.path}: ${p.reason}`).join(' / ')}`, problems });
     }
     try {
       const added = addTasks(tasks);
@@ -943,6 +1108,12 @@ async function start() {
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
+  });
+
+  // S-14: 未定義の /api/* はメソッドを問わず JSON の 404（Vite の SPA フォールバックより先に受ける）
+  api.use((req, res) => {
+    recordInvalid({ kind: 'api-route-undefined', stage: 'S-14 /api fallback', raw: { method: req.method, path: req.originalUrl }, reason: '定義されていない API' });
+    res.status(404).json({ error: '未定義の API です', method: req.method, path: req.originalUrl });
   });
 
   app.use('/api', api);

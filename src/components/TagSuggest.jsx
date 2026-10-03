@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { api } from '../lib/api';
+import { recordFailure } from '../lib/invalidLog';
 
 export default function TagSuggest({ value, onChange, style, ...rest }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -32,7 +33,9 @@ export default function TagSuggest({ value, onChange, style, ...rest }) {
         const results = await api.searchTags(token);
         setSuggestions(results.slice(0, 10));
         setActiveIdx(-1);
-      } catch {
+      } catch (e) {
+        // §4.3 #23: タグ候補の取得の失敗（裏の取得なので記録だけ）
+        recordFailure('§4.3 #23 TagSuggest.search', 'tag-suggest-failed', e, { token });
         setSuggestions([]);
       }
     }, 300);

@@ -9,6 +9,13 @@ export { closeDb };
 import { parsePngMeta } from './png-meta.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// 集約先（log.js）への記録。既存 verifier（pv#40）が scanner.js を写して読むため静的 import にしない
+function recordInvalidLater(entry) {
+  import('./log.js')
+    .then(m => m.recordInvalid(entry))
+    .catch(e => console.warn('[INVALID] 集約先に記録できない', JSON.stringify(entry).slice(0, 300), e.message));
+}
 const THUMBS_DIR = join(__dirname, '..', 'data', 'thumbs');
 
 let scanState = {
@@ -30,8 +37,9 @@ async function walkDir(dir) {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
-  } catch {
+  } catch (e) {
     scanState.incomplete = true;
+    recordInvalidLater({ kind: 'scan-dir-unreadable', stage: 'S-07 scanner.walkDir', raw: { dir, error: e.message }, reason: 'ディレクトリを読めない（走査は incomplete・削除はしない）' });
     return files;
   }
   for (const entry of entries) {
@@ -56,6 +64,7 @@ export async function generateThumb(hash, srcPath) {
     setThumbOk(hash, 1);
   } catch (e) {
     console.warn(`[Scanner] サムネイル生成失敗 ${hash}: ${e.message}`);
+    recordInvalidLater({ kind: 'thumbnail-failed', stage: 'S-08 scanner.generateThumb', raw: { hash, path: srcPath, error: e.message }, reason: 'サムネイルを作れない（thumb_ok=0 のまま）' });
   }
 }
 
@@ -89,6 +98,9 @@ export async function startScan(vaultRoot) {
         const now = new Date().toISOString();
 
         const meta = parsePngMeta(buf);
+        if (meta.residue.length) {
+          recordInvalidLater({ kind: 'png-meta-unread', stage: 'S-06 scanner.parsePngMeta', raw: { file: relPath, residue: meta.residue }, reason: meta.residue.map(r => r.reason).join(' / ') });
+        }
         const charJson = meta.char_prompts ? JSON.stringify({ base_positive: meta.prompt || '', base_negative: meta.negative || '', chars: meta.char_prompts }) : null;
         const searchPrompt = meta.char_prompts
           ? [meta.prompt, ...meta.char_prompts.map(c => c.positive)].filter(Boolean).join(', ')
@@ -147,6 +159,7 @@ export async function startScan(vaultRoot) {
       } catch (e) {
         scanState.incomplete = true;
         console.warn(`[Scanner] ファイル処理失敗 ${filePath}: ${e.message}`);
+        recordInvalidLater({ kind: 'scan-file-failed', stage: 'S-07 scanner.startScan', raw: { file: filePath, error: e.message }, reason: 'ファイルを処理できない（走査は incomplete・削除はしない）' });
       }
       scanState.processed++;
     }
@@ -170,6 +183,7 @@ export async function startScan(vaultRoot) {
     console.log(`[Scanner] 完了: 新規${scanState.newCount}件 移動${scanState.movedCount}件 削除${scanState.deletedCount}件`);
   } catch (e) {
     console.error('[Scanner] エラー:', e.message);
+    recordInvalidLater({ kind: 'scan-failed', stage: 'S-07 scanner.startScan', raw: { vaultRoot, error: e.message }, reason: '走査が途中で止まった' });
   } finally {
     scanState.scanning = false;
   }

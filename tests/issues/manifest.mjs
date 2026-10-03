@@ -15,6 +15,12 @@ import pv053 from './pv-053-cloud-fallback.mjs';
 import pv056 from './pv-056-cloud-business-api.mjs';
 import pv070 from './pv-070-album-backend-scope.mjs';
 import pv081 from './pv-081-result-fetch-by-task.mjs';
+import pv098 from './pv-098-invalid-aggregator.mjs';
+import pv099 from './pv-099-checker-residue.mjs';
+import pv100 from './pv-100-write-guard.mjs';
+import pv101 from './pv-101-paid-call-guard.mjs';
+import pv102 from './pv-102-route-residue.mjs';
+import pv103 from './pv-103-remaining-residue.mjs';
 
 export const issueVerifiers = Object.freeze({
   [pv005.issue]: pv005,
@@ -34,4 +40,10 @@ export const issueVerifiers = Object.freeze({
   [pv056.issue]: pv056,
   [pv070.issue]: pv070,
   [pv081.issue]: pv081,
+  [pv098.issue]: pv098,
+  [pv099.issue]: pv099,
+  [pv100.issue]: pv100,
+  [pv101.issue]: pv101,
+  [pv102.issue]: pv102,
+  [pv103.issue]: pv103,
 });

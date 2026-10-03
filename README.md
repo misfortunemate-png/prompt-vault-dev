@@ -80,5 +80,5 @@ npx wrangler pages deploy dist --project-name=prompt-vault --branch=main
 
 `public/sw.js` のキャッシュ名を変更すると古い SW が強制的に入れ替わる。
 
-- 現在のキャッシュ名: `prompt-vault-v4.0.1`
+- 現在のキャッシュ名: `prompt-vault-v4.1.0`
 - クロスオリジンリクエスト（フランサーバー等）は SW が傍受しない（same-origin ガード適用済み）

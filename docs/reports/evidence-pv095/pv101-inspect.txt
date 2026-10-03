@@ -1,0 +1,9 @@
+
+✅ マニフェスト照合
+✅ 支給物SHA-256照合
+✅ 版確認
+✅ _STATUS.md 行数
+✅ danbooru-filtered.csv SHA-256
+✅ ビルド確認
+
+=== ALL GREEN ===

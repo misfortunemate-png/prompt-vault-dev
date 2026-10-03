@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { createHash } from 'crypto';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { recordInvalid } from '../server/log.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cardsPath = join(__dirname, '..', 'data', 'cards.json');
@@ -27,7 +28,11 @@ for (const c of data.cards) {
 
 const orphans = data.cards.filter(c => !slotIds.has(c.slotId));
 if (orphans.length > 0) {
-  console.log(`Removing ${orphans.length} orphan cards: ${orphans.map(c => c.id).join(', ')}`);
+  // T-06・J-7: 削除するカードの中身全体を集約先（logs/ の INVALID）に残してから削除する
+  for (const c of orphans) {
+    recordInvalid({ kind: 'orphan-card-deleted', stage: 'T-06 normalize-cards', raw: c, reason: `存在しないスロット ${JSON.stringify(c.slotId)} を指すカードを削除`, full: true });
+  }
+  console.log(`Removing ${orphans.length} orphan cards: ${orphans.map(c => c.id).join(', ')}（中身は logs/ に INVALID として記録）`);
   data.cards = data.cards.filter(c => slotIds.has(c.slotId));
   fixed += orphans.length;
 }

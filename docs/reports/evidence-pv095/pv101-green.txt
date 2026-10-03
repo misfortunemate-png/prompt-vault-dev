@@ -1,0 +1,114 @@
+[INVALID] queue-state-unknown F-08 GenerateScreen.queue state が idle/running/paused のどれでもない {"state":"draining"}
+[INVALID] queue-task-status-unknown F-08 GenerateScreen.QueueTaskRow status が pending/running/done/error/skipped のどれでもない {"task_id":"t_y","status":"zombie"}
+repository_sha=001c4e7f4e194b417f0b5472c657b1defaa8a058
+
+pv#101 [AUTO_FAILURE_INJECTION] gate=true Paid NovelAI calls are not made with unmatched values; failure kinds are recorded on both paths
+  VERIFIER tests/issues/pv-101-paid-call-guard.mjs sha256=a671f155ae4e2beb6229c5aa686c445c1374d09c9519f1c08a9db383dbf6b7ab
+  PASS    Fran test instance starts
+  PASS    AC-8 S-03 unknown model: rejected with 4xx
+  PASS    AC-8 S-03 unknown model: NovelAI (mock) not called
+  PASS    AC-8 S-03 unknown model: recorded as INVALID
+  PASS    AC-8 S-04 width non-numeric string: rejected with 4xx
+  PASS    AC-8 S-04 width non-numeric string: NovelAI (mock) not called
+  PASS    AC-8 S-04 width non-numeric string: recorded as INVALID
+  PASS    AC-8 S-04 width 0: rejected with 4xx
+  PASS    AC-8 S-04 width 0: NovelAI (mock) not called
+  PASS    AC-8 S-04 width 0: recorded as INVALID
+  PASS    AC-8 S-04 width not a multiple of 64: rejected with 4xx
+  PASS    AC-8 S-04 width not a multiple of 64: NovelAI (mock) not called
+  PASS    AC-8 S-04 width not a multiple of 64: recorded as INVALID
+  PASS    AC-8 S-04 steps 0: rejected with 4xx
+  PASS    AC-8 S-04 steps 0: NovelAI (mock) not called
+  PASS    AC-8 S-04 steps 0: recorded as INVALID
+  PASS    AC-8 S-04 steps 60: rejected with 4xx
+  PASS    AC-8 S-04 steps 60: NovelAI (mock) not called
+  PASS    AC-8 S-04 steps 60: recorded as INVALID
+  PASS    AC-8 S-04 unknown sampler: rejected with 4xx
+  PASS    AC-8 S-04 unknown sampler: NovelAI (mock) not called
+  PASS    AC-8 S-04 unknown sampler: recorded as INVALID
+  PASS    AC-8 S-04 scale as string: rejected with 4xx
+  PASS    AC-8 S-04 scale as string: NovelAI (mock) not called
+  PASS    AC-8 S-04 scale as string: recorded as INVALID
+  PASS    AC-8 S-04 negative seed other than -1: rejected with 4xx
+  PASS    AC-8 S-04 negative seed other than -1: NovelAI (mock) not called
+  PASS    AC-8 S-04 negative seed other than -1: recorded as INVALID
+  PASS    AC-8 S-04 fractional seed: rejected with 4xx
+  PASS    AC-8 S-04 fractional seed: NovelAI (mock) not called
+  PASS    AC-8 S-04 fractional seed: recorded as INVALID
+  PASS    AC-8 S-04 prompt not a string: rejected with 4xx
+  PASS    AC-8 S-04 prompt not a string: NovelAI (mock) not called
+  PASS    AC-8 S-04 prompt not a string: recorded as INVALID
+  PASS    AC-8 S-04 unknown body key: rejected with 4xx
+  PASS    AC-8 S-04 unknown body key: NovelAI (mock) not called
+  PASS    AC-8 S-04 unknown body key: recorded as INVALID
+  PASS    AC-8 unspecified (only prompt) uses defaults and calls once
+  PASS    AC-8 unspecified (null / empty values) uses defaults and calls once
+  PASS    AC-8 control model nai-diffusion-5-full: accepted and called once
+  PASS    AC-8 control model nai-diffusion-5-curated: accepted and called once
+  PASS    AC-8 control model nai-diffusion-4-5-full: accepted and called once
+  PASS    AC-8 control model nai-diffusion-4-5-curated: accepted and called once
+  PASS    AC-8 control model nai-diffusion-4-full: accepted and called once
+  PASS    AC-8 control model nai-diffusion-3: accepted and called once
+  PASS    AC-8 control sampler k_euler_ancestral: accepted and called once
+  PASS    AC-8 control sampler k_euler: accepted and called once
+  PASS    AC-8 control sampler k_dpmpp_2m_sde: accepted and called once
+  PASS    AC-8 control resolution 832x1216: accepted and called once
+  PASS    AC-8 control resolution 1216x832: accepted and called once
+  PASS    AC-8 control resolution 1024x1024: accepted and called once
+  PASS    AC-8 control seed -1: accepted and called once
+  PASS    AC-8 control seed 4294967295: accepted and called once
+  PASS    AC-8 control settings default model (fixture): accepted and called once
+  PASS    AC-8 S-19 unknown model in params: 4xx, nothing queued, recorded
+  PASS    AC-8 S-19 unknown task field: 4xx, nothing queued, recorded
+  PASS    AC-8 S-19 steps as string: 4xx, nothing queued, recorded
+  PASS    AC-8 S-19 folderSegments not an array: 4xx, nothing queued, recorded
+  PASS    AC-8 S-19 unknown params key: 4xx, nothing queued, recorded
+  PASS    AC-8 S-19 control: front task shapes are queued
+  PASS    AC-9 S-18 intervalMin is a string: queue is not started
+  PASS    AC-9 S-18 intervalMin is a string: NovelAI (mock) not called
+  PASS    AC-9 S-18 intervalMin is a string: reason on screen (response) and in the aggregator
+  PASS    AC-9 S-18 intervalMax below intervalMin: queue is not started
+  PASS    AC-9 S-18 intervalMax below intervalMin: NovelAI (mock) not called
+  PASS    AC-9 S-18 intervalMax below intervalMin: reason on screen (response) and in the aggregator
+  PASS    AC-9 S-18 intervalMin negative: queue is not started
+  PASS    AC-9 S-18 intervalMin negative: NovelAI (mock) not called
+  PASS    AC-9 S-18 intervalMin negative: reason on screen (response) and in the aggregator
+  PASS    AC-10 single status:401: recorded with kind novelai-auth
+  PASS    AC-10 single status:401: no retry (called exactly once)
+  PASS    AC-10 single status:401: raw keeps the status and body head
+  PASS    AC-10 single status:402: recorded with kind novelai-payment
+  PASS    AC-10 single status:402: no retry (called exactly once)
+  PASS    AC-10 single status:402: raw keeps the status and body head
+  PASS    AC-10 single status:429: recorded with kind novelai-rate-limit
+  PASS    AC-10 single status:429: no retry (called exactly once)
+  PASS    AC-10 single status:429: raw keeps the status and body head
+  PASS    AC-10 single status:503: recorded with kind novelai-server-error
+  PASS    AC-10 single status:503: no retry (called exactly once)
+  PASS    AC-10 single status:503: raw keeps the status and body head
+  PASS    AC-10 single status:418: recorded with kind novelai-unexpected-status
+  PASS    AC-10 single status:418: no retry (called exactly once)
+  PASS    AC-10 single status:418: raw keeps the status and body head
+  PASS    AC-10 single html: recorded with kind novelai-response-format
+  PASS    AC-10 single html: no retry (called exactly once)
+  PASS    AC-10 S-02: raw keeps Content-Type and the head of the body
+  PASS    AC-10 single throw: recorded with kind novelai-network
+  PASS    AC-10 single throw: no retry (called exactly once)
+  PASS    AC-10: kinds are all distinct
+  PASS    AC-10 queue 429: recorded in the aggregator (not only task.error)
+  PASS    AC-10 S-05: test-api 429 is recorded as rate-limit, not API_AUTH_FAILED
+  PASS    AC-10 S-05 control: test-api 401 keeps API_AUTH_FAILED (existing code)
+  PASS    AC-10 F-08: Worker values (state idle/running/paused, status pending/running/done/error, skipped) are not residue
+  PASS    AC-10 F-08: unknown state/status are recorded with the raw value
+  PASS    AC-10 §4.3 #1: GenerateScreen records the residue
+  PASS    AC-10 §4.3 #2: GenerateScreen records the residue
+  PASS    AC-10 §4.3 #5: GenerateScreen records the residue
+  PASS    AC-10 §4.3 #7: GenerateScreen records the residue
+  PASS    AC-10 §4.3 #8: GenerateScreen records the residue
+  PASS    AC-10 F-09: GenerateScreen records the residue
+  PASS    AC-10 F-08: GenerateScreen classifies task status and queue state via queueStatus
+  PASS    AC-10 #1/#7/#8: no silent catch around the task image fetch
+  PASS    AC-10 #5: queue polling failure is not silent
+  PASS    AC-10 #2: QueueTaskRow does not fold an unparseable result into null silently
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=105 fail=0 gated_fail=0 not_run=0 waived=0 unknown=0

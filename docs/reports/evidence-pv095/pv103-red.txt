@@ -1,0 +1,66 @@
+repository_sha=42182d724cd834cdf104db6d99c4fed44230a793
+
+pv#103 [AUTO_FAILURE_INJECTION] gate=true Remaining swallowed failures and branches have a residue type (light)
+  VERIFIER tests/issues/pv-103-remaining-residue.mjs sha256=dc11c8719946ecb2c659e43b94fb3b8c94212175acba07e0d6296ef51e4e85b6
+  PASS    Fran test instance starts
+  FAIL    AC-13 S-06: Comment JSON that cannot be parsed is recorded — []
+  FAIL    AC-13 S-06: zTXt Description is recorded — []
+  FAIL    AC-13 S-06: compressed iTXt Comment is recorded — []
+  PASS    AC-13 S-06 (J-17): other keywords are skipped explicitly, not recorded
+  FAIL    AC-13 S-06: a non-PNG .png file is recorded — []
+  FAIL    AC-13 S-08: a thumbnail failure is recorded in logs/ (not console only) — []
+  PASS    AC-13 S-07: scan finished and status still exposes incomplete
+  FAIL    AC-13 S-09: folding seed null → 0000000000 and a non-string segment are recorded, save unchanged (200) — status=200 s09=[]
+  PASS    AC-13 S-12: limit=abc is 400 and recorded
+  FAIL    AC-13 S-21: skipped CSV rows and unparseable counts are recorded with samples — []
+  FAIL    AC-13 S-22: an unparseable M2 presets.json is recorded (migration behavior unchanged) — []
+  PASS    AC-13 S-20: an unparseable log line is returned as INVALID
+  PASS    AC-13 S-17: a corrupted settings.json is recorded (response unchanged 500)
+  FAIL    AC-13 S-16: a non-numeric PORT stops startup with a reason — started=false exit=1 out=/run_main:101:5)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:2044:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EACCES',
+  errno: -4092,
+  syscall: 'listen',
+  address: 'abc',
+  port: -1
+}
+
+Node.js v24.15.0
+
+  FAIL    AC-13 S-16: startable residue (.env line without =, missing VAULT_ROOT) is recorded and startup continues — up=true e16=[]
+  PASS    AC-13 S-16 (J-3): the content of a line without = is not copied into raw
+  FAIL    AC-13 §4.3 #21: getThumb failure returns null and is recorded — []
+  FAIL    AC-13 §4.3 #27: IndexedDB failures return the empty result and are recorded — []
+  FAIL    AC-13 §4.3 #3: recorded / handled in src/screens/GenerateScreen.jsx — silent pattern remains
+  FAIL    AC-13 §4.3 #4: recorded / handled in src/screens/GenerateScreen.jsx — marker missing
+  FAIL    AC-13 §4.3 #9: recorded / handled in src/screens/GenerateScreen.jsx — silent pattern remains
+  FAIL    AC-13 §4.3 #10: recorded / handled in src/lib/thumbGen.js — marker missing
+  FAIL    AC-13 §4.3 #13: recorded / handled in src/components/ImageViewer.jsx — silent pattern remains
+  FAIL    AC-13 §4.3 #14: recorded / handled in src/components/ImageViewer.jsx — marker missing
+  FAIL    AC-13 §4.3 #15: recorded / handled in src/screens/AlbumScreen.jsx — marker missing
+  FAIL    AC-13 §4.3 #16: recorded / handled in src/screens/AlbumScreen.jsx — silent pattern remains
+  FAIL    AC-13 §4.3 #17: recorded / handled in src/screens/AlbumScreen.jsx — marker missing
+  FAIL    AC-13 §4.3 #18: recorded / handled in src/screens/AlbumScreen.jsx — silent pattern remains
+  FAIL    AC-13 §4.3 #19: recorded / handled in src/screens/AlbumScreen.jsx — marker missing
+  FAIL    AC-13 §4.3 #20 (cards): recorded / handled in src/screens/TemplateCardList.jsx — marker missing
+  FAIL    AC-13 §4.3 #20 (presets): recorded / handled in src/screens/TemplatePresetList.jsx — marker missing
+  FAIL    AC-13 §4.3 #22 (cards): recorded / handled in src/screens/TemplateCardList.jsx — marker missing
+  FAIL    AC-13 §4.3 #22 (presets): recorded / handled in src/screens/TemplatePresetList.jsx — marker missing
+  FAIL    AC-13 §4.3 #23: recorded / handled in src/components/TagSuggest.jsx — marker missing
+  FAIL    AC-13 §4.3 #24: recorded / handled in src/App.jsx — marker missing
+  FAIL    AC-13 §4.3 #25: recorded / handled in src/App.jsx — silent pattern remains
+  FAIL    AC-13 §4.3 #26: recorded / handled in src/screens/SettingsScreen.jsx — silent pattern remains
+  FAIL    AC-13 F-14: recorded / handled in src/App.jsx — marker missing
+  FAIL    AC-13 F-15 (cards): recorded / handled in src/screens/TemplateCardList.jsx — marker missing
+  FAIL    AC-13 F-15 (presets): recorded / handled in src/screens/TemplatePresetList.jsx — marker missing
+  FAIL    AC-13 F-16 (sw): recorded / handled in public/sw.js — marker missing
+  FAIL    AC-13 F-16 (client): recorded / handled in src/main.jsx — marker missing
+  FAIL    AC-13 F-17: recorded / handled in src/screens/GenerateScreen.jsx — marker missing
+  FAIL    AC-13 F-18: recorded / handled in src/App.jsx — marker missing
+  FAIL    AC-13 S-07 (front reads incomplete): recorded / handled in src/screens/AlbumScreen.jsx — marker missing
+  FAIL    AC-13 F-18 (J-17): resolveResultsOwner stays pure (offline keeps the owner; unknown is reported to the caller) — unknownRoute flag missing
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=7 fail=40 gated_fail=40 not_run=0 waived=0 unknown=0

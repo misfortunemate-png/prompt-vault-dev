@@ -4,6 +4,9 @@ import { api } from '../lib/api';
 import { getConnection, resolveTmpImgUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
 import { generateAndUploadThumb } from '../lib/thumbGen';
+import { parseTaskResult } from '../lib/queueResult';
+import { recordInvalid, recordFailure } from '../lib/invalidLog';
+import { checkTaskStatus, checkQueueState } from '../lib/queueStatus';
 
 const MODELS = [
   { value: 'nai-diffusion-5-full',       label: 'V5 Full ⚡' },
@@ -21,6 +24,23 @@ const RESOLUTIONS = [
 ];
 
 const SAMPLERS = ['k_euler_ancestral', 'k_euler', 'k_dpmpp_2m_sde'];
+const RESOLUTION_VALUES = [...RESOLUTIONS.map(r => r.value), 'random'];
+
+// F-10: 復元・既定値の model・sampler・resolution が一覧にないときは、寄せずにその値のまま持ち、記録する
+function noteUnlisted(field, value, source) {
+  const lists = { model: MODELS.map(m => m.value), sampler: SAMPLERS, resolution: RESOLUTION_VALUES };
+  if (lists[field].includes(value)) return;
+  recordInvalid({ kind: 'generate-option-unlisted', stage: `F-10 GenerateScreen.${source}`, raw: { [field]: value }, reason: `${field} が選択肢の一覧にない（その値のまま表示し、生成時にサーバが判定する）` });
+}
+
+// F-10: シード欄。空はランダム（未指定）。数でない入力を乱数に寄せない
+function parseSeed(seed) {
+  if (seed === '' || seed === null || seed === undefined) return { ok: true, value: null };
+  const n = Number(seed);
+  if (Number.isInteger(n)) return { ok: true, value: n };
+  recordInvalid({ kind: 'generate-seed-invalid', stage: 'F-10 GenerateScreen.parseSeed', raw: { seed }, reason: '整数でない（ランダムに寄せない）' });
+  return { ok: false, value: null };
+}
 
 const fieldStyle = {
   width: '100%',
@@ -64,7 +84,13 @@ async function fetchTaskImage(conn, taskId) {
   const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
   const r = await fetch(conn.cloudUrl + `/queue/task/${encodeURIComponent(taskId)}/data`, { headers });
   if (r.status === 404) return { expired: true, plain: null };
-  if (!r.ok) return { expired: false, plain: null };
+  if (!r.ok) {
+    // F-06: 401・403・5xx などを黙って捨てない（呼び出し側が表示・記録する）
+    recordInvalid({ kind: 'task-image-fetch-status', stage: 'F-06 GenerateScreen.fetchTaskImage', raw: { task_id: taskId, status: r.status }, reason: `2xx・404 以外（${r.status}）` });
+    const err = new Error(`生成画像を取得できません (${r.status})`);
+    err.status = r.status;
+    throw err;
+  }
   return { expired: false, plain: await decrypt(await r.arrayBuffer()) };
 }
 
@@ -77,6 +103,15 @@ async function uploadThumbAfterSave(blobUrl, hash, conn) {
 
 const STATUS_ICONS = { pending: '⏳', running: '🔄', done: '✅', error: '❌', skipped: '⏭' };
 
+// §4.3 #2: 一覧の行で result を解析できないものは、行ごとに一度だけ集約先に残す（描画のたびに数えない）
+const reportedRowResults = new Set();
+function reportRowResultOnce(task, err) {
+  const key = `${task.id}|${String(task.result).slice(0, 100)}`;
+  if (reportedRowResults.has(key)) return;
+  reportedRowResults.add(key);
+  recordInvalid({ kind: 'queue-task-result-unparseable', stage: '§4.3 #2 GenerateScreen.QueueTaskRow', raw: { task_id: task.id, result: task.result }, reason: err?.message || String(err) });
+}
+
 function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
   const conn = getConnection();
   const isCloud = conn.route === 'cloud';
@@ -86,7 +121,7 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
   const parsedResult = (() => {
     if (!task.result) return null;
     if (typeof task.result === 'object') return task.result;
-    try { return JSON.parse(task.result); } catch { return null; }
+    try { return JSON.parse(task.result); } catch (e) { reportRowResultOnce(task, e); return null; }
   })();
 
   useEffect(() => {
@@ -102,7 +137,10 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
         url = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
         setBlobUrl(url);
       })
-      .catch(() => {});
+      .catch((e) => {
+        // §4.3 #1: 裏の取得なのでトーストは出さず、集約先に残す（J-4）
+        recordInvalid({ kind: 'queue-task-image-fetch-failed', stage: '§4.3 #1 GenerateScreen.QueueTaskRow', raw: { task_id: task.id, error: e?.message || String(e) }, reason: e?.message || String(e) });
+      });
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
   }, [task.status, task.id, isCloud, conn.cloudUrl, conn.token]);
 
@@ -122,7 +160,7 @@ function QueueTaskRow({ task, onPreview, onSave, onRemove }) {
       ) : task.status === 'done' && expired ? (
         <span style={{ fontSize: '10px', flexShrink: 0, width: 36, textAlign: 'center', color: 'var(--text-secondary)' }}>期限切れ</span>
       ) : (
-        <span style={{ fontSize: '14px', flexShrink: 0, width: 36, textAlign: 'center' }}>{STATUS_ICONS[task.status] || '?'}</span>
+        <span title={String(task.status)} style={{ fontSize: '14px', flexShrink: 0, width: 36, textAlign: 'center' }}>{checkTaskStatus(task.status, task.id) ? STATUS_ICONS[task.status] : `?${String(task.status)}`}</span>
       )}
       <span style={{ flex: 1, fontSize: 'var(--fs-label)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: task.status === 'error' ? '#c0392b' : 'var(--text-primary)' }}>
         {task.label}
@@ -155,7 +193,9 @@ function ResultCard({ item, onSave, onPreview }) {
       gap: '12px',
       alignItems: 'flex-start',
     }}>
-      {item.expired ? (
+      {item.invalid ? (
+        <div title={item.invalidReason} style={{ width: 72, height: 72, borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>結果を読めない</div>
+      ) : item.expired ? (
         <div style={{ width: 72, height: 72, borderRadius: 'var(--radius-s)', flexShrink: 0, background: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>期限切れ</div>
       ) : (
         <img
@@ -172,9 +212,14 @@ function ResultCard({ item, onSave, onPreview }) {
         <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {label}
         </div>
+        {item.invalid && (
+          <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+            {item.invalidReason}（設定 → デバッグ・接続に記録）
+          </div>
+        )}
         <button
           onClick={onSave}
-          disabled={item.saved}
+          disabled={item.saved || item.invalid}
           style={{
             padding: '6px 14px',
             background: item.saved ? 'transparent' : 'var(--accent)',
@@ -310,14 +355,16 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     try {
       const stored = JSON.parse(localStorage.getItem('pv3-last-prompt'));
       if (stored) {
-        if (stored.model) setModel(stored.model);
-        if (stored.resolution) setResolution(stored.resolution);
+        if (stored.model) { noteUnlisted('model', stored.model, 'restore'); setModel(stored.model); }
+        if (stored.resolution) { noteUnlisted('resolution', stored.resolution, 'restore'); setResolution(stored.resolution); }
         if (stored.steps != null) setSteps(stored.steps);
         if (stored.scale != null) setScale(stored.scale);
-        if (stored.sampler) setSampler(stored.sampler);
+        if (stored.sampler) { noteUnlisted('sampler', stored.sampler, 'restore'); setSampler(stored.sampler); }
         promptApplied.current = stored;
       }
-    } catch {}
+    } catch (e) {
+      recordInvalid({ kind: 'last-prompt-unparseable', stage: 'F-10 GenerateScreen.restore', raw: (() => { try { return localStorage.getItem('pv3-last-prompt'); } catch { return null; } })(), reason: `前回のプロンプトを解析できない: ${e.message}` });
+    }
   }, []);
 
   // #7: カード選択の永続化 — 復元
@@ -424,7 +471,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     if (!tabRefreshed.current) { tabRefreshed.current = true; return; }
     if (activeTab !== 'generate' || !connectionRoute || connectionRoute === 'offline') return;
     refreshCardsData();
-    api.getPresets().then(pd => setPresetsData(pd)).catch(() => {});
+    // §4.3 #3: タブ復帰時の再取得（裏の取得なので記録だけ）
+    api.getPresets().then(pd => setPresetsData(pd)).catch(e => recordFailure('§4.3 #3 GenerateScreen.presetsRefetch', 'presets-refetch-failed', e));
   }, [activeTab]);
 
   useEffect(() => {
@@ -446,12 +494,14 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               setQueueData(qd);
             }
           } catch (e) {
+            // §4.3 #4: Cloud の初回読込の失敗はすべて記録する（トーストは従来どおり認証エラーのみ）
+            recordFailure('§4.3 #4 GenerateScreen.cloudInitialLoad', 'cloud-initial-load-failed', e);
             if (e.message?.includes('認証エラー')) addToast('error', e.message);
           }
         } else {
           setQueueData({ state: 'idle', tasks: [], currentIndex: null, startedAt: null });
           const [info, settings] = await Promise.all([api.getSystemInfo(), api.getSettings()]);
-          if (settings.generation?.model && !promptApplied.current) setModel(settings.generation.model);
+          if (settings.generation?.model && !promptApplied.current) { noteUnlisted('model', settings.generation.model, 'settingsDefault'); setModel(settings.generation.model); }
           const ready = !!info.vaultRoot;
           setVaultReady(ready);
           if (ready) {
@@ -480,7 +530,13 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   useEffect(() => {
     if (queueData.state !== 'running') return;
     const id = setInterval(async () => {
-      try { const d = await api.getQueue(); setQueueData(d); } catch {}
+      try {
+        const d = await api.getQueue();
+        setQueueData(d);
+      } catch (e) {
+        // §4.3 #5: ポーリングの失敗は記録だけ（トーストを連発しない・J-4）
+        recordInvalid({ kind: 'queue-poll-failed', stage: '§4.3 #5 GenerateScreen.queuePolling', raw: e?.message || String(e), reason: e?.message || String(e) });
+      }
     }, 2000);
     return () => clearInterval(id);
   }, [queueData.state]);
@@ -499,29 +555,17 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     const isCloud = conn.route === 'cloud';
     newDone.forEach(async (task) => {
       addedTaskIdsRef.current.add(task.id);
-      let parsedResult = task.result;
-      if (typeof parsedResult === 'string') {
-        try { parsedResult = JSON.parse(parsedResult); } catch { return; }
-      }
-      if (!parsedResult) return;
-      const parseSegArr = (raw) => {
-        if (Array.isArray(raw)) return raw;
-        if (typeof raw === 'string') { try { return JSON.parse(raw); } catch {} }
-        return [];
-      };
-      const entry = {
-        ...parsedResult,
-        task_id: task.id,
-        folderSegments: parseSegArr(task.folder_segments ?? task.folderSegments),
-        filenameSegments: parseSegArr(task.filename_segments ?? task.filenameSegments),
-        saved: !!task.saved,
-      };
-      if (isCloud) {
+      // §4.3 #6: 解析できない result は捨てずに invalid の項目として一覧に出す（集約先にも残る）
+      const entry = parseTaskResult(task);
+      if (isCloud && !entry.invalid) {
         try {
           const { expired, plain } = await fetchTaskImage(conn, task.id);
           if (expired) entry.expired = true;
           else if (plain) entry.blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
-        } catch {}
+        } catch (e) {
+          // §4.3 #7: 裏の取得なのでトーストは出さず、集約先に残す（J-4）
+          recordInvalid({ kind: 'queue-result-image-fetch-failed', stage: '§4.3 #7 GenerateScreen.queueCompletion', raw: { task_id: task.id, error: e?.message || String(e) }, reason: e?.message || String(e) });
+        }
       }
       setResults(prev => [entry, ...prev].slice(0, maxResults));
     });
@@ -762,7 +806,21 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const pickResolution = () => resolution === 'random'
     ? RESOLUTIONS[Math.floor(Math.random() * RESOLUTIONS.length)]
-    : (RESOLUTIONS.find(r => r.value === resolution) || RESOLUTIONS[0]);
+    : RESOLUTIONS.find(r => r.value === resolution);
+
+  // F-10: 一覧にない解像度・整数でないシードでは生成・キュー追加をしない（Portrait・乱数に寄せない）
+  const checkGenerateInputs = () => {
+    if (resolution !== 'random' && !RESOLUTIONS.some(r => r.value === resolution)) {
+      noteUnlisted('resolution', resolution, 'checkGenerateInputs');
+      addToast('error', `解像度「${resolution}」は一覧にない値です。選び直してください`);
+      return false;
+    }
+    if (!parseSeed(seed).ok) {
+      addToast('error', `シード「${seed}」は整数でありません。空（ランダム）か整数にしてください`);
+      return false;
+    }
+    return true;
+  };
 
   const buildSingleTask = () => {
     const res = pickResolution();
@@ -848,7 +906,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
     return {
       positive: pos,
       negative: neg,
-      params: { model, width: res.width, height: res.height, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null },
+      params: { model, width: res.width, height: res.height, steps, scale, sampler, seed: parseSeed(seed).value },
       folderSegments,
       filenameSegments,
       preset_id: selectedPresetId || null,
@@ -858,6 +916,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const handleAddToQueue = async () => {
     if (!vaultReady) { addToast('error', 'VAULT_ROOTが未設定です'); return; }
+    if (!checkGenerateInputs()) return;
     const task = buildSingleTask();
     try {
       const r = await api.queueAdd([task]);
@@ -870,7 +929,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   };
 
   const buildCartesianTasks = () => {
-    const baseParams = { model, steps, scale, sampler, seed: seed !== '' ? parseInt(seed, 10) : null };
+    const baseParams = { model, steps, scale, sampler, seed: parseSeed(seed).value };
     const allCards = cardsData?.cards || [];
     const enabledSlots = sortedSlots.filter(s => slotEnabledMap[s.id] !== false);
     const slotOptions = enabledSlots.map(slot => {
@@ -878,6 +937,10 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         return { slot, options: [null], isRandom: true };
       }
       const mode = cartesianMode[slot.id] ?? 'fixed';
+      if (mode !== 'fixed' && mode !== 'expand') {
+        // F-17: 直積モードの未知の値は fixed として扱うが、記録する
+        recordInvalid({ kind: 'cartesian-mode-unknown', stage: 'F-17 GenerateScreen.buildCartesianTasks', raw: { slotId: slot.id, mode }, reason: 'fixed/expand のどれでもない（fixed として扱う）' });
+      }
       if (mode === 'expand') {
         const rootCards = allCards.filter(c => c.slotId === slot.id && !c.parentId);
         return { slot, options: rootCards.length > 0 ? rootCards : [null] };
@@ -942,6 +1005,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   const handleAddCartesian = async () => {
     if (!vaultReady) { addToast('error', 'VAULT_ROOTが未設定です'); return; }
+    if (!checkGenerateInputs()) return;
     const tasks = buildCartesianTasks();
     if (tasks.length === 0) { addToast('error', '展開するタスクがありません'); return; }
     try {
@@ -978,7 +1042,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   // ── Generation / Save ──
 
   const handleGenerate = async () => {
-    if (steps > 28 && !window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
+    if (!checkGenerateInputs()) return;
+    if (steps > 28 &&!window.confirm('ステップ数が28を超えています。Anlasが消費されます。続行しますか？')) return;
     setGenerating(true);
     const routeAtFetch = connectionRoute;
     const revisionAtFetch = connectionRevision;
@@ -1067,7 +1132,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         prompt: pos,
         negative_prompt: neg,
         model, width: res.width, height: res.height, steps, scale, sampler,
-        seed: seed !== '' ? parseInt(seed, 10) : null,
+        seed: parseSeed(seed).value,
         folderSegments,
         filenameSegments,
         preset_id: selectedPresetId || null,
@@ -1079,11 +1144,19 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
         const taskId = result.task_id ?? result.image.task_id;
         let blobUrl = null;
         let expired = false;
+        if (!taskId) {
+          // F-09: task_id がない応答は期限切れとして出すが、黙らずに残す
+          recordInvalid({ kind: 'generate-response-shape-unknown', stage: 'F-09 GenerateScreen.handleGenerate', raw: { route: conn.route, result }, reason: 'Cloud の応答に task_id がない（期限切れとして表示）' });
+        }
         try {
           const got = taskId ? await fetchTaskImage(conn, taskId) : { expired: true, plain: null };
           expired = got.expired;
           if (got.plain) blobUrl = URL.createObjectURL(new Blob([got.plain], { type: 'image/png' }));
-        } catch {}
+        } catch (e) {
+          // §4.3 #8: 利用者の生成操作の結果なので、集約先とトーストに出す（J-4）
+          recordInvalid({ kind: 'generate-image-fetch-failed', stage: '§4.3 #8 GenerateScreen.handleGenerate', raw: { task_id: taskId, error: e?.message || String(e) }, reason: e?.message || String(e) });
+          addToast('error', `生成画像の取得に失敗しました: ${e?.message || e}`);
+        }
         if (getConnection().revision !== revisionAtFetch) return;
         if (getConnection().route !== routeAtFetch) return;
         if (result.task_id) addedTaskIdsRef.current.add(result.task_id);
@@ -1091,11 +1164,15 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
           const next = [{ ...result.image, task_id: result.image.task_id ?? result.task_id, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false, blobUrl, expired }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
-      } else {
+      } else if (conn.route === 'fran' && result.image?.filename) {
         setResults(prev => {
           const next = [{ ...result.image, folderSegments, filenameSegments, preset_id: selectedPresetId, saved: false }, ...prev];
           return next.length > maxResults ? next.slice(0, maxResults) : next;
         });
+      } else {
+        // F-09: 経路に合う形でない応答を Fran の扱いに寄せない
+        recordInvalid({ kind: 'generate-response-shape-unknown', stage: 'F-09 GenerateScreen.handleGenerate', raw: { route: conn.route, result }, reason: 'cloud なら image.hash、fran なら image.filename が要る' });
+        addToast('error', '生成結果の形が想定外のため表示できません（設定 → デバッグ・接続に記録）');
       }
       savePromptToStorage();
     } catch (e) {
@@ -1120,7 +1197,8 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       if (getConnection().revision !== revisionAtFetch) return;
       if (connectionRoute !== routeAtFetch) return;
       setResults(prev => prev.map((r, i) => i === idx ? { ...r, saved: true } : r));
-      if (conn.route === 'cloud') uploadThumbAfterSave(item.blobUrl, item.hash, conn).catch(() => {});
+      // §4.3 #9: 保存後のサムネイル作成・アップロードの失敗（裏の処理なので記録だけ）
+      if (conn.route === 'cloud') uploadThumbAfterSave(item.blobUrl, item.hash, conn).catch(e => recordFailure('§4.3 #9 GenerateScreen.handleSave', 'thumb-upload-failed', e, { hash: item.hash }));
     } catch (e) {
       addToast('error', '保存に失敗しました: ' + (e.message || ''));
     }
@@ -1354,6 +1432,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               <label style={labelStyle}>モデル</label>
               <select value={model} onChange={e => setModel(e.target.value)} style={fieldStyle}>
                 {MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                {!MODELS.some(m => m.value === model) && <option value={model}>一覧にない値: {String(model)}</option>}
               </select>
             </div>
             <div>
@@ -1361,6 +1440,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               <select value={resolution} onChange={e => setResolution(e.target.value)} style={fieldStyle}>
                 {RESOLUTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 <option value="random">ランダム</option>
+                {!RESOLUTION_VALUES.includes(resolution) && <option value={resolution}>一覧にない値: {String(resolution)}</option>}
               </select>
             </div>
             <div>
@@ -1375,6 +1455,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
               <label style={labelStyle}>サンプラー</label>
               <select value={sampler} onChange={e => setSampler(e.target.value)} style={fieldStyle}>
                 {SAMPLERS.map(s => <option key={s} value={s}>{s}</option>)}
+                {!SAMPLERS.includes(sampler) && <option value={sampler}>一覧にない値: {String(sampler)}</option>}
               </select>
             </div>
             <div>
@@ -1460,7 +1541,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                 </div>
               )}
               <span style={{ fontSize: 'var(--fs-label)', color: queueData.state === 'running' ? 'var(--accent)' : 'var(--text-secondary)' }}>
-                {queueData.state === 'running' ? '実行中' : queueData.state === 'paused' ? '中断' : ''}
+                {queueData.state === 'running' ? '実行中' : queueData.state === 'paused' ? '中断' : checkQueueState(queueData.state) ? '' : `不明な状態: ${String(queueData.state)}`}
               </span>
             </div>
 
@@ -1479,7 +1560,7 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                           await api.queueTaskSave(task.id);
                           let hash = null;
                           try { hash = (typeof task.result === 'string' ? JSON.parse(task.result) : task.result)?.hash; } catch {}
-                          uploadThumbAfterSave(rowBlobUrl, hash, getConnection()).catch(() => {});
+                          uploadThumbAfterSave(rowBlobUrl, hash, getConnection()).catch(e => recordFailure('§4.3 #9 GenerateScreen.queueRowSave', 'thumb-upload-failed', e, { hash }));
                           setQueueData(await api.getQueue()); addToast('success', '保存しました');
                         }
                         catch (e) { addToast('error', e.message); }

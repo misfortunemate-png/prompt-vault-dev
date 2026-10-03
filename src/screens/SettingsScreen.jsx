@@ -3,11 +3,12 @@ import { api } from '../lib/api';
 import { clearAll as clearThumbDb } from '../lib/thumbDb';
 import { FONT_REGISTRY, DISPLAY_DEFAULTS } from '../App';
 import {
-  getConnection, checkReachability, switchRoute, clearManual, updateSettings, getTimeoutSetting,
+  getConnection, checkReachability, switchRoute, clearManual, updateSettings, getTimeoutSetting, isValidTimeout,
 } from '../lib/connection';
 import {
   hasVaultKey, getVaultKey, setVaultKey, clearVaultKey, generateVaultKey,
 } from '../lib/crypto';
+import { getInvalidLog, clearInvalidLog, subscribeInvalidLog, recordInvalid, recordFailure } from '../lib/invalidLog';
 
 const SAMPLER_OPTIONS = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2m_sde'];
 
@@ -86,6 +87,48 @@ function SelectRow({ label, value, options, onChange }) {
 const LS_SELECTION_KEY = 'pv-selection-rules';
 const SELECTION_DEFAULTS = { days: 30, includeFavorites: true, r2LimitMb: 5120 };
 
+// 当たらなかった入力（この端末の集約先）。接続先に関係なく表示する（offline でも見える）
+function InvalidLogPanel() {
+  const [entries, setEntries] = useState(getInvalidLog);
+  useEffect(() => subscribeInvalidLog(() => setEntries(getInvalidLog())), []);
+  return (
+    <div style={{ marginBottom: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <h4 style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', margin: 0 }}>
+          当たらなかった入力（この端末）: {entries.length}件
+        </h4>
+        <button
+          onClick={() => { if (confirm('この端末の「当たらなかった入力」の記録を消去しますか？')) clearInvalidLog(); }}
+          disabled={entries.length === 0}
+          style={{ ...debugBtnStyle, minHeight: '32px', padding: '4px 10px' }}
+        >消去</button>
+      </div>
+      {entries.length === 0 ? (
+        <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>記録はありません</div>
+      ) : (
+        <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+          {entries.slice().reverse().map((e, i) => (
+            <InvalidEntry key={`${e.kind}|${e.stage}|${e.raw}|${i}`} e={e} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InvalidEntry({ e }) {
+  return (
+    <div style={{ background: 'var(--bg)', padding: '8px', borderRadius: 'var(--radius-s)', marginBottom: '6px', fontSize: 'var(--fs-label)', wordBreak: 'break-all' }}>
+      <div style={{ color: 'var(--text-secondary)' }}>
+        {e.lastTs ?? e.ts ?? '時刻不明'}{e.count > 1 ? ` ×${e.count}（初回 ${e.ts}）` : ''}
+      </div>
+      <div><strong>[{e.code ?? 'INVALID'}: {e.kind}]</strong> {e.reason}</div>
+      <div style={{ color: 'var(--text-secondary)' }}>段: {e.stage}</div>
+      <div style={{ color: 'var(--text-secondary)', fontFamily: 'monospace', marginTop: '2px' }}>raw: {e.raw}</div>
+    </div>
+  );
+}
+
 function loadSelectionRules() {
   try {
     const v = localStorage.getItem(LS_SELECTION_KEY);
@@ -106,6 +149,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
   const [debugOpen, setDebugOpen] = useState(!!debugInitialOpen);
   const [version, setVersion] = useState('');
   const [errors, setErrors] = useState([]);
+  const [errorsFailure, setErrorsFailure] = useState(null);
 
   // 接続設定
   const [conn, setConn] = useState(() => connectionState ?? getConnection());
@@ -127,11 +171,14 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
   useEffect(() => {
     setLoadedRoute(connectionState.route);
     api.getSettings().then(s => {
+      if (s.generation && !MODEL_OPTIONS.some(m => m.value === s.generation.model)) {
+        recordInvalid({ kind: 'settings-model-unlisted', stage: 'F-11 SettingsScreen.load', raw: { model: s.generation.model }, reason: '既定モデルが設定画面の選択肢にない（その値のまま表示・保存する）' });
+      }
       setGen(s.generation);
       setGuard(s.guard);
       setCaptionStyle(s.captionStyle || { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true });
     }).catch(() => addToast('error', '設定の読み込みに失敗しました'));
-    api.getSystemInfo().then(setSystemInfo).catch(() => {});
+    api.getSystemInfo().then(setSystemInfo).catch(e => recordFailure('§4.3 #26 SettingsScreen.systemInfo', 'system-info-failed', e));
   }, [addToast, connectionState.route]);
 
   const handleSave = async () => {
@@ -166,9 +213,10 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     if (onConnectionChange) onConnectionChange(updated);
   }, [conn, onConnectionChange]);
 
-  const handleTimeoutChange = useCallback((val) => {
-    setTimeoutMs(val);
-    updateSettings({ timeoutMs: val });
+  // F-03: 入力中の値はそのまま見せ、500〜30000 の整数のときだけ保存する（空や 0 を保存しない）
+  const handleTimeoutChange = useCallback((text) => {
+    setTimeoutMs(text);
+    if (isValidTimeout(text)) updateSettings({ timeoutMs: Number(text) });
   }, []);
 
   const handleRecheck = useCallback(async () => {
@@ -228,7 +276,7 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
       setVaultKeyId('vault:v1');
       setVaultImportVal('');
       addToast('success', 'vault鍵をインポートしました');
-    } catch { addToast('error', 'インポートに失敗しました'); }
+    } catch (e) { addToast('error', `インポートに失敗しました: ${e?.message || e}`); }
   }, [addToast, vaultImportVal]);
 
   const handleDeleteKey = useCallback(() => {
@@ -244,16 +292,24 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     try {
       const h = await api.healthz();
       setVersion(h.version);
-    } catch {}
+    } catch (e) {
+      recordFailure('§4.3 #26 SettingsScreen.version', 'version-fetch-failed', e);
+      setVersion(`取得できません: ${e?.message || e}`);
+    }
     try {
       const e = await api.getErrors();
-      setErrors(e);
-    } catch {}
+      setErrors(Array.isArray(e) ? e : []);
+      setErrorsFailure(Array.isArray(e) ? null : `応答が配列でない: ${JSON.stringify(e).slice(0, 200)}`);
+    } catch (err) {
+      setErrors([]);
+      setErrorsFailure(err?.message || String(err));
+      recordFailure('§4.3 #26 SettingsScreen.errors', 'debug-errors-fetch-failed', err);
+    }
   }, []);
 
   useEffect(() => {
     if (debugOpen) loadDebug();
-  }, [debugOpen, loadDebug]);
+  }, [debugOpen, loadDebug, connectionState.route]);
 
   const handleClearSW = async () => {
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
@@ -422,6 +478,8 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
                 {MODEL_OPTIONS.map(m => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
+                {/* F-11・J-14: 一覧にない保存値（V5 系など）はその値のまま見せる（選択肢は変えない） */}
+                {!MODEL_OPTIONS.some(m => m.value === gen.model) && <option value={gen.model}>一覧にない値: {String(gen.model)}</option>}
               </select>
             </div>
 
@@ -755,27 +813,36 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
                 </button>
               </div>
 
+              <InvalidLogPanel />
+
               <div>
                 <h4 style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                  直近エラー一覧
+                  直近エラー（接続中の経路: {connectionState.route === 'fran' ? 'Fran' : connectionState.route === 'cloud' ? 'Cloud' : '未接続'} の /debug/errors）
                 </h4>
-                {errors.length === 0 ? (
+                {errorsFailure ? (
+                  <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
+                    取得できません: {errorsFailure}
+                  </div>
+                ) : errors.length === 0 ? (
                   <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
                     エラーはありません
                   </div>
                 ) : (
-                  errors.map((e, i) => (
-                    <div key={i} style={{
-                      background: 'var(--bg)',
-                      padding: '8px',
-                      borderRadius: 'var(--radius-s)',
-                      marginBottom: '6px',
-                      fontSize: 'var(--fs-label)',
-                    }}>
-                      <div style={{ color: 'var(--text-secondary)' }}>{e.ts}</div>
-                      <div><strong>[{e.code}]</strong> {e.message}</div>
-                      {e.detail && <div style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>{e.detail}</div>}
-                    </div>
+                  errors.slice().reverse().map((e, i) => (
+                    e && e.code === 'INVALID' ? <InvalidEntry key={i} e={e} /> : (
+                      <div key={i} style={{
+                        background: 'var(--bg)',
+                        padding: '8px',
+                        borderRadius: 'var(--radius-s)',
+                        marginBottom: '6px',
+                        fontSize: 'var(--fs-label)',
+                        wordBreak: 'break-all',
+                      }}>
+                        <div style={{ color: 'var(--text-secondary)' }}>{e?.ts}</div>
+                        <div><strong>[{e?.code}]</strong> {e?.message}</div>
+                        {e?.detail && <div style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>{typeof e.detail === 'string' ? e.detail : JSON.stringify(e.detail)}</div>}
+                      </div>
+                    )
                   ))
                 )}
               </div>
@@ -819,9 +886,14 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
               value={timeoutMs}
               min={500}
               max={30000}
-              onChange={e => handleTimeoutChange(Number(e.target.value))}
+              onChange={e => handleTimeoutChange(e.target.value)}
               style={inputStyle}
             />
+            {!isValidTimeout(timeoutMs) && (
+              <div style={{ fontSize: 'var(--fs-label)', color: '#c0392b', marginTop: '4px' }}>
+                500〜30000 の整数を入れてください（この値は保存されていません）
+              </div>
+            )}
           </div>
 
           {/* vault鍵管理 */}

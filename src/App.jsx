@@ -10,10 +10,20 @@ import { api } from './lib/api';
 import { getConnection, checkReachability, initVisibilityCheck, destroyVisibilityCheck } from './lib/connection';
 import { hasVaultKey } from './lib/crypto';
 import { startVersionCheck } from './lib/versionCheck';
+import { recordInvalid, recordFailure } from './lib/invalidLog';
+
+const KNOWN_TABS = ['generate', 'album', 'template'];
+
+// §4.3 #25: 到達確認の Promise の reject（裏の処理なので記録だけ）
+function reportReachabilityError(e) {
+  recordFailure('§4.3 #25 App.checkReachability', 'reachability-rejected', e);
+}
 
 // 一覧の持ち主を更新し、消すべきかを返す（offline は持ち主を変えない）
+// F-18: offline は意図どおり持ち主を変えない枝。fran・cloud・offline 以外は同じ扱いにしつつ unknownRoute を返す（呼び出し側が記録）
 function resolveResultsOwner(owner, conn) {
-  if (conn.route !== 'cloud' && conn.route !== 'fran') return { owner, clear: false };
+  if (conn.route === 'offline') return { owner, clear: false };
+  if (conn.route !== 'cloud' && conn.route !== 'fran') return { owner, clear: false, unknownRoute: true };
   const key = `${conn.route}\u0000${conn.token || ''}`;
   if (owner === null || owner === key) return { owner: key, clear: false };
   return { owner: key, clear: true };
@@ -109,6 +119,11 @@ export default function App() {
   const [maxResults, setMaxResults] = useState(5);
   const [connectionState, setConnectionState] = useState(() => getConnection());
 
+  // F-14: 未知のタブは「未実装のタブです」と出し、元の値を記録する
+  useEffect(() => {
+    if (!KNOWN_TABS.includes(activeTab)) recordInvalid({ kind: 'tab-unknown', stage: 'F-14 App.activeTab', raw: { activeTab }, reason: 'generate・album・template のどれでもない' });
+  }, [activeTab]);
+
   const handleTabChange = useCallback((tab) => {
     if (tab === activeTab) {
       setResetKey(k => k + 1);
@@ -124,7 +139,7 @@ export default function App() {
   useEffect(() => {
     api.getSettings().then(s => {
       if (s.generation?.maxResults) setMaxResults(s.generation.maxResults);
-    }).catch(() => {});
+    }).catch(e => recordFailure('§4.3 #24 App.loadMaxResults', 'settings-load-failed', e)); // §4.3 #24: 既定の 5 件のまま（記録する）
   }, []);
 
   const addToast = useCallback((type, message) => {
@@ -140,9 +155,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    checkReachability().then(setConnectionState).catch(() => {});
+    checkReachability().then(setConnectionState).catch(reportReachabilityError);
     initVisibilityCheck(() => {
-      checkReachability().then(setConnectionState).catch(() => {});
+      checkReachability().then(setConnectionState).catch(reportReachabilityError);
     });
     const handleStorage = (e) => {
       if (e.key === 'pv-connection' || e.key === null) {
@@ -162,7 +177,7 @@ export default function App() {
     const { route, manual } = connectionState;
     if ((route !== 'offline' && route !== 'cloud') || manual) return;
     const id = setInterval(() => {
-      checkReachability().then(setConnectionState).catch(() => {});
+      checkReachability().then(setConnectionState).catch(reportReachabilityError);
     }, 30000);
     return () => clearInterval(id);
   }, [connectionState.route, connectionState.manual]);
@@ -175,6 +190,13 @@ export default function App() {
     resultsOwnerRef.current = owner;
     if (clear) setResults([]);
   }, [connectionState.route, connectionState.token]);
+
+  // F-18: fran・cloud・offline 以外の経路は持ち主を変えないが、記録する
+  useEffect(() => {
+    if (resolveResultsOwner(null, connectionState).unknownRoute) {
+      recordInvalid({ kind: 'results-owner-route-unknown', stage: 'F-18 App.resolveResultsOwner', raw: { route: connectionState.route }, reason: 'fran・cloud・offline 以外の経路（持ち主を変えない）' });
+    }
+  }, [connectionState.route]);
 
   // cloud モードで vault key が未設定なら警告。
   // 認証トークン未設定/不正は checkReachability() が offline reason として扱う。

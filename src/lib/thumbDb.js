@@ -1,3 +1,5 @@
+import { recordFailure } from './invalidLog.js';
+
 const DB_NAME = 'pv-thumb-cache';
 const STORE = 'thumbs';
 const VERSION = 1;
@@ -22,7 +24,11 @@ export async function getThumb(hash) {
       req.onsuccess = e => resolve(e.target.result ?? null);
       req.onerror = e => reject(e.target.error);
     });
-  } catch { return null; }
+  } catch (e) {
+    // §4.3 #27: IndexedDB が使えない・読めない（キャッシュなしとして続ける）
+    recordFailure('§4.3 #27 thumbDb.getThumb', 'thumb-cache-failed', e, { hash });
+    return null;
+  }
 }
 
 export async function putThumb(hash, data) {
@@ -33,7 +39,9 @@ export async function putThumb(hash, data) {
       req.onsuccess = () => resolve();
       req.onerror = e => reject(e.target.error);
     });
-  } catch {}
+  } catch (e) {
+    recordFailure('§4.3 #27 thumbDb.putThumb', 'thumb-cache-failed', e, { hash });
+  }
 }
 
 export async function clearAll() {
@@ -45,7 +53,12 @@ export async function clearAll() {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-  } catch {
-    try { indexedDB.deleteDatabase(DB_NAME); } catch {}
+  } catch (e) {
+    recordFailure('§4.3 #27 thumbDb.clearAll', 'thumb-cache-failed', e);
+    try {
+      indexedDB.deleteDatabase(DB_NAME);
+    } catch (e2) {
+      recordFailure('§4.3 #27 thumbDb.clearAll', 'thumb-cache-delete-failed', e2);
+    }
   }
 }

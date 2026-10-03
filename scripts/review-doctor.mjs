@@ -58,9 +58,9 @@ function parseArgs(argv) {
   for (const arg of argv) {
     if (arg === '--json') out.json = true;
     else if (arg === '--deep') out.deep = true;
-    else if (arg.startsWith('--port=')) out.port = Number(arg.slice('--port='.length));
+    else if (arg.startsWith('--port=')) out.port = parseIntArg(arg, '--port=', 1, 65535);
     else if (arg.startsWith('--vault-root=')) out.vaultRoot = arg.slice('--vault-root='.length);
-    else if (arg.startsWith('--timeout-ms=')) out.timeoutMs = Number(arg.slice('--timeout-ms='.length));
+    else if (arg.startsWith('--timeout-ms=')) out.timeoutMs = parseIntArg(arg, '--timeout-ms=', 1, 600000);
     else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -70,6 +70,20 @@ function parseArgs(argv) {
     }
   }
   return out;
+}
+
+// T-03: 数値の引数は整数かつ範囲内だけを当たる枝とする。当たらなければ元の字句と理由を出して exit 64
+function invalidUsage(raw, reason) {
+  console.error(`Invalid argument: ${raw}（理由: ${reason}）`);
+  process.exit(64);
+}
+
+function parseIntArg(arg, prefix, min, max) {
+  const raw = arg.slice(prefix.length);
+  if (!/^\d+$/.test(raw)) invalidUsage(arg, `整数でない（${min}〜${max} の整数を指定）`);
+  const n = Number(raw);
+  if (n < min || n > max) invalidUsage(arg, `範囲外（${min}〜${max}）`);
+  return n;
 }
 
 function printHelp() {
@@ -577,7 +591,11 @@ function printHuman(report) {
 const args = parseArgs(process.argv.slice(2));
 const repository = probeRepository();
 const vaultRoot = args.vaultRoot || readEnvValue('VAULT_ROOT');
-const port = Number(args.port || readEnvValue('PORT') || 8789);
+const envPort = args.port == null ? readEnvValue('PORT') : null;
+if (envPort != null && envPort !== '' && !(/^\d+$/.test(envPort) && Number(envPort) >= 1 && Number(envPort) <= 65535)) {
+  invalidUsage(`PORT=${envPort}（環境変数または .env）`, '1〜65535 の整数でない');
+}
+const port = args.port ?? (envPort ? Number(envPort) : 8789);
 
 const cards = probeJsonFile('cards.json', join(DATA_DIR, 'cards.json'), validateCards);
 const presets = probeJsonFile('presets.json', join(DATA_DIR, 'presets.json'), validatePresets);

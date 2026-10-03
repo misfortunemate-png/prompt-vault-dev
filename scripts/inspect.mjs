@@ -81,21 +81,51 @@ check('支給物SHA-256照合', () => {
 });
 
 // 3. 版確認
+// T-02: 「起動していない（接続できない）」だけを NOT_RUN とし、応答の異常は理由と元の字句を付けて FAILED にする
 check('版確認', () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
   console.log(`  package.json version: ${pkg.version}`);
+  const port = process.env.PORT || 8789;
+  const url = `http://localhost:${port}/api/healthz`;
+  let out;
   try {
-    const port = process.env.PORT || 8789;
-    const resp = execSync(`curl -s http://localhost:${port}/api/healthz`, { timeout: 5000 });
-    const data = JSON.parse(resp.toString());
-    console.log(`  healthz version: ${data.version}`);
-    if (pkg.version !== data.version) {
-      console.log('  ❌ Version mismatch');
-      return false;
+    out = execSync(`curl -sS --max-time 5 -w "\\n__HTTP_STATUS__%{http_code}" ${url}`, { timeout: 10000, stdio: ['ignore', 'pipe', 'pipe'] }).toString();
+  } catch (e) {
+    const stderr = (e.stderr ? e.stderr.toString() : '').trim();
+    if (e.status === 7) {
+      console.log(`  ⚠ Server not running — healthz check NOT_RUN（理由: 接続できない curl exit 7 ${stderr}）`);
+      return null;
     }
-  } catch {
-    console.log('  ⚠ Server not running — healthz check NOT_RUN');
-    return null;
+    console.log(`  ❌ healthz の応答に異常（理由: curl exit ${e.status ?? '?'} ${stderr || e.message}）url=${url}`);
+    return false;
+  }
+  const m = out.match(/\r?\n?__HTTP_STATUS__(\d{3})\s*$/);
+  const status = m ? Number(m[1]) : null;
+  const body = m ? out.slice(0, m.index) : out;
+  const rawHead = JSON.stringify(body.slice(0, 200));
+  if (status === null) {
+    console.log(`  ❌ healthz の状態コードを読めない（理由: curl の出力に印がない）raw=${JSON.stringify(out.slice(-200))}`);
+    return false;
+  }
+  if (status < 200 || status > 299) {
+    console.log(`  ❌ healthz HTTP ${status}（理由: 2xx 以外）raw=${rawHead}`);
+    return false;
+  }
+  let data;
+  try {
+    data = JSON.parse(body);
+  } catch (e) {
+    console.log(`  ❌ healthz の応答が JSON でない（理由: ${e.message}）raw=${rawHead}`);
+    return false;
+  }
+  if (!data || typeof data.version !== 'string') {
+    console.log(`  ❌ healthz の応答に version（文字列）がない（理由: 版を確かめられない）raw=${rawHead}`);
+    return false;
+  }
+  console.log(`  healthz version: ${data.version}`);
+  if (pkg.version !== data.version) {
+    console.log('  ❌ Version mismatch');
+    return false;
   }
   return true;
 });

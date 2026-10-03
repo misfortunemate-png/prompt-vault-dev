@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { api } from '../lib/api';
 import { getConnection, resolveThumbUrl, resolveFullImgUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
+import { recordInvalid, recordFailure } from '../lib/invalidLog';
 
 const FONT_SIZE_MAP = { small: '14px', medium: '20px', large: '28px' };
 const DEFAULT_CAPTION_CFG = { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true, x: 50, y: 20 };
@@ -68,8 +69,15 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
       const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
       // thumb先行
       const thumbUrl = conn.cloudUrl + `/thumbs/${img.hash}`;
+      // §4.3 #13: 2xx 以外を null に寄せず記録する（表示は従来どおり）
+      const okOrRecord = (r, what) => {
+        if (!r) return null;
+        if (r.ok) return r.arrayBuffer();
+        recordInvalid({ kind: 'viewer-image-fetch-status', stage: '§4.3 #13 ImageViewer.load', raw: { hash: img.hash, what, status: r.status }, reason: `2xx 以外（${r.status}）` });
+        return null;
+      };
       fetch(thumbUrl, { headers })
-        .then(r => r.ok ? r.arrayBuffer() : null)
+        .then(r => okOrRecord(r, 'thumb'))
         .then(buf => buf ? decrypt(buf) : null)
         .then(plain => {
           if (cancelled || !plain) return;
@@ -79,7 +87,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
           // full image
           return fetch(conn.cloudUrl + `/gallery/image/${img.hash}/data`, { headers });
         })
-        .then(r => r && r.ok ? r.arrayBuffer() : null)
+        .then(r => okOrRecord(r, 'full'))
         .then(buf => buf ? decrypt(buf) : null)
         .then(plain => {
           if (cancelled || !plain) return;
@@ -88,7 +96,10 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
           setDisplaySrc(url);
           setImgLoading(false);
         })
-        .catch(() => { if (!cancelled) setImgLoading(false); });
+        .catch(e => {
+          recordFailure('§4.3 #13 ImageViewer.load', 'viewer-image-load-failed', e, { hash: img.hash });
+          if (!cancelled) setImgLoading(false);
+        });
     } else {
       setDisplaySrc(resolveThumbUrl(img.hash));
       setImgLoading(true);
@@ -137,7 +148,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
     const seq = ++fetchSeqRef.current;
     api.getGalleryImage(img.hash)
       .then(d => { if (!cancelled && seq === fetchSeqRef.current) setDetail(d); })
-      .catch(() => {});
+      .catch(e => recordFailure('§4.3 #14 ImageViewer.detail', 'viewer-detail-failed', e, { hash: img.hash }));
     return () => { cancelled = true; };
   }, [img?.hash]);
 
@@ -235,10 +246,13 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
     try {
       await api.setFavorite(img.hash, newVal);
       if (onFavoriteToggle) onFavoriteToggle(img.hash, newVal);
-    } catch {
+    } catch (err) {
       setFavoriteMap(m => ({ ...m, [img.hash]: newVal !== 1 }));
+      // §4.3 #11: 黙って戻さず、集約先とトーストに出す（利用者の操作の失敗・J-4）
+      recordInvalid({ kind: 'favorite-save-failed', stage: '§4.3 #11 ImageViewer.toggleFavorite', raw: { hash: img.hash, favorite: newVal, error: err?.message || String(err) }, reason: err?.message || String(err) });
+      if (addToast) addToast('error', `お気に入りの保存に失敗しました: ${err?.message || err}`);
     }
-  }, [img, favoriteMap, onFavoriteToggle]);
+  }, [img, favoriteMap, onFavoriteToggle, addToast]);
 
   const saveCaption = useCallback(async () => {
     if (!img || captionEdit === null) return;
@@ -254,9 +268,13 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
         : { caption: saved, caption_config: JSON.stringify(savedCfg) }
       );
       setCaptionEdit(null);
-    } catch {}
+    } catch (err) {
+      // §4.3 #12: 黙って捨てず、集約先とトーストに出す（利用者の操作の失敗・J-4）
+      recordInvalid({ kind: 'caption-save-failed', stage: '§4.3 #12 ImageViewer.saveCaption', raw: { hash: img.hash, caption: captionEdit, error: err?.message || String(err) }, reason: err?.message || String(err) });
+      if (addToast) addToast('error', `セリフの保存に失敗しました: ${err?.message || err}`);
+    }
     setCaptionSaving(false);
-  }, [img, captionEdit, captionCfg, onCaptionSave]);
+  }, [img, captionEdit, captionCfg, onCaptionSave, addToast]);
 
   const openCardDialog = useCallback(async () => {
     try {

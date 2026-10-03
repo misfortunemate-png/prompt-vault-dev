@@ -1,6 +1,21 @@
 import { getConnection, resolveThumbUrl, captureConnectionSnapshot, isConnectionSnapshotCurrent } from './connection.js';
 import { decrypt } from './crypto.js';
 
+// 集約先（invalidLog.js）への記録。既存 verifier が api.js を写して読み込むため静的 import にしない
+function recordInvalidLater(entry) {
+  import('./invalidLog.js')
+    .then(m => m.recordInvalid(entry))
+    .catch(e => console.warn('[INVALID] 集約先に記録できない', entry, e));
+}
+
+function apiError(message, { status, path, route }) {
+  const err = new Error(message);
+  err.status = status;
+  err.path = path;
+  err.route = route;
+  return err;
+}
+
 export class StaleConnectionError extends Error {
   constructor(path) {
     super(`接続先が変更されたため古い応答を破棄しました: ${path}`);
@@ -47,18 +62,38 @@ async function request(path, opts = {}) {
 
   assertCurrentConnection(snapshot, path);
 
+  const routeLabel = conn.route === 'cloud' ? 'Cloud' : 'Fran';
+  const meta = { status: res.status, path, route: conn.route };
   if (!res.ok) {
     let body = '';
-    try { const j = await res.json(); body = j.error || j.message || ''; } catch {}
+    try {
+      const j = await res.json();
+      body = j.error || j.message || '';
+    } catch (e) {
+      // F-05: エラー応答の本文が JSON でない（詳細を黙って空にしない）
+      recordInvalidLater({ kind: 'api-error-body-not-json', stage: 'F-05 api.request', raw: { route: conn.route, path, status: res.status, contentType: res.headers?.get?.('content-type') ?? null }, reason: `エラー応答の本文が JSON でない: ${e.message}` });
+    }
     assertCurrentConnection(snapshot, path);
     const detail = body ? `: ${body}` : '';
-    if (res.status === 401) throw new Error(`認証エラー (401): トークンを設定してください`);
-    if (res.status === 403) throw new Error(`権限エラー (403)${detail}`);
-    if (res.status === 404) throw new Error(`エンドポイント未実装 (404): ${path}`);
-    if (res.status >= 500) throw new Error(`サーバーエラー (${res.status})${detail}`);
-    throw new Error(`API エラー (${res.status})${detail}`);
+    if (res.status === 401) throw apiError(`認証エラー (401): トークンを設定してください`, meta);
+    if (res.status === 403) throw apiError(`権限エラー (403)${detail}`, meta);
+    if (res.status === 404) throw apiError(`エンドポイント未実装 (404): ${path}`, meta);
+    if (res.status >= 500) throw apiError(`サーバーエラー (${res.status})${detail}`, meta);
+    throw apiError(`API エラー (${res.status})${detail}`, meta);
   }
-  const data = await res.json();
+  // F-05: 2xx で JSON でない本文（S-14 の index.html 等）は経路・path・status を付けて上げ、記録する
+  const copy = typeof res.clone === 'function' ? res.clone() : null;
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    let head = null;
+    if (copy) {
+      try { head = (await copy.text()).slice(0, 200); } catch (readErr) { head = `（本文を読めない: ${readErr.message}）`; }
+    }
+    recordInvalidLater({ kind: 'api-response-not-json', stage: 'F-05 api.request', raw: { route: conn.route, path, status: res.status, contentType: res.headers?.get?.('content-type') ?? null, head }, reason: e.message });
+    throw apiError(`応答が JSON でない [${routeLabel}] ${path} (${res.status}): ${e.message}`, meta);
+  }
   assertCurrentConnection(snapshot, path);
   return data;
 }
@@ -140,7 +175,11 @@ export const api = {
       const plain = await decrypt(await res.arrayBuffer());
       if (!isConnectionSnapshotCurrent(snapshot)) return null;
       return URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
-    } catch { return null; }
+    } catch (e) {
+      // §4.3 #21: null（サムネなし）に寄せる前に記録する
+      recordInvalidLater({ kind: 'thumb-fetch-failed', stage: '§4.3 #21 api.getThumb', raw: { hash, error: e?.message || String(e) }, reason: e?.message || String(e) });
+      return null;
+    }
   },
 
   // Queue M5

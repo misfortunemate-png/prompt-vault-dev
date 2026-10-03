@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { randomInt, randomBytes } from 'crypto';
 import { inflateRawSync } from 'zlib';
+import { recordEvent, recordInvalid } from '../log.js';
 
 const API_URL = 'https://image.novelai.net/ai/generate-image';
 const GENERATE_TIMEOUT_MS = 120_000;
@@ -9,7 +10,20 @@ const GENERATE_TIMEOUT_MS = 120_000;
 // ZIPローカルファイルヘッダー (PK\x03\x04) を走査してPNGを取得
 // 対応圧縮: 0=store, 8=deflate
 // bit3フラグ対応: data descriptor (PK\x07\x08) からcompSizeを取得
-function extractFirstPngFromZip(buffer) {
+// S-01・J-10: NovelAI の 2xx 以外の種別。当たらない status は null（残余として INVALID に残す）
+export function classifyNovelAiStatus(status) {
+  if (status === 401 || status === 403) return 'auth';
+  if (status === 402) return 'payment';
+  if (status === 429) return 'rate-limit';
+  if (status >= 500 && status <= 599) return 'server-error';
+  return null;
+}
+
+function stageOf(origin) {
+  return origin === 'queue' ? 'novelai.generate（queue キュー）' : 'novelai.generate（single 単発）';
+}
+
+function extractFirstPngFromZip(buffer, stage) {
   let offset = 0;
   while (offset < buffer.length - 30) {
     if (buffer[offset] !== 0x50 || buffer[offset + 1] !== 0x4b ||
@@ -39,15 +53,18 @@ function extractFirstPngFromZip(buffer) {
       const raw = buffer.slice(dataStart, dataStart + compSize);
       if (compression === 0) return raw;
       if (compression === 8) return inflateRawSync(raw);
-      throw new Error(`未対応の圧縮方式: ${compression}`);
+      throw new Error(`未対応の圧縮方式: ${compression}（${fileName}）`);
     }
+    // PNG 以外のエントリは読み飛ばすが、黙らずに残す
+    recordInvalid({ kind: 'novelai-zip-non-png-entry', stage: `S-02 ${stage}`, raw: { fileName, compression, compSize }, reason: 'ZIP に PNG 以外のエントリがある（読み飛ばす）' });
 
     offset = dataStart + compSize;
   }
   throw new Error('ZIPレスポンス内にPNGが見つかりません');
 }
 
-export async function generate({ prompt, negativePrompt, model, width, height, steps, scale, sampler, seed, vaultRoot }) {
+export async function generate({ prompt, negativePrompt, model, width, height, steps, scale, sampler, seed, vaultRoot, origin = 'single' }) {
+  const stage = stageOf(origin);
   const token = process.env.NOVELAI_TOKEN;
   if (!token) throw new Error('NOVELAI_TOKENが設定されていません');
 
@@ -86,7 +103,9 @@ export async function generate({ prompt, negativePrompt, model, width, height, s
     };
   }
 
-  const resp = await fetch(API_URL, {
+  let resp;
+  try {
+    resp = await fetch(API_URL, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -95,15 +114,36 @@ export async function generate({ prompt, negativePrompt, model, width, height, s
     body: JSON.stringify({ input: prompt, model, action: 'generate', parameters }),
     signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS),
   });
+  } catch (e) {
+    recordEvent({ code: 'NOVELAI_FAILED', kind: 'novelai-network', stage: `S-01 ${stage}`, raw: `${e.name}: ${e.message}`, reason: e.name === 'TimeoutError' ? 'タイムアウト' : '通信失敗' });
+    e.novelaiRecorded = true;
+    throw e;
+  }
 
+  const contentType = resp.headers.get('content-type') || '';
   if (!resp.ok) {
     const errText = await resp.text();
-    throw new Error(`NovelAI API ${resp.status}: ${errText.slice(0, 300)}`);
+    const cls = classifyNovelAiStatus(resp.status);
+    const raw = `status=${resp.status} content-type=${contentType} body=${errText.slice(0, 300)}`;
+    if (cls) recordEvent({ code: 'NOVELAI_FAILED', kind: `novelai-${cls}`, stage: `S-01 ${stage}`, raw, reason: `NovelAI が ${resp.status} を返した` });
+    else recordInvalid({ kind: 'novelai-unexpected-status', stage: `S-01 ${stage}`, raw, reason: '401/402/403/429/5xx のどれでもない 2xx 以外' });
+    const err = new Error(`NovelAI API ${resp.status}: ${errText.slice(0, 300)}`);
+    err.novelaiRecorded = true;
+    err.kind = cls ? `novelai-${cls}` : 'novelai-unexpected-status';
+    throw err;
   }
 
   const arrayBuffer = await resp.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
-  const pngData = extractFirstPngFromZip(buffer);
+  let pngData;
+  try {
+    pngData = extractFirstPngFromZip(buffer, stage);
+  } catch (e) {
+    // S-02: 本文の形式の残余。Content-Type と本文の先頭を残す
+    recordInvalid({ kind: 'novelai-response-format', stage: `S-02 ${stage}`, raw: `content-type=${contentType} length=${buffer.length} head=${JSON.stringify(buffer.subarray(0, 80).toString('latin1'))}`, reason: e.message });
+    e.novelaiRecorded = true;
+    throw e;
+  }
 
   const tmpDir = join(vaultRoot, '.tmp');
   mkdirSync(tmpDir, { recursive: true });

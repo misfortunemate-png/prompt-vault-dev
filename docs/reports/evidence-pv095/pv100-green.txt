@@ -1,0 +1,113 @@
+[INVALID] vault-key-import-invalid F-12 crypto.setVaultKey base64 でない [secret type=string length=28]
+[INVALID] vault-key-import-invalid F-12 crypto.setVaultKey 長さが 256bit（32 バイト）でない（16 バイト） [secret type=string length=24]
+[INVALID] vault-key-id-mismatch F-12 crypto.decrypt 暗号文の鍵 id が手元の鍵と違う（復号は試みる） ciphertext keyId="vault:v1" local keyId="vault:v2"
+[INVALID] queue-task-result-unparseable §4.3 #6 queueResult.parseTaskResult JSON として解析できない: Expected property name or '}' in JSON at position 1 (line 1 column 2) {"task_id":"t_1","result":"{not json"}
+repository_sha=9516af3fb0b645eff952abad9bdee7e71d58947f
+
+pv#100 [AUTO_FAILURE_INJECTION] gate=true Write paths reject unknown values without writing; deletions are recorded first
+  VERIFIER tests/issues/pv-100-write-guard.mjs sha256=875c6e146a950bcf50cb60658781296f5fd0ffd6cd8bc87726933fa6b91d8d98
+  PASS    Fran test instance starts
+  PASS    AC-5 S-10 PUT /settings unknown top key: 4xx
+  PASS    AC-5 S-10 PUT /settings unknown top key: file bytes unchanged
+  PASS    AC-5 S-10 PUT /settings unknown top key: recorded as INVALID
+  PASS    AC-5 S-10 PUT /settings missing guard: 4xx
+  PASS    AC-5 S-10 PUT /settings missing guard: file bytes unchanged
+  PASS    AC-5 S-10 PUT /settings missing guard: recorded as INVALID
+  PASS    AC-5 S-10 PUT /settings steps is a non-numeric string: 4xx
+  PASS    AC-5 S-10 PUT /settings steps is a non-numeric string: file bytes unchanged
+  PASS    AC-5 S-10 PUT /settings steps is a non-numeric string: recorded as INVALID
+  PASS    AC-5 S-10 PUT /settings body is an array: 4xx
+  PASS    AC-5 S-10 PUT /settings body is an array: file bytes unchanged
+  PASS    AC-5 S-10 PUT /settings body is an array: recorded as INVALID
+  PASS    AC-5 S-10 PUT /cards card with unknown field: 4xx
+  PASS    AC-5 S-10 PUT /cards card with unknown field: file bytes unchanged
+  PASS    AC-5 S-10 PUT /cards card with unknown field: recorded as INVALID
+  PASS    AC-5 S-10 PUT /cards card in a missing slot: 4xx
+  PASS    AC-5 S-10 PUT /cards card in a missing slot: file bytes unchanged
+  PASS    AC-5 S-10 PUT /cards card in a missing slot: recorded as INVALID
+  PASS    AC-5 S-10 PUT /cards slots is not an array: 4xx
+  PASS    AC-5 S-10 PUT /cards slots is not an array: file bytes unchanged
+  PASS    AC-5 S-10 PUT /cards slots is not an array: recorded as INVALID
+  PASS    AC-5 S-10 PUT /presets tags is not an array: 4xx
+  PASS    AC-5 S-10 PUT /presets tags is not an array: file bytes unchanged
+  PASS    AC-5 S-10 PUT /presets tags is not an array: recorded as INVALID
+  PASS    AC-5 S-10 PUT /presets unknown top key: 4xx
+  PASS    AC-5 S-10 PUT /presets unknown top key: file bytes unchanged
+  PASS    AC-5 S-10 PUT /presets unknown top key: recorded as INVALID
+  PASS    AC-5 S-11 POST /cards/slot unknown field: 4xx
+  PASS    AC-5 S-11 POST /cards/slot unknown field: file bytes unchanged
+  PASS    AC-5 S-11 POST /cards/slot unknown field: recorded as INVALID
+  PASS    AC-5 S-11 PUT /cards/slot/:id non-boolean flag: 4xx
+  PASS    AC-5 S-11 PUT /cards/slot/:id non-boolean flag: file bytes unchanged
+  PASS    AC-5 S-11 PUT /cards/slot/:id non-boolean flag: recorded as INVALID
+  PASS    AC-5 S-11 PUT /cards/card/:id move to a missing slot: 4xx
+  PASS    AC-5 S-11 PUT /cards/card/:id move to a missing slot: file bytes unchanged
+  PASS    AC-5 S-11 PUT /cards/card/:id move to a missing slot: recorded as INVALID
+  PASS    AC-5 S-11 PUT /cards/card/:id unknown field: 4xx
+  PASS    AC-5 S-11 PUT /cards/card/:id unknown field: file bytes unchanged
+  PASS    AC-5 S-11 PUT /cards/card/:id unknown field: recorded as INVALID
+  PASS    AC-5 S-11 POST /cards/card unknown field: 4xx
+  PASS    AC-5 S-11 POST /cards/card unknown field: file bytes unchanged
+  PASS    AC-5 S-11 POST /cards/card unknown field: recorded as INVALID
+  PASS    AC-5 S-11 PUT /presets/:id unknown field: 4xx
+  PASS    AC-5 S-11 PUT /presets/:id unknown field: file bytes unchanged
+  PASS    AC-5 S-11 PUT /presets/:id unknown field: recorded as INVALID
+  PASS    AC-5 S-11 POST /presets cards is not an object: 4xx
+  PASS    AC-5 S-11 POST /presets cards is not an object: file bytes unchanged
+  PASS    AC-5 S-11 POST /presets cards is not an object: recorded as INVALID
+  PASS    AC-5 S-12 GET /gallery/recent?limit=-1: 400 and INVALID
+  PASS    AC-5 S-12 GET /gallery/recent?limit=-1: DB unchanged
+  PASS    AC-5 S-12 GET /gallery/recent?limit=abc: 400 and INVALID
+  PASS    AC-5 S-12 GET /gallery/recent?limit=abc: DB unchanged
+  PASS    AC-5 S-12 GET /gallery/recent?days=-3: 400 and INVALID
+  PASS    AC-5 S-12 GET /gallery/recent?days=-3: DB unchanged
+  PASS    AC-5 S-12 GET /gallery/favorites?limit=0: 400 and INVALID
+  PASS    AC-5 S-12 GET /gallery/favorites?limit=0: DB unchanged
+  PASS    AC-5 S-12 GET /gallery/search?q=a&limit=-5: 400 and INVALID
+  PASS    AC-5 S-12 GET /gallery/search?q=a&limit=-5: DB unchanged
+  PASS    AC-5 S-12 GET /gallery/by-preset/p_00001?limit=abc: 400 and INVALID
+  PASS    AC-5 S-12 GET /gallery/by-preset/p_00001?limit=abc: DB unchanged
+  PASS    AC-5 S-12 GET /gallery/by-card?positive=tag&limit=-1: 400 and INVALID
+  PASS    AC-5 S-12 GET /gallery/by-card?positive=tag&limit=-1: DB unchanged
+  PASS    AC-5 S-12 sync-inventory (pv-sync caller, J-5): response unchanged (200) but recorded
+  PASS    AC-6 front PUT /settings {generation,guard,captionStyle}: accepted
+  PASS    AC-6 front PUT /cards (GenerateScreen slot move: GET then PUT): accepted
+  PASS    AC-6 front POST /cards/slot {name}: accepted
+  PASS    AC-6 front PUT /cards/slot/:id {name}: accepted
+  PASS    AC-6 front PUT /cards/slot/:id {useInFilename}: accepted
+  PASS    AC-6 front POST /cards/card (ImageViewer/GenerateScreen): accepted
+  PASS    AC-6 front POST /cards/card (TemplateCardEdit payload): accepted
+  PASS    AC-6 front PUT /cards/card/:id (TemplateCardEdit payload): accepted
+  PASS    AC-6 front PUT /cards/card/:id {positive,negative}: accepted
+  PASS    AC-6 front POST /presets (TemplatePresetEdit data): accepted
+  PASS    AC-6 POST /presets keeps the fields the front sends (slotOrder/folder/filename/childCards)
+  PASS    AC-6 front PUT /presets/:id (TemplatePresetEdit data): accepted
+  PASS    AC-6 fixture PUT /settings: accepted
+  PASS    AC-6 fixture PUT /cards: accepted
+  PASS    AC-6 fixture PUT /presets: accepted
+  PASS    AC-6 Fran DEFAULT_SETTINGS with sync.* keys: accepted
+  PASS    AC-6 real Fran data/settings.json: accepted
+  PASS    AC-6 real Fran data/cards.json: accepted
+  PASS    AC-6 real Fran data/presets.json: accepted
+  PASS    AC-6 Cloud-origin settings (pv-sync handback shape): accepted
+  PASS    AC-6 Cloud-origin cards (pv-sync handback shape): accepted
+  PASS    AC-6 Cloud-origin presets (pv-sync handback shape): accepted
+  PASS    AC-7 S-13 favorite on a missing hash: 404 and INVALID
+  PASS    AC-7 S-13 caption on a missing hash: 404 and INVALID
+  PASS    AC-7 S-13 meta (J-5: response unchanged) on a missing hash: 200 and INVALID
+  PASS    AC-7 S-13 control: favorite/caption on an existing hash are 200
+  PASS    AC-7 T-06: the orphan card is still removed (deletion rule unchanged)
+  PASS    AC-7 T-06: the whole deleted card is in logs/ as INVALID before deletion
+  PASS    AC-7 F-12: a non-base64 key is not saved
+  PASS    AC-7 F-12: a 128-bit key (wrong length) is not saved
+  PASS    AC-7 F-12: rejected imports are recorded without the key value (J-3)
+  PASS    AC-7 F-12 control: a valid 256-bit base64 key is saved
+  PASS    AC-7 F-12: a ciphertext keyId different from the local key is recorded (decryption still attempted)
+  PASS    AC-7 #6: an unparseable result yields a visible invalid entry (not dropped)
+  PASS    AC-7 #6 control: a parseable result is passed through
+  PASS    AC-7 #6: GenerateScreen no longer returns silently on an unparseable result
+  PASS    AC-7 #11 favorite: failure is recorded and toasted
+  PASS    AC-7 #12 caption: failure is recorded and toasted
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=102 fail=0 gated_fail=0 not_run=0 waived=0 unknown=0
