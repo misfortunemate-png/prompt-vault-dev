@@ -5,6 +5,8 @@ import { recordInvalid, describeSecret } from './invalidLog.js';
 
 const LS_KEY = 'pv-vault-key';
 const KEY_BYTES = 32; // AES-256
+// pv#113・J-2: 同じ鍵を指す別の id。pv-sync（ai-family-foundation scripts/pv-sync.mjs）は 'v1' で暗号化する
+const KEY_ID_ALIASES = { 'vault:v1': ['v1'] };
 
 export function hasVaultKey() {
   try {
@@ -105,7 +107,7 @@ export async function decrypt(encryptedBuffer) {
   // J-8: 暗号文の keyId が手元の鍵と違えば記録する（鍵の世代の振り分けはしない。復号は試みる）
   const keyId = new TextDecoder().decode(buf.slice(1, 1 + idLen));
   const rec = loadKeyRecord();
-  if (rec && keyId !== rec.id) {
+  if (rec && keyId !== rec.id && !(KEY_ID_ALIASES[rec.id] || []).includes(keyId)) {
     recordInvalid({ kind: 'vault-key-id-mismatch', stage: 'F-12 crypto.decrypt', raw: `ciphertext keyId=${JSON.stringify(keyId)} local keyId=${JSON.stringify(rec.id)}`, reason: '暗号文の鍵 id が手元の鍵と違う（復号は試みる）' });
   }
   const iv = buf.slice(1 + idLen, 1 + idLen + 12);
