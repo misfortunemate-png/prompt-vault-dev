@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import { getConnection, resolveThumbUrl, resolveFullImgUrl } from '../lib/connection';
 import { decrypt } from '../lib/crypto';
 import { recordInvalid, recordFailure } from '../lib/invalidLog';
+import { parseJsonOnce } from '../lib/storedValues';
 
 const FONT_SIZE_MAP = { small: '14px', medium: '20px', large: '28px' };
 const DEFAULT_CAPTION_CFG = { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true, x: 50, y: 20 };
@@ -131,14 +132,15 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
 
   // Load default caption style from settings
   useEffect(() => {
-    api.getSettings().then(s => { if (s.captionStyle) setDefaultCaptionStyle(s.captionStyle); }).catch(() => {});
+    api.getSettings().then(s => { if (s.captionStyle) setDefaultCaptionStyle(s.captionStyle); })
+      .catch(e => recordFailure('pv#111 ImageViewer.captionStyle', 'settings-load-failed', e)); // 既定の見た目のまま
   }, []);
 
   // Load captionCfg from detail when it arrives
   useEffect(() => {
     if (!detail) return;
     let cfg;
-    try { if (detail.caption_config) cfg = JSON.parse(detail.caption_config); } catch {}
+    if (detail.caption_config) cfg = parseJsonOnce(detail.caption_config, { kind: 'caption-config-unparseable', stage: 'pv#111 ImageViewer.captionConfig', id: detail.hash }) || undefined;
     setCaptionCfg(cfg || defaultCaptionStyle || DEFAULT_CAPTION_CFG);
   }, [detail?.hash, detail?.caption_config, defaultCaptionStyle]);
 
@@ -281,7 +283,8 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
       const data = await api.getCards();
       setCardSlots(data.slots || []);
       setCardSlotId(data.slots?.[0]?.id || '');
-    } catch {
+    } catch (e) {
+      recordFailure('pv#111 ImageViewer.openCardDialog', 'card-slots-load-failed', e);
       setCardSlots([]);
       setCardSlotId('');
     }
@@ -298,7 +301,8 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
       const data = await api.getCards();
       setCardSlots(data.slots || []);
       setCardSlotId(data.slots?.[0]?.id || '');
-    } catch {
+    } catch (e) {
+      recordFailure('pv#111 ImageViewer.openCharCardDialog', 'card-slots-load-failed', e);
       setCardSlots([]);
       setCardSlotId('');
     }
@@ -333,6 +337,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
       if (addToast) addToast('success', 'カードを登録しました');
       setShowCardDialog(false);
     } catch (e) {
+      recordFailure('pv#111 ImageViewer.submitCard', 'card-register-failed', e);
       if (addToast) addToast('error', e.message?.includes('同名') ? e.message : 'カード登録に失敗しました');
     }
     setCardSaving(false);
@@ -346,7 +351,8 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
       if (addToast) addToast('success', '画像を削除しました');
       setShowDeleteConfirm(false);
       if (onDelete) onDelete(img.hash);
-    } catch {
+    } catch (e) {
+      recordFailure('pv#111 ImageViewer.handleDelete', 'image-delete-failed', e, { hash: img.hash });
       if (addToast) addToast('error', '画像の削除に失敗しました');
       setDeleting(false);
     }
@@ -602,7 +608,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                       <button onClick={saveCaption} disabled={captionSaving} style={{ flex: 1, background: 'var(--accent)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>保存</button>
-                      <button onClick={() => { setCaptionEdit(null); if (d?.caption_config) { try { setCaptionCfg(JSON.parse(d.caption_config)); } catch {} } else { setCaptionCfg(defaultCaptionStyle || DEFAULT_CAPTION_CFG); } }} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>キャンセル</button>
+                      <button onClick={() => { setCaptionEdit(null); if (d?.caption_config) { const c = parseJsonOnce(d.caption_config, { kind: 'caption-config-unparseable', stage: 'pv#111 ImageViewer.captionConfig', id: d.hash }); if (c) setCaptionCfg(c); } else { setCaptionCfg(defaultCaptionStyle || DEFAULT_CAPTION_CFG); } }} style={{ flex: 1, background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '4px', padding: '7px', cursor: 'pointer', fontSize: '13px' }}>キャンセル</button>
                     </div>
                   </div>
                 </div>
@@ -625,7 +631,7 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
 
               {/* プロンプト（ベース＋キャラ分離表示） */}
               {(() => {
-                const parsed = d?.char_prompts ? (() => { try { return JSON.parse(d.char_prompts); } catch { return null; } })() : null;
+                const parsed = d?.char_prompts ? parseJsonOnce(d.char_prompts, { kind: 'char-prompts-unparseable', stage: 'pv#111 ImageViewer.charPrompts', id: d.hash }) : null;
                 const charData = parsed?.chars || (Array.isArray(parsed) ? parsed : null);
                 const basePrompt = charData ? (parsed.base_positive || d.prompt) : d?.prompt;
                 const baseNeg = charData ? (parsed.base_negative || d.negative) : d?.negative;

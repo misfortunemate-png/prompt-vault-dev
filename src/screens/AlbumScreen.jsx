@@ -6,6 +6,7 @@ import { decrypt, hasVaultKey } from '../lib/crypto';
 import { generateAndUploadThumb } from '../lib/thumbGen';
 import { getThumb, putThumb } from '../lib/thumbDb';
 import { recordInvalid, recordFailure } from '../lib/invalidLog';
+import { readStoredInt, writeStored } from '../lib/storedValues';
 
 const thumbCache = new Map();
 
@@ -291,7 +292,8 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('icon');
   const [thumbColMin, setThumbColMin] = useState(() => {
-    try { return parseInt(localStorage.getItem('pv_thumbColMin')) || 110; } catch { return 110; }
+    // pv#111: スライダーの範囲（60〜200）に当たらない保存値は記録して 110
+    return readStoredInt('pv_thumbColMin', 'pv#111 AlbumScreen.thumbColMin', { min: 60, max: 200, fallback: 110 });
   });
   const pollRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -414,7 +416,8 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
           recordFailure('§4.3 #19 AlbumScreen.rescanPolling', 'rescan-poll-failed', e);
         }
       }, 3000);
-    } catch {
+    } catch (e) {
+      recordFailure('pv#111 AlbumScreen.rescanStart', 'rescan-start-failed', e);
       addToast('error', 'リスキャンの開始に失敗しました');
     }
   }, [scanning, path, addToast, loadFolder, loadRoot]);
@@ -426,7 +429,8 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
       setPath(null);
       setFolderData(null);
       setViewer(null);
-    } catch {
+    } catch (e) {
+      recordFailure('pv#111 AlbumScreen.showFavorites', 'favorites-load-failed', e);
       addToast('error', 'お気に入りの読み込みに失敗しました');
     }
   }, [addToast]);
@@ -439,7 +443,8 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
       setPath(null);
       setFolderData(null);
       setViewer(null);
-    } catch {
+    } catch (e) {
+      recordFailure('pv#111 AlbumScreen.runSearch', 'search-failed', e);
       addToast('error', '検索に失敗しました');
     }
   }, [addToast]);
@@ -451,7 +456,8 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
       setPath(null);
       setFolderData(null);
       setViewer(null);
-    } catch {
+    } catch (e) {
+      recordFailure('pv#111 AlbumScreen.showPreset', 'preset-album-load-failed', e);
       addToast('error', 'プリセットアルバムの読み込みに失敗しました');
     }
   }, [addToast]);
@@ -496,7 +502,7 @@ export default function AlbumScreen({ addToast, resetKey, connectionRoute }) {
 
   const setThumbSize = useCallback((val) => {
     setThumbColMin(val);
-    try { localStorage.setItem('pv_thumbColMin', val); } catch {}
+    writeStored('pv_thumbColMin', String(val), 'pv#111 AlbumScreen.thumbColMin');
   }, []);
 
   const isFavorite = useCallback((img) => {

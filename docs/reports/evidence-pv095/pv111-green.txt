@@ -1,0 +1,33 @@
+[INVALID] local-storage-unparseable pv111 JSON として解析できない（既定を使う）: Expected property name or '}' in JSON at position 1 (line 1 column 2) {"key":"k-broken","text":"{not json"}
+[INVALID] local-storage-not-object pv111 オブジェクトでない（既定を使う） {"key":"k-array","value":[1,2]}
+[INVALID] local-storage-value-invalid pv111 真偽値でない値を読み飛ばす（1 件） {"key":"k-mixed","entries":[{"key":"s_b","value":"yes"}]}
+[INVALID] local-storage-value-invalid pv111 60〜200 の整数でない（110 を使う） {"key":"k-int","text":"abc"}
+[INVALID] local-storage-value-invalid pv111 60〜200 の整数でない（110 を使う） {"key":"k-int-range","text":"9999"}
+[INVALID] local-storage-value-invalid pv111 theme: light/dark/sepiaでない / extra: 未知のキー（既定を使う） {"key":"k-obj","fields":[{"field":"theme","value":"neon","reason":"light/dark/sepiaでない"},{"field":"extra","value":1,"reason":"未知のキー"}]}
+[INVALID] k pv111 JSON として解析できない: Expected property name or '}' in JSON at position 1 (line 1 column 2) {"id":"h1","text":"\"{bad\""}
+[INVALID] local-storage-write-failed pv111.write localStorage に書けない（次回は復元されない） {"key":"k-w","error":"QuotaExceededError"}
+[INVALID] local-storage-unavailable pv111.read localStorage が読めない（既定を使う） {"key":"k-r","error":"SecurityError: storage disabled"}
+repository_sha=3bd497aae76a316b4a75341a3ff3f1d1c4e48c47
+
+pv#111 [AUTO_FAILURE_INJECTION] gate=true Swallowed catches outside the 72-point survey get a residue type (light)
+  VERIFIER tests/issues/pv-111-remaining-catches.mjs sha256=7c6a7ee3c584a8e67ca113e55caa43979d594a9466cd35bb4506f7344ec8622b
+  PASS    absent key returns null without recording
+  PASS    unparseable JSON is recorded with the raw text and yields null
+  PASS    a non-object (array) is recorded and yields null
+  PASS    values that do not match are skipped and recorded; matching ones are kept
+  PASS    an int outside the rule uses the fallback and is recorded with the raw value
+  PASS    an object keeps matching fields; unknown keys and bad values are recorded
+  PASS    parseJsonOnce records an unparseable field once per id
+  PASS    parseJsonOnce control: valid JSON is returned
+  PASS    write failure returns false and is recorded; read failure yields null and is recorded
+  PASS    GenerateScreen: pv3-* restores go through readStoredMap
+  PASS    GenerateScreen: pv3-* saves go through writeStored (no silent catch)
+  PASS    ImageViewer: settings fetch failure is recorded
+  PASS    ImageViewer: caption_config / char_prompts parse failures are recorded
+  PASS    ImageViewer: card dialog / card registration / delete failures are recorded
+  PASS    AlbumScreen: pv_thumbColMin is read/written through storedValues
+  PASS    AlbumScreen: favorites / search / preset / rescan-start failures are recorded
+  PASS    App: display settings restore goes through readStoredObject (no silent catch)
+  VERDICT PASS
+
+SUMMARY issues=1 gated=1 pass=17 fail=0 gated_fail=0 not_run=0 waived=0 unknown=0

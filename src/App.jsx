@@ -11,6 +11,7 @@ import { getConnection, checkReachability, initVisibilityCheck, destroyVisibilit
 import { hasVaultKey } from './lib/crypto';
 import { startVersionCheck } from './lib/versionCheck';
 import { recordInvalid, recordFailure } from './lib/invalidLog';
+import { readStoredObject, writeStored } from './lib/storedValues';
 
 const KNOWN_TABS = ['generate', 'album', 'template'];
 
@@ -81,12 +82,19 @@ function applyDisplaySettings(s) {
   }
 }
 
+// pv#111: 当たる欄だけを使い、壊れた・当たらない値・未知のキーは記録して既定に戻す
+const DISPLAY_FIELDS = {
+  theme: [v => ['light', 'dark', 'sepia'].includes(v), 'light/dark/sepia'],
+  fontSize: [v => typeof v === 'number' && Number.isFinite(v) && v > 0, '正の数'],
+  lineHeight: [v => typeof v === 'number' && Number.isFinite(v) && v > 0, '正の数'],
+  padding: [v => typeof v === 'number' && Number.isFinite(v) && v >= 0, '0 以上の数'],
+  fontJa: [v => FONT_REGISTRY.ja.some(f => f.id === v), '和文フォントの id'],
+  fontEn: [v => FONT_REGISTRY.en.some(f => f.id === v), '欧文フォントの id'],
+};
+
 function loadDisplaySettings() {
-  try {
-    const saved = localStorage.getItem(DISPLAY_KEY);
-    if (saved) return { ...DISPLAY_DEFAULTS, ...JSON.parse(saved) };
-  } catch {}
-  return { ...DISPLAY_DEFAULTS };
+  const saved = readStoredObject(DISPLAY_KEY, 'pv#111 App.loadDisplaySettings', DISPLAY_FIELDS);
+  return { ...DISPLAY_DEFAULTS, ...(saved || {}) };
 }
 
 export { FONT_REGISTRY, DISPLAY_DEFAULTS, DISPLAY_KEY, applyDisplaySettings, loadDisplaySettings };
@@ -230,7 +238,7 @@ export default function App() {
   const updateDisplay = useCallback((key, value) => {
     setDisplaySettings(prev => {
       const next = { ...prev, [key]: value };
-      localStorage.setItem(DISPLAY_KEY, JSON.stringify(next));
+      writeStored(DISPLAY_KEY, next, 'pv#111 App.updateDisplay');
       applyDisplaySettings(next);
       return next;
     });
