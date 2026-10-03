@@ -8,7 +8,7 @@ import {
 import {
   hasVaultKey, getVaultKey, setVaultKey, clearVaultKey, generateVaultKey,
 } from '../lib/crypto';
-import { getInvalidLog, clearInvalidLog, subscribeInvalidLog, recordInvalid, recordFailure } from '../lib/invalidLog';
+import { getInvalidLog, clearInvalidLog, subscribeInvalidLog, recordInvalid, recordFailure, formatEntriesForCopy } from '../lib/invalidLog';
 
 const SAMPLER_OPTIONS = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2m_sde'];
 
@@ -87,8 +87,46 @@ function SelectRow({ label, value, options, onChange }) {
 const LS_SELECTION_KEY = 'pv-selection-rules';
 const SELECTION_DEFAULTS = { days: 30, includeFavorites: true, r2LimitMb: 5120 };
 
+// クリップボードへコピーする（発注者の指示・2026-10-03）。clipboard API が使えなければ選択してコピーする
+async function copyToClipboard(text) {
+  let apiError = null;
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (e) {
+      apiError = e; // 許可が得られない環境では選択してコピーする方式を試す
+    }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) throw new Error(`この端末ではクリップボードに書けません${apiError ? `（${apiError.message}）` : ''}`);
+}
+
+function CopyButton({ title, entries, meta, addToast }) {
+  const onCopy = async () => {
+    try {
+      await copyToClipboard(formatEntriesForCopy(title, entries, { 'コピーした時刻': new Date().toISOString(), ...meta }));
+      if (addToast) addToast('success', `${title}をコピーしました（${entries.length}件）`);
+    } catch (e) {
+      recordFailure('SettingsScreen.copyToClipboard', 'clipboard-write-failed', e);
+      if (addToast) addToast('error', `コピーできませんでした: ${e?.message || e}`);
+    }
+  };
+  return (
+    <button onClick={onCopy} disabled={entries.length === 0} style={{ ...debugBtnStyle, minHeight: '32px', padding: '4px 10px' }}>コピー</button>
+  );
+}
+
 // 当たらなかった入力（この端末の集約先）。接続先に関係なく表示する（offline でも見える）
-function InvalidLogPanel() {
+function InvalidLogPanel({ addToast, meta }) {
   const [entries, setEntries] = useState(getInvalidLog);
   useEffect(() => subscribeInvalidLog(() => setEntries(getInvalidLog())), []);
   return (
@@ -97,11 +135,14 @@ function InvalidLogPanel() {
         <h4 style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', margin: 0 }}>
           当たらなかった入力（この端末）: {entries.length}件
         </h4>
-        <button
-          onClick={() => { if (confirm('この端末の「当たらなかった入力」の記録を消去しますか？')) clearInvalidLog(); }}
-          disabled={entries.length === 0}
-          style={{ ...debugBtnStyle, minHeight: '32px', padding: '4px 10px' }}
-        >消去</button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <CopyButton title="当たらなかった入力（この端末）" entries={entries} meta={meta} addToast={addToast} />
+          <button
+            onClick={() => { if (confirm('この端末の「当たらなかった入力」の記録を消去しますか？')) clearInvalidLog(); }}
+            disabled={entries.length === 0}
+            style={{ ...debugBtnStyle, minHeight: '32px', padding: '4px 10px' }}
+          >消去</button>
+        </div>
       </div>
       {entries.length === 0 ? (
         <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>記録はありません</div>
@@ -287,6 +328,10 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
     setVaultGenResult(null);
     addToast('success', 'vault鍵を削除しました');
   }, [addToast]);
+
+  // コピーする文字列の見出し（版・経路・時刻）
+  const routeLabel = connectionState.route === 'fran' ? 'Fran' : connectionState.route === 'cloud' ? 'Cloud' : '未接続';
+  const copyMeta = { '接続中の経路': routeLabel, 'サーバの版': version || '不明', '画面': typeof location !== 'undefined' ? location.host : '' };
 
   const loadDebug = useCallback(async () => {
     try {
@@ -813,12 +858,15 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
                 </button>
               </div>
 
-              <InvalidLogPanel />
+              <InvalidLogPanel addToast={addToast} meta={copyMeta} />
 
               <div>
-                <h4 style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                  直近エラー（接続中の経路: {connectionState.route === 'fran' ? 'Fran' : connectionState.route === 'cloud' ? 'Cloud' : '未接続'} の /debug/errors）
-                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '8px' }}>
+                  <h4 style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)', margin: 0 }}>
+                    直近エラー（接続中の経路: {routeLabel} の /debug/errors）
+                  </h4>
+                  <CopyButton title={`直近エラー（${routeLabel} の /debug/errors）`} entries={errors} meta={copyMeta} addToast={addToast} />
+                </div>
                 {errorsFailure ? (
                   <div style={{ fontSize: 'var(--fs-label)', color: 'var(--text-secondary)' }}>
                     取得できません: {errorsFailure}

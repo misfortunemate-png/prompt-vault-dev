@@ -121,6 +121,18 @@ export default {
     checks.push(check('AC-2: the front list is rendered without a route condition (visible offline)',
       panelIdx >= 0 && !/route\s*[!=]==?\s*'(fran|cloud|offline)'\s*&&\s*\(?\s*$/.test(before.trimEnd()),
       panelIdx >= 0 ? 'InvalidLogPanel is guarded by a route condition' : 'InvalidLogPanel not rendered'));
+    // 発注者の指示（2026-10-03）: 両方の欄をクリップボードへコピーできる
+    await withGlobals({ localStorage: new MemStore() }, async () => {
+      const m = await freshImport(modPath);
+      const text = m.formatEntriesForCopy('T', [
+        { code: 'INVALID', kind: 'k-route', stage: 'S-14 /api fallback', raw: '{"path":"/api/x"}', reason: '定義されていない API', ts: 't1' },
+        { code: 'GENERATE_FAILED', message: 'NovelAI API 500', detail: { origin: 'queue' }, ts: 't2' },
+      ], { '接続中の経路': 'Fran' });
+      checks.push(check('copy: the text carries kind/stage/raw/reason of INVALID and code/message/detail of other entries',
+        ['k-route', 'S-14 /api fallback', '{"path":"/api/x"}', '定義されていない API', 'GENERATE_FAILED', 'NovelAI API 500', '"origin":"queue"', '接続中の経路: Fran', '件数: 2'].every(s => text.includes(s)), text));
+    });
+    checks.push(check('copy: both the device list and the route /debug/errors list have a copy button',
+      (settings.match(/<CopyButton /g) || []).length === 2 && /navigator\.clipboard/.test(settings), 'copy buttons missing'));
     checks.push(check('AC-2: the route /debug/errors list is shown next to it',
       settings.includes('api.getErrors()') && /接続中の経路/.test(settings), 'route error list label missing'));
 

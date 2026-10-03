@@ -7,6 +7,7 @@ import { generateAndUploadThumb } from '../lib/thumbGen';
 import { parseTaskResult } from '../lib/queueResult';
 import { recordInvalid, recordFailure } from '../lib/invalidLog';
 import { checkTaskStatus, checkQueueState } from '../lib/queueStatus';
+import { readStoredMap, writeStored, parseJsonOnce } from '../lib/storedValues';
 
 const MODELS = [
   { value: 'nai-diffusion-5-full',       label: 'V5 Full ⚡' },
@@ -369,12 +370,9 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
 
   // #7: カード選択の永続化 — 復元
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('pv3-selected-cards'));
-      if (stored && typeof stored === 'object') {
-        setSelectedCardMap(stored);
-      }
-    } catch {}
+    // pv#111: 壊れた・形の違う保存値は記録して既定（空）に戻す
+    const stored = readStoredMap('pv3-selected-cards', 'pv#111 GenerateScreen.restore', v => v === null || typeof v === 'string', 'カード id（文字列か null）');
+    if (stored) setSelectedCardMap(stored);
   }, []);
 
   // #7: カード選択の永続化 — 保存（初回復元を除外するためにrefで管理）
@@ -384,61 +382,51 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
       cardMapInitialized.current = true;
       return;
     }
-    try {
-      localStorage.setItem('pv3-selected-cards', JSON.stringify(selectedCardMap));
-    } catch {}
+    writeStored('pv3-selected-cards', selectedCardMap, 'pv#111 GenerateScreen.save');
   }, [selectedCardMap]);
 
   // slotRandomMap 永続化
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('pv3-slot-random'));
-      if (stored && typeof stored === 'object') setSlotRandomMap(stored);
-    } catch {}
+    const stored = readStoredMap('pv3-slot-random', 'pv#111 GenerateScreen.restore', v => typeof v === 'boolean', '真偽値');
+    if (stored) setSlotRandomMap(stored);
   }, []);
   const slotRandomMapInitialized = useRef(false);
   useEffect(() => {
     if (!slotRandomMapInitialized.current) { slotRandomMapInitialized.current = true; return; }
-    try { localStorage.setItem('pv3-slot-random', JSON.stringify(slotRandomMap)); } catch {}
+    writeStored('pv3-slot-random', slotRandomMap, 'pv#111 GenerateScreen.save');
   }, [slotRandomMap]);
 
   // slotEnabledMap 永続化
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('pv3-slot-enabled'));
-      if (stored && typeof stored === 'object') setSlotEnabledMap(stored);
-    } catch {}
+    const stored = readStoredMap('pv3-slot-enabled', 'pv#111 GenerateScreen.restore', v => typeof v === 'boolean', '真偽値');
+    if (stored) setSlotEnabledMap(stored);
   }, []);
   const slotEnabledMapInitialized = useRef(false);
   useEffect(() => {
     if (!slotEnabledMapInitialized.current) { slotEnabledMapInitialized.current = true; return; }
-    try { localStorage.setItem('pv3-slot-enabled', JSON.stringify(slotEnabledMap)); } catch {}
+    writeStored('pv3-slot-enabled', slotEnabledMap, 'pv#111 GenerateScreen.save');
   }, [slotEnabledMap]);
 
   // randomChildMode 永続化
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('pv3-random-child-mode'));
-      if (stored && typeof stored === 'object') setRandomChildMode(stored);
-    } catch {}
+    const stored = readStoredMap('pv3-random-child-mode', 'pv#111 GenerateScreen.restore', v => typeof v === 'boolean', '真偽値');
+    if (stored) setRandomChildMode(stored);
   }, []);
   const randomChildModeInitialized = useRef(false);
   useEffect(() => {
     if (!randomChildModeInitialized.current) { randomChildModeInitialized.current = true; return; }
-    try { localStorage.setItem('pv3-random-child-mode', JSON.stringify(randomChildMode)); } catch {}
+    writeStored('pv3-random-child-mode', randomChildMode, 'pv#111 GenerateScreen.save');
   }, [randomChildMode]);
 
   // selectedChildMap 永続化
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem('pv3-selected-children'));
-      if (stored && typeof stored === 'object') setSelectedChildMap(stored);
-    } catch {}
+    const stored = readStoredMap('pv3-selected-children', 'pv#111 GenerateScreen.restore', v => v === null || typeof v === 'string', '子カード id（文字列か null）');
+    if (stored) setSelectedChildMap(stored);
   }, []);
   const selectedChildMapInitialized = useRef(false);
   useEffect(() => {
     if (!selectedChildMapInitialized.current) { selectedChildMapInitialized.current = true; return; }
-    try { localStorage.setItem('pv3-selected-children', JSON.stringify(selectedChildMap)); } catch {}
+    writeStored('pv3-selected-children', selectedChildMap, 'pv#111 GenerateScreen.save');
   }, [selectedChildMap]);
 
   // #10: resetKey — スクロールトップ
@@ -757,13 +745,11 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   // ── Prompt storage ──
 
   const savePromptToStorage = useCallback(() => {
-    try {
-      localStorage.setItem('pv3-last-prompt', JSON.stringify({
-        positive: editedPositive,
-        negative: editedNegative,
-        model, resolution, steps, scale, sampler,
-      }));
-    } catch {}
+    writeStored('pv3-last-prompt', {
+      positive: editedPositive,
+      negative: editedNegative,
+      model, resolution, steps, scale, sampler,
+    }, 'pv#111 GenerateScreen.savePrompt');
   }, [editedPositive, editedNegative, model, resolution, steps, scale, sampler]);
 
   const handleClearPrompt = useCallback(() => {
@@ -1556,14 +1542,15 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
                     {queueData.tasks.map(task => (
                       <QueueTaskRow key={task.id} task={task} onPreview={setPreviewItem} onSave={async (rowBlobUrl) => {
                         if (task.saved) return;
+                        // pv#111: 解析できない result は記録する（サムネイルは作らない）
+                        const res = typeof task.result === 'string' ? parseJsonOnce(task.result, { kind: 'queue-task-result-unparseable', stage: 'pv#111 GenerateScreen.queueRowSave', id: task.id }) : task.result;
+                        const hash = res?.hash ?? null;
                         try {
                           await api.queueTaskSave(task.id);
-                          let hash = null;
-                          try { hash = (typeof task.result === 'string' ? JSON.parse(task.result) : task.result)?.hash; } catch {}
                           uploadThumbAfterSave(rowBlobUrl, hash, getConnection()).catch(e => recordFailure('§4.3 #9 GenerateScreen.queueRowSave', 'thumb-upload-failed', e, { hash }));
                           setQueueData(await api.getQueue()); addToast('success', '保存しました');
                         }
-                        catch (e) { addToast('error', e.message); }
+                        catch (e) { recordFailure('pv#111 GenerateScreen.queueRowSave', 'queue-task-save-failed', e, { task_id: task.id }); addToast('error', e.message); }
                       }} onRemove={() => handleRemoveTask(task.id)} />
                     ))}
                   </div>

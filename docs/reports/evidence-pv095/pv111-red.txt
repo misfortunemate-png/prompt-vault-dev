@@ -1,0 +1,16 @@
+repository_sha=3bd497aae76a316b4a75341a3ff3f1d1c4e48c47
+
+pv#111 [AUTO_FAILURE_INJECTION] gate=true Swallowed catches outside the 72-point survey get a residue type (light)
+  VERIFIER tests/issues/pv-111-remaining-catches.mjs sha256=7c6a7ee3c584a8e67ca113e55caa43979d594a9466cd35bb4506f7344ec8622b
+  FAIL    storedValues module exists — src/lib/storedValues.js not found
+  FAIL    GenerateScreen: pv3-* restores go through readStoredMap — direct JSON.parse of pv3-* remains
+  FAIL    GenerateScreen: pv3-* saves go through writeStored (no silent catch) — silent pv3 save remains
+  FAIL    ImageViewer: settings fetch failure is recorded — silent settings catch remains
+  FAIL    ImageViewer: caption_config / char_prompts parse failures are recorded — silent parse remains
+  FAIL    ImageViewer: card dialog / card registration / delete failures are recorded — card/delete failure records missing
+  FAIL    AlbumScreen: pv_thumbColMin is read/written through storedValues — silent thumbColMin remains
+  FAIL    AlbumScreen: favorites / search / preset / rescan-start failures are recorded — records missing
+  FAIL    App: display settings restore goes through readStoredObject (no silent catch) — silent display settings restore remains
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=0 fail=9 gated_fail=9 not_run=0 waived=0 unknown=0
