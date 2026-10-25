@@ -1,0 +1,7 @@
+# 2026-10-25T18:29:40+09:00 node docs/reports/pv-115/ac15-real-worker-e2e.mjs
+fran up: true
+PUT /sync/folders: {"ok":true,"folders":["E2E"],"ignored":0}
+POST /sync/run: 200 {"started":true}
+lastRun: {"finishedAt":"2026-10-25T09:29:41.430Z","uploaded":0,"skipped":0,"failed":0,"errors":["クラウドの認証に失敗しました（401）。送信を止めました"],"aborted":true}
+token value in output/logs/status: false
+VERDICT PASS (real Worker 401 → sync aborted before any upload)

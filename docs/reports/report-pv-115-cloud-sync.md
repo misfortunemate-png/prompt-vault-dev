@@ -1,4 +1,10 @@
-# pv#115 クラウド改修 — 報告（実装・モック検証・Fran 再起動は済み。実 Worker での確認と Pages 配信が未実施）
+# pv#115 クラウド改修 — 報告（差し戻し対応: AC-15 の実 Worker 技術検証。拒否側は検証済み、有効トークン側は秘密の配置待ち）
+
+> **差し戻し対応（2026-10-25・検収「AC-15 技術検証のみ未了」）**
+> - 実 Worker で拒否側を確かめた（秘密は使わない）。Authorization なし・ダミートークンで `GET /sync/images`・`/sync/r2-usage` は **401**（`pv-115/ac15-real-worker-negative.log`）
+> - Fran の写しを本物の Worker に向け、ダミートークンと使い捨ての乱数鍵で同期させた。一覧取得で 401 → `aborted`・`uploaded 0`・PUT なし・トークンの値はログや状態に出ない、で **PASS**（`pv-115/ac15-real-worker-e2e.mjs`・`.log`）
+> - 有効トークン側（200）と鍵の一致は、本番の秘密が置かれていないので未検証のまま。PG は秘密に触れない。運用者が `PV_VAULT_KEY`・`CLOUD_TOKEN` を `D:\AI\secrets\secrets.env` に置いた後に、`scripts/sync-auth-check.bat` を一度実行すれば確かめられる。この検査は読み取りだけで、`GET /sync/images`・`/sync/r2-usage` の 200 と、クラウドにある 1 件を鍵で復号できるかを表示する。秘密の値は表示しない。秘密なし・ダミートークンで、それぞれ NOT READY・401 FAIL になることは確認済み（`pv-115/ac15-auth-check-script.log`）
+> - 実機確認と Pages 配信は、PM の訂正（`9c2f308`）どおり検収の外で扱う
 
 文書種別: 作業文書（PG報告）
 作成: 2026-10-25 ／ PG ／ 対応指示書: docs/instructions/instructions-pv-115-cloud-sync.md（PM 裁定 S-1〜S-4 反映版 `c23add4`）／ 仕様: docs/prompt-vault-cloud-spec.md ／ Issue: pv#115（関連: foundation#276）
@@ -8,7 +14,7 @@
 ## 状態
 
 - 実装と、モックの Worker を使った検証（AC-1〜AC-17）は終わった
-- **未検証**: AC-15 のうち「実 Worker で、有効なトークンなら 200・無効なトークンなら 401/403」の確認と、実クラウドへの送信。旧 pv-sync が使っていた `CLOUD_TOKEN` の候補はある（下の §5）。ただし、その有効性を読み取り専用の GET で確かめる操作は、PG 環境の権限判定（秘密の探索に当たる）で止められた。そのため実施していない。指示書の規定に従い、**この項目は完了扱いにしない**
+- **未検証**: AC-15 のうち「実 Worker で、有効なトークンなら 200・無効なトークンなら 401/403」の確認と、実クラウドへの送信。旧 pv-sync が使っていた `CLOUD_TOKEN` の候補はある（下の §5）。ただし、その有効性を読み取り専用の GET で確かめる操作は、PG 環境の権限判定（秘密の探索に当たる）で止められた。そのため実施していない。指示書の規定（`9c2f308` の訂正後）に従い、未検証と明記し、技術的に達成しているかの判定は PM に委ねる（拒否側は上の差し戻し対応で検証済み）
 - 着工: pull prompt-vault-dev `c23add4`／foundation `158c3b0`、マニフェスト照合 OK、inspect 緑
 
 ---
@@ -61,7 +67,7 @@
 | AC-12 | npm run verify:issues で既存の結果を維持（両リポジトリ） | prompt-vault-dev: 着工前 `issues=25 pass=458 fail=0 waived=4` → 後 `issues=26 pass=499 fail=0 waived=4`（pv#115 の 41 項目が増えた）。1 回目の全体実行で pv#115 AC-2 の既存 `PUT /api/settings` が 1 度だけ 500 を返した（§5-3）。foundation: §2.1 | `ac12-verify-pv-run2.log`（緑）、`ac12-verify-pv.log`（1 回目・1 件 FAIL）、`ac12-ac16-verify-foundation.log` |
 | AC-13 | 既存のクラウド hash が WebP に上書きされ、復号すると WebP | PASS（旧 PNG の a1 → フロントの decrypt() で WebP・原寸 64×48、サムネも WebP、メタデータは Worker の契約どおり、PNG は送らない）。negative control: 旧来の差分ルールでは a1 は対象外。**NC 実行**: 対象ルールを旧来の差分に戻すと AC-13・AC-14 が FAIL | 「AC-13 …」×5、`nc2-old-diff-rule.log` |
 | AC-14 | 再同期での skip・失敗の再送・後から選んだフォルダの上書き | PASS（2 回目は PUT 0 件で skip 2。サムネ PUT 500 の失敗注入 → failed 1 で記録なし → 次回 uploaded 1。後から選んだ B の旧 PNG も WebP に上書き。記録はあるのにクラウドから消えた hash は再送） | 「AC-14 …」×3、「S-4 …」 |
-| AC-15 | 秘密なしで通常起動・同期は 503・有効な認証で 200・無効な認証で送信を止める | **一部未検証**。モック: 秘密なしで起動、503、鍵だけでトークンなしなら 503 で送信 0、無効トークン → 401 → 中断・PUT 0 件、有効トークン → 200 で進む、ログと状態に秘密の値なし — PASS。本番 Fran: 秘密なしで 4.2.0 が起動し 503（§7）。**実 Worker での 200／401 の確認は未実施**（§5-1） | 「AC-15 …」×7、`live-fran-after-restart.log` |
+| AC-15 | 秘密なしで通常起動・同期は 503・有効な認証で 200・無効な認証で送信を止める | **一部未検証**。モック: 秘密なしで起動、503、鍵だけでトークンなしなら 503 で送信 0、無効トークン → 401 → 中断・PUT 0 件、有効トークン → 200 で進む、ログと状態に秘密の値なし — PASS。本番 Fran: 秘密なしで 4.2.0 が起動し 503（§7）。**実 Worker**: トークンなし・ダミートークンは 401。Fran の写しから本物の Worker へ同期すると 401 で中断し、送信なし — PASS（差し戻し対応）。**有効トークンでの 200 は未検証**（秘密の配置待ち。検査は `scripts/sync-auth-check.bat`） | 「AC-15 …」×7、`live-fran-after-restart.log`、`ac15-real-worker-negative.log`、`ac15-real-worker-e2e.log`、`ac15-auth-check-script.log` |
 | AC-16 | foundation の既存 verifier と fixture を維持、旧ジョブは停止のまま | PASS（foundation の変更 0 件、pv-sync.mjs は残置、runner の pv-sync 参照 0 件、Fran は旧スクリプトを呼ばない） | `ac16-old-job.log`、`ac12-ac16-verify-foundation.log` |
 | AC-17 | 既存の設定保存と再起動を挟んでも、同期の選択と WebP 送信記録が残る | PASS（再起動後に PUT /api/settings → 選択 A,B が残り、再同期の PUT 0 件・skip 3）。negative control は AC-2 と同じ（旧方式は消える） | 「AC-17 …」 |
 
@@ -98,7 +104,7 @@
 1. **実 Worker での認証確認と実送信（AC-15 の一部・仕様 §8.3）**: 秘密がまだ置かれていない（`D:\AI\secrets\secrets.env` に `PV_VAULT_KEY`・`CLOUD_TOKEN` がない）
    - 旧 pv-sync の `.env` に当たるファイル（`chat-pwa/.env`。`FRAN_BASE`・`PV_VAULT_ROOT`・`CLOUD_TOKEN`・`PV_VAULT_KEY` のキーがある）と、`D:\AI\secrets\pv-cloud-connection.json`（`auth_token`・`vault_key_base64`）に候補がある。キー名だけを見た
    - これを使う読み取り専用の GET は、PG 環境の権限判定で止められた。値は読んでいないし、回り道もしていない
-   - 必要なのは、インフラPG（または発注者）が有効なトークンと鍵を secrets.env に置くこと。置いた後は、設定画面で小さなフォルダを選んで「同期」を押せば実送信の確認になる。トークンが無効なら 401 で送信せずに止まる
+   - 必要なのは、インフラPG（または発注者）が有効なトークンと鍵を secrets.env に置くこと。置いた後は、`scripts/sync-auth-check.bat`（読み取りのみ）で 200 と鍵の一致を確かめ、設定画面で小さなフォルダを選んで「同期」を押せば実送信の確認になる。トークンが無効なら 401 で送信せずに止まる（実 Worker で確認済み）
 2. 設定画面「クラウド同期」の目視・実機確認（指示書の実機系）。前提となる **Pages へのフロント配信が未実施**（§7。PG 環境の権限判定で止められた）
 3. 1 回目の全体実行で、既存の `PUT /api/settings` が 1 度だけ 500 を返した（`ac12-verify-pv.log`）。pv#115 を単独で 4 回、全体を 1 回走らせ直すといずれも緑だった。harness の Fran で `PUT /api/settings` を 300 回叩いても再現しなかった。同期のコードは settings.json を書かない（読むだけ）。既存の `atomicWriteJson`（rename）が Windows で一時的に失敗したものと推定するが、原因は確定していない。次に起きたときに原因が分かるよう、verifier の失敗詳細に `UNHANDLED` のログを載せるようにした
 4. 1 回の同期の途中で R2 上限を超えることは止めていない。開始時の判定だけで、仕様 §3.7（旧 pvImageUp を踏襲）どおり

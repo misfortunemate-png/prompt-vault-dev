@@ -1,0 +1,11 @@
+# 2026-10-25T18:30:30+09:00 scripts/sync-auth-check.mjs（読み取りのみ）
+## 1. 本番の秘密が未配置の状態（既定の D:\AI\secrets\secrets.env）
+sources: {"PV_VAULT_KEY":null,"CLOUD_TOKEN":null,"CLOUD_BASE":"default","secretsFile":"D:\\AI\\secrets\\secrets.env"} token length: 0 cloudBase: https://ai-family-foundation.misfortunemate.workers.dev
+NOT READY: vault鍵（PV_VAULT_KEY）が設定されていません / クラウドのトークン（CLOUD_TOKEN）が設定されていません
+exit=2
+## 2. 使い捨ての乱数鍵＋ダミートークン（本物の Worker）
+sources: {"PV_VAULT_KEY":"env","CLOUD_TOKEN":"env","CLOUD_BASE":"default","secretsFile":null} token length: 25 cloudBase: https://ai-family-foundation.misfortunemate.workers.dev
+GET /sync/images?limit=1 → 401
+GET /sync/r2-usage → 401 
+VERDICT FAIL
+exit=1

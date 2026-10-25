@@ -54,6 +54,7 @@ ALLOWED_ORIGINS=https://misfortunemate-png.github.io,https://prompt-vault-6gr.pa
 - 置き場所: `D:\AI\secrets\secrets.env`（`PV_SYNC_SECRETS_PATH` で変更可）。`server/sync.js` がこの 3 キーだけを同期開始のたびに読む（環境変数が優先）。置いた後の再起動は不要
 - 秘密がなくてもフランは通常どおり起動する。同期ボタンは 503（理由を表示）
 - ランタイムデータ: `data/sync.json`（選んだフォルダ）・`data/sync-webp-state.json`（WebP の送信に成功した hash）。どちらも設定画面の保存では消えない
+- 秘密を置いた後の確認: `scripts/sync-auth-check.bat`（読み取りだけ。実 Worker への 200 と、クラウドの 1 件を鍵で復号できるかを表示。値は表示しない）
 - 検査: `scripts/verify-sync.bat`（`npm run verify:issues -- pv#115`。モックの Worker を使い、実クラウドには触れない）
 
 ---

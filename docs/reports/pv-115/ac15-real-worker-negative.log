@@ -1,0 +1,7 @@
+# AC-15 実 Worker・秘密を使わない確認 2026-10-25T18:29:22+09:00
+## Authorization なしで GET /sync/images?limit=1
+HTTP 401
+## 無効なトークン（ダミー文字列）で GET /sync/images?limit=1
+HTTP 401
+## 無効なトークンで GET /sync/r2-usage
+HTTP 401
