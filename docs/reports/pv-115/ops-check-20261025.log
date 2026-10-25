@@ -1,0 +1,26 @@
+# PG 運用確認 2026-10-25T19:45:09+09:00（読み取りのみ）
+## Fran healthz（localhost・tailnet）
+{"status":"ok","version":"4.2.0","sha":"71b9717"}
+{"status":"ok","version":"4.2.0","sha":"71b9717"}
+## repo HEAD
+2b2e1d4 docs(pv#115): PM accept AC15 after real Worker 200 and successful vault decryption
+71b9717
+## 稼働中の 71b9717 と HEAD の間でサーバー・フロントのコードに差分がないこと（空なら差分なし）
+(end)
+## scripts/sync-auth-check.mjs（バッチは pause と文字化けがあるため、同じ処理の node を直接実行）
+sources: {"PV_VAULT_KEY":"secrets-file","CLOUD_TOKEN":"secrets-file","CLOUD_BASE":"default","secretsFile":"D:\\AI\\secrets\\secrets.env"} token length: 8 cloudBase: https://ai-family-foundation.misfortunemate.workers.dev
+GET /sync/images?limit=1 → 200
+GET /sync/r2-usage → 200 totalBytes=908374610
+cloud images total: 590
+decrypt thumb f8991a56aa2b9dba: OK (keyId=v1, 10626 bytes)
+VERDICT PASS
+exit=0
+## Pages（https://prompt-vault-6gr.pages.dev）の公開版（読み取りのみ）
+### sw.js の CACHE_NAME
+const CACHE_NAME = 'prompt-vault-v4.1.0';
+### index.html が参照する JS
+/assets/index-mX9tZicu.js
+### その JS に 4.2.0 の印（クラウド同期・/sync/folders）があるか
+(上が空なら含まれない)
+### 手元の 71b9717 ビルドの JS 名（参考）
+index-CC_MCOQy.js

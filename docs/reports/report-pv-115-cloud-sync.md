@@ -138,3 +138,23 @@
 - 画像本体: `PUT /api/prompt-vault/sync/upload-image`（`src/worker/handlers/prompt-vault-sync.js:58` `handleUploadImage`。旧 pvImageUp の送り先 `pv-sync.mjs:333` と同じ）。サムネ: `PUT /api/prompt-vault/thumbs/{hash}`（`functions/api/prompt-vault/thumbs/[hash].js`）
 - Worker は暗号文を中身を見ずに R2 へ置き、D1 を `ON CONFLICT(hash)` で更新する。WebP に変わっても影響はない。**Worker の変更・デプロイは不要**
 - 注意点: 本体だけを送ると、その時点で D1 は `thumb_ok=0`・`thumb_r2_key=NULL` になる（excluded で上書き）。その直後のサムネ PUT で `thumb_ok=1` に戻る。サムネの送信に失敗した hash は、次回の同期で本体から送り直す
+
+---
+
+## 9. PG 運用確認（2026-10-25 19:45・読み取りのみ）
+
+発令「prompt-vault 4.2.0 — PG運用確認」に対応する追記。pull `2b2e1d4`・マニフェスト照合 OK・inspect 緑で着工した。生の出力は `docs/reports/pv-115/ops-check-20261025.log`（秘密の値は含まない。トークンは長さだけ）。
+
+| 確認項目 | 結果 | 証跡（ops-check-20261025.log の該当行） |
+|---|---|---|
+| Fran の稼働版 | **4.2.0・`71b9717`**（localhost と tailnet `:8445` の両方）。`71b9717..2b2e1d4` の間に server/・server.js・src/・package.json・public/ の差分はない（後の追加は docs と scripts だけ）ので、稼働中のコードは検収した実装と同じ | `{"status":"ok","version":"4.2.0","sha":"71b9717"}` ×2、差分 stat が空 |
+| 実 Worker の認証（有効トークン） | **200 ×2**（PG が独立に取得） | `GET /sync/images?limit=1 → 200`、`GET /sync/r2-usage → 200 totalBytes=908374610` |
+| 秘密の出所 | `PV_VAULT_KEY`・`CLOUD_TOKEN` とも `secrets-file`（`D:\AI\secrets\secrets.env`）、`CLOUD_BASE` は既定。Fran の同期と同じローダーで読んだ | `sources: {...}` 行 |
+| 既存暗号文の復号 | **OK**。クラウドにある既存サムネ `f8991a56aa2b9dba`（keyId `v1`＝旧 pv-sync の暗号文）を、配置された `PV_VAULT_KEY` で AES-256-GCM 復号できた（認証 tag の照合を含む）。Pixel の鍵と同じかどうかは、この鍵がクラウドの既存の暗号文と一致することから推定できるが、Pixel 側は見ていない | `decrypt thumb f8991a56aa2b9dba: OK (keyId=v1, 10626 bytes)` |
+| 判定の独立性 | `VERDICT PASS` 行ではなく、上の 200 ×2 の行と `decrypt … OK` の行をそれぞれ根拠にした。発注者が提供した出力（`ac15-real-worker-positive-user-20261025.md`）とは別の実行で、内容は一致する | — |
+| Pages の公開版 | **4.1.0 のまま**（4.2.0 は未配信）。公開中の `sw.js` は `CACHE_NAME = 'prompt-vault-v4.1.0'`、`index.html` が読む `/assets/index-mX9tZicu.js` に `/sync/folders`・`クラウド同期`・`loadViewerImage` はない。手元の 71b9717 のビルドは `index-CC_MCOQy.js` | `### sw.js の CACHE_NAME` 以下 |
+
+補足
+- 実行したのは `node scripts/sync-auth-check.mjs`。`.bat` は末尾の `pause` で止まり、コメントの文字化けもある（派生 #118）ため、同じ処理を直接実行した。中身は読み取り（GET 4 回）だけ
+- クラウドの画像数は 590 件、R2 使用量は約 866 MiB（908,374,610 B）。既定の上限 5GB の範囲内
+- 画像アップロード（同期の実行）・Pages 配信・サーバー再起動・コード変更は、いずれもしていない。停止条件（権限拒否・秘密の不一致）には当たらなかった
