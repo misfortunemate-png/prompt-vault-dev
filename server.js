@@ -13,6 +13,7 @@ import { validateSettings, validateCardsDoc, validatePresetsDoc, validateSlotBod
 import { checkGenerateBody, checkQueueTasks } from './server/genParams.js';
 import { classifyNovelAiStatus } from './server/providers/novelai.js';
 import { getStatus as queueGetStatus, getTask as queueGetTask, addTasks, removeTask, clearQueue, startQueue, stopQueue } from './server/queue.js';
+import { setupSyncRoutes } from './server/sync.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -1109,6 +1110,9 @@ async function start() {
       res.status(500).json({ error: e.message });
     }
   });
+
+  // ── Cloud sync（pv#115） ──
+  setupSyncRoutes(api);
 
   // S-14: 未定義の /api/* はメソッドを問わず JSON の 404（Vite の SPA フォールバックより先に受ける）
   api.use((req, res) => {

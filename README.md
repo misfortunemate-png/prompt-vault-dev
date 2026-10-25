@@ -46,6 +46,16 @@ https://3f6c5a34.prompt-vault-6gr.pages.dev
 ALLOWED_ORIGINS=https://misfortunemate-png.github.io,https://prompt-vault-6gr.pages.dev
 ```
 
+### クラウド同期（pv#115）
+
+設定画面の「クラウド同期」（Fran 接続時のみ表示）で最上位フォルダを選び、「同期」を押すと、選んだフォルダ（子フォルダを含む）の画像を表示用 WebP（原寸・品質80）とサムネイル（長辺320px）にして、vault 鍵で暗号化してクラウドへ送る。手動のみ。クラウド側の画像は消さない。
+
+- 必要な秘密: `PV_VAULT_KEY`（設定画面の vault 鍵と同じ base64 の 32 バイト鍵）・`CLOUD_TOKEN`（Worker の入口照合を通るトークン）。`CLOUD_BASE` は省略時 `https://ai-family-foundation.misfortunemate.workers.dev`
+- 置き場所: `D:\AI\secrets\secrets.env`（`PV_SYNC_SECRETS_PATH` で変更可）。`server/sync.js` がこの 3 キーだけを同期開始のたびに読む（環境変数が優先）。置いた後の再起動は不要
+- 秘密がなくてもフランは通常どおり起動する。同期ボタンは 503（理由を表示）
+- ランタイムデータ: `data/sync.json`（選んだフォルダ）・`data/sync-webp-state.json`（WebP の送信に成功した hash）。どちらも設定画面の保存では消えない
+- 検査: `scripts/verify-sync.bat`（`npm run verify:issues -- pv#115`。モックの Worker を使い、実クラウドには触れない）
+
 ---
 
 ## 初期設定（サイトデータをクリアした後など）
@@ -80,5 +90,5 @@ npx wrangler pages deploy dist --project-name=prompt-vault --branch=main
 
 `public/sw.js` のキャッシュ名を変更すると古い SW が強制的に入れ替わる。
 
-- 現在のキャッシュ名: `prompt-vault-v4.1.0`
+- 現在のキャッシュ名: `prompt-vault-v4.2.0`
 - クロスオリジンリクエスト（フランサーバー等）は SW が傍受しない（same-origin ガード適用済み）

@@ -4,6 +4,7 @@ import { getConnection, resolveThumbUrl, resolveFullImgUrl } from '../lib/connec
 import { decrypt } from '../lib/crypto';
 import { recordInvalid, recordFailure } from '../lib/invalidLog';
 import { parseJsonOnce } from '../lib/storedValues';
+import { loadViewerImage, sniffImageType } from '../lib/cloudImageLoad';
 
 const FONT_SIZE_MAP = { small: '14px', medium: '20px', large: '28px' };
 const DEFAULT_CAPTION_CFG = { mode: 'margin', fontSize: 'medium', color: '#ffffff', outline: true, x: 50, y: 20 };
@@ -68,39 +69,22 @@ export default function ImageViewer({ images, initialIndex, onClose, onNextFolde
     if (conn.route === 'cloud') {
       setImgLoading(true);
       const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
-      // thumb先行
-      const thumbUrl = conn.cloudUrl + `/thumbs/${img.hash}`;
-      // §4.3 #13: 2xx 以外を null に寄せず記録する（表示は従来どおり）
-      const okOrRecord = (r, what) => {
-        if (!r) return null;
-        if (r.ok) return r.arrayBuffer();
-        recordInvalid({ kind: 'viewer-image-fetch-status', stage: '§4.3 #13 ImageViewer.load', raw: { hash: img.hash, what, status: r.status }, reason: `2xx 以外（${r.status}）` });
-        return null;
+      const show = (plain, type) => {
+        const url = URL.createObjectURL(new Blob([plain], { type }));
+        blobsToRevoke.push(url);
+        setDisplaySrc(url);
       };
-      fetch(thumbUrl, { headers })
-        .then(r => okOrRecord(r, 'thumb'))
-        .then(buf => buf ? decrypt(buf) : null)
-        .then(plain => {
-          if (cancelled || !plain) return;
-          const url = URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
-          blobsToRevoke.push(url);
-          setDisplaySrc(url);
-          // full image
-          return fetch(conn.cloudUrl + `/gallery/image/${img.hash}/data`, { headers });
-        })
-        .then(r => okOrRecord(r, 'full'))
-        .then(buf => buf ? decrypt(buf) : null)
-        .then(plain => {
-          if (cancelled || !plain) return;
-          const url = URL.createObjectURL(new Blob([plain], { type: 'image/png' }));
-          blobsToRevoke.push(url);
-          setDisplaySrc(url);
-          setImgLoading(false);
-        })
-        .catch(e => {
-          recordFailure('§4.3 #13 ImageViewer.load', 'viewer-image-load-failed', e, { hash: img.hash });
-          if (!cancelled) setImgLoading(false);
-        });
+      // thumb先行。B-1（pv#115）: サムネが 404 等で取れなくても本体に進み、どの道筋でも読み込み中を解除する
+      loadViewerImage({
+        hash: img.hash, cloudUrl: conn.cloudUrl, headers, decryptImpl: decrypt,
+        isCancelled: () => cancelled,
+        onThumb: plain => show(plain, 'image/webp'),
+        onFull: plain => show(plain, sniffImageType(plain)),
+        onDone: () => setImgLoading(false),
+        // §4.3 #13: 2xx 以外を null に寄せず記録する（表示は従来どおり）
+        recordStatus: (what, status) => recordInvalid({ kind: 'viewer-image-fetch-status', stage: '§4.3 #13 ImageViewer.load', raw: { hash: img.hash, what, status }, reason: `2xx 以外（${status}）` }),
+        recordError: (what, e) => recordFailure('§4.3 #13 ImageViewer.load', 'viewer-image-load-failed', e, { hash: img.hash, what }),
+      });
     } else {
       setDisplaySrc(resolveThumbUrl(img.hash));
       setImgLoading(true);

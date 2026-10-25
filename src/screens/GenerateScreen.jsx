@@ -8,6 +8,7 @@ import { parseTaskResult } from '../lib/queueResult';
 import { recordInvalid, recordFailure } from '../lib/invalidLog';
 import { checkTaskStatus, checkQueueState } from '../lib/queueStatus';
 import { readStoredMap, writeStored, parseJsonOnce } from '../lib/storedValues';
+import { createBlobUrlSetTracker } from '../lib/blobUrls';
 
 const MODELS = [
   { value: 'nai-diffusion-5-full',       label: 'V5 Full ⚡' },
@@ -242,6 +243,12 @@ export default function GenerateScreen({ addToast, results, setResults, maxResul
   const [presetsData, setPresetsData] = useState(null);
   const [vaultReady, setVaultReady] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // B-3（pv#115）: 生成結果が持つ Blob URL は、一覧から外れた（上限で切り捨て・消去）ときと画面を外すときに解放する
+  const resultBlobsRef = useRef(null);
+  if (!resultBlobsRef.current) resultBlobsRef.current = createBlobUrlSetTracker();
+  useEffect(() => { resultBlobsRef.current.sync(results.map(r => r?.blobUrl)); }, [results]);
+  useEffect(() => () => resultBlobsRef.current.releaseAll(), []);
 
   const [selectedPresetId, setSelectedPresetId] = useState(null);
   const [selectedCardMap, setSelectedCardMap] = useState({});

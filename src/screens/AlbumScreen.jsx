@@ -7,8 +7,8 @@ import { generateAndUploadThumb } from '../lib/thumbGen';
 import { getThumb, putThumb } from '../lib/thumbDb';
 import { recordInvalid, recordFailure } from '../lib/invalidLog';
 import { readStoredInt, writeStored } from '../lib/storedValues';
-
-const thumbCache = new Map();
+import { loadPreviewImage, sniffImageType } from '../lib/cloudImageLoad';
+import { createBlobUrlSlot } from '../lib/blobUrls';
 
 async function fetchWithRetry(url, options, retries = 3) {
   let lastErr;
@@ -82,10 +82,8 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
 
   useEffect(() => {
     if (!isCloud) return;
-    if (thumbCache.has(image.hash)) {
-      setBlobUrl(thumbCache.get(image.hash));
-      return;
-    }
+    // B-3（pv#115）: この枠が作った Blob URL は、枠を外す・画像が替わるときに解放する（モジュール全体での持ち続けをやめる）
+    const slot = createBlobUrlSlot();
     let cancelled = false;
     const obs = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting) return;
@@ -95,9 +93,7 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
         if (image.thumb_ok) {
           const cached = await getThumb(image.hash);
           if (cached && !cancelled) {
-            const url = URL.createObjectURL(new Blob([cached], { type: 'image/webp' }));
-            thumbCache.set(image.hash, url);
-            setBlobUrl(url);
+            setBlobUrl(slot.set(new Blob([cached], { type: 'image/webp' })));
             return;
           }
         }
@@ -108,7 +104,6 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
         const fetchUrl = image.thumb_ok
           ? conn.cloudUrl + `/thumbs/${image.hash}`
           : conn.cloudUrl + `/gallery/image/${image.hash}/data`;
-        const mimeType = image.thumb_ok ? 'image/webp' : 'image/png';
 
         await acquireSlot();
         if (cancelled) { releaseSlot(); return; }
@@ -117,9 +112,7 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
           const plain = await decrypt(await res.arrayBuffer());
           releaseSlot();
           if (cancelled) return;
-          const url = URL.createObjectURL(new Blob([plain], { type: mimeType }));
-          thumbCache.set(image.hash, url);
-          setBlobUrl(url);
+          setBlobUrl(slot.set(new Blob([plain], { type: image.thumb_ok ? 'image/webp' : sniffImageType(plain) })));
           // thumb_ok=1 の webp だけ IndexedDB に保存（フルPNGは保存しない）
           // §4.3 #16: IndexedDB への保存・サムネイル作成の失敗（裏の処理なので記録だけ）
           if (image.thumb_ok) putThumb(image.hash, plain).catch(e => recordFailure('§4.3 #16 AlbumScreen.putThumb', 'thumb-cache-save-failed', e, { hash: image.hash }));
@@ -135,6 +128,8 @@ function ThumbCell({ image, onClick, isFavorite, showFolder }) {
     return () => {
       cancelled = true;
       obs.disconnect();
+      slot.release();
+      setBlobUrl(null);
     };
   }, [isCloud, image.hash, image.thumb_ok, conn.cloudUrl, conn.token]);
 
@@ -196,23 +191,21 @@ function PreviewThumb({ hash }) {
       return;
     }
     const headers = conn.token ? { 'Authorization': `Bearer ${conn.token}` } : {};
-    let blobUrl = null;
+    const slot = createBlobUrlSlot();
     let cancelled = false;
     // §4.3 #17: フォルダのプレビュー画像。2xx 以外を null に寄せず記録する
-    fetch(conn.cloudUrl + `/thumbs/${hash}`, { headers })
-      .then(r => {
-        if (r.ok) return r.arrayBuffer();
-        recordInvalid({ kind: 'folder-preview-fetch-status', stage: '§4.3 #17 AlbumScreen.folderPreview', raw: { hash, status: r.status }, reason: `2xx 以外（${r.status}）` });
-        return null;
-      })
-      .then(buf => buf ? decrypt(buf) : null)
-      .then(plain => {
-        if (cancelled || !plain) return;
-        blobUrl = URL.createObjectURL(new Blob([plain], { type: 'image/webp' }));
-        setSrc(blobUrl);
+    // B-2（pv#115）: サムネがない（thumb_ok=0 等）ときは本体で代わりに出し、サムネを作って上げる（ThumbCell と同じ）
+    loadPreviewImage({
+      hash, cloudUrl: conn.cloudUrl, headers, decryptImpl: decrypt,
+      recordStatus: (what, status) => recordInvalid({ kind: 'folder-preview-fetch-status', stage: '§4.3 #17 AlbumScreen.folderPreview', raw: { hash, what, status }, reason: `2xx 以外（${status}）` }),
+    })
+      .then(got => {
+        if (cancelled || !got) return;
+        setSrc(slot.set(new Blob([got.plain], { type: got.fromFull ? sniffImageType(got.plain) : got.type })));
+        if (got.fromFull) generateAndUploadThumb(got.plain, hash, conn).catch(e => recordFailure('§4.3 #16 AlbumScreen.folderPreview.generateThumb', 'thumb-upload-failed', e, { hash }));
       })
       .catch(e => recordFailure('§4.3 #17 AlbumScreen.folderPreview', 'folder-preview-failed', e, { hash }));
-    return () => { cancelled = true; if (blobUrl) URL.revokeObjectURL(blobUrl); };
+    return () => { cancelled = true; slot.release(); };
   }, [hash]);
   if (!src) return <Placeholder />;
   return <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />;

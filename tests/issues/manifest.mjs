@@ -23,6 +23,7 @@ import pv102 from './pv-102-route-residue.mjs';
 import pv103 from './pv-103-remaining-residue.mjs';
 import pv111 from './pv-111-remaining-catches.mjs';
 import pv113 from './pv-113-key-id-alias.mjs';
+import pv115 from './pv-115-cloud-sync.mjs';
 
 export const issueVerifiers = Object.freeze({
   [pv005.issue]: pv005,
@@ -50,4 +51,5 @@ export const issueVerifiers = Object.freeze({
   [pv103.issue]: pv103,
   [pv111.issue]: pv111,
   [pv113.issue]: pv113,
+  [pv115.issue]: pv115,
 });

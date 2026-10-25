@@ -9,6 +9,7 @@ import {
   hasVaultKey, getVaultKey, setVaultKey, clearVaultKey, generateVaultKey,
 } from '../lib/crypto';
 import { getInvalidLog, clearInvalidLog, subscribeInvalidLog, recordInvalid, recordFailure, formatEntriesForCopy } from '../lib/invalidLog';
+import CloudSyncSection from '../components/CloudSyncSection';
 
 const SAMPLER_OPTIONS = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2m_sde'];
 
@@ -738,6 +739,9 @@ export default function SettingsScreen({ onClose, addToast, displaySettings, upd
             opacity: (!gen || !guard) ? 0.5 : 1,
           }}
         >保存</button>
+
+        {/* pv#115 クラウド同期（Fran 接続時のみ） */}
+        {connectionState.route === 'fran' && <CloudSyncSection addToast={addToast} sectionStyle={sectionStyle} />}
 
         {/* §4.6 デバッグ・接続 */}
         <div style={sectionStyle}>
