@@ -45,18 +45,17 @@ prompt-vaultサーバーに同期モジュールを新設する。旧pv-sync（a
 
 ### §3.2 フォルダ選択の保存
 
-同期対象フォルダの一覧を `data/settings.json` に保存する。既存の設定項目と同じファイルに `sync.folders` キーとして格納する。
+同期対象フォルダは `data/sync.json` に独立保存する。既存の `PUT /api/settings` は `data/settings.json` を全置換するため、そこに同期選択を混在させない（停止報告S-1のPM裁定）。
 
 ```json
 {
-  "sync": {
-    "folders": ["キャラA", "キャラB"],
-    "r2_limit_gb": 5
-  }
+  "folders": ["キャラA", "キャラB"]
 }
 ```
 
-- `sync.folders`: 同期対象の最上位フォルダ名の配列。空配列は「未選択」
+- `folders`: 同期対象の最上位フォルダ名の配列。空配列は「未選択」。未作成時は空配列とみなす
+- `data/sync.json` は原子的に更新し、同期中の読み取りおよび設定保存との競合で内容を失わない
+- R2上限は従来の `data/settings.json` のフラットキー `'sync.r2_limit_gb'` を読み、存在しなければ5GBを用いる。同期選択ファイルに混在させない
 - フォルダ名はギャラリーインデックス（SQLite `images` テーブルの `folder` 列）の最上位セグメントに対応する
 - D-5により、子フォルダは自動的に含まれる。例: `"キャラA"` を選択すると `キャラA/サブフォルダ` 配下の画像もすべて対象
 
@@ -89,7 +88,7 @@ prompt-vaultサーバーに同期モジュールを新設する。旧pv-sync（a
 
 リクエスト: `{ "folders": ["キャラA", "キャラB"] }`
 
-`data/settings.json` の `sync.folders` を上書き保存する。存在しないフォルダ名が含まれていた場合は無視して保存する（C-1: 存在しないフォルダ名はinvalid集約先に記録する）。
+`data/sync.json` の `folders` を上書き保存する。存在しないフォルダ名が含まれていた場合は無視して保存する（C-1: invalid集約先に記録）。既存の `PUT /api/settings` / `validateSettings` は変更しない。
 
 **POST /api/sync/run**
 
@@ -141,12 +140,16 @@ prompt-vaultサーバーに同期モジュールを新設する。旧pv-sync（a
 
 **手順1: 対象画像の列挙（scanning）**
 
-1. `sync.folders` から選択済みフォルダを取得
+1. `data/sync.json` の `folders` から選択済みフォルダを取得
 2. SQLiteの `images` テーブルから、選択済みフォルダ（子フォルダ含む）に属する画像のハッシュ一覧を取得
-3. クラウドの同期API（`GET /api/prompt-vault/sync/images`）から既存画像のハッシュ一覧を取得（ページング対応、最大500件ずつ）
-4. フラン側にあってクラウド側にない画像を差分として特定する
+3. クラウドの同期API（`GET /api/prompt-vault/sync/images`）から既存画像のハッシュ・`deleted_at` を取得（ページング対応、最大500件ずつ）
+4. `data/sync-webp-state.json` に、今回の機構がWebP本体とサムネイルを正常送信済みのハッシュを記録する（初期値は空集合、原子的に永続化）
+5. 選択フォルダ内で、クラウドに未登録のハッシュ、またはクラウドに存在しても送信成功記録のないハッシュを転送対象とする。後者は既存の暗号化PNGをWebPに上書きするためである。送信済み記録があってもクラウド上で欠けていれば再送対象とする
+6. 明示削除済み（`deleted_at` あり）のハッシュは、同意なく再生成・復活させず、今回の同期では除外する
 
-D-3（削除しない）により、クラウドにあってフランの選択フォルダにない画像はそのまま残す。差分転送は「追加のみ」の片方向となる。
+各画像について本体とサムネイルの両方が成功した後にのみ送信済み記録を残す。片方でも失敗した場合は次回再試行する。状態ファイルとフォルダ選択ファイルは分離して、保存操作の競合による記録喪失を防ぐ。
+
+D-3（削除しない）により、クラウドにあってフランの選択フォルダにない画像はそのまま残す。同期は追加・既存PNGからWebPへの置換のみのFran→Cloud片方向である。
 
 **手順2: 画像変換・暗号化・アップロード（uploading）**
 
@@ -205,13 +208,16 @@ function encrypt(plainBuffer, keyBuffer, keyId = 'vault:v1') {
 
 ### §3.6 vault keyの読み込み
 
-vault key（AES-256の生鍵、32バイト）を `secrets.env` から読み込む。
+vault key（AES-256の生鍵、32バイト）とクラウド接続情報は、同期モジュールが必要な値だけを安全に取得する（停止報告S-3のPM裁定）。
 
 ```
 PV_VAULT_KEY=<base64エンコードされた32バイト鍵>
 ```
 
-- サーバー起動時に `PV_VAULT_KEY` 環境変数を読み、Base64デコードして32バイトのBufferとして保持する
+- `server/sync.js` は `process.env` を優先し、未設定の値に限り `D:\\AI\\secrets\\secrets.env`（`PV_SYNC_SECRETS_PATH` でパス変更可）から **`PV_VAULT_KEY`、`CLOUD_TOKEN`、`CLOUD_BASE` の3項目だけ**を読み取る。Node.js v24の `node:util` `parseEnv` 相当で解析し、ファイル内の他の値は環境全体に展開しない。ファイルがなければ通常起動は継続する
+- `CLOUD_BASE` の既定値は従来の同期先 `https://ai-family-foundation.misfortunemate.workers.dev` とし、`CLOUD_TOKEN` は従来のpv-syncで有効だったトークンを同名で再利用する。`FA_TOKEN_MACHINE` を、権限が検証されないまま暗黙に代用しない
+- `CLOUD_TOKEN` が欠ける／Workerから401・403が返る場合は送信を始めず、秘密値を含めない同期エラーを返す。インフラPGが既存の有効トークンをprivate secretsに配置し、GET `/api/prompt-vault/sync/images` の認証成功（200）を確認する。必要な秘密の現物値はリポジトリや報告に書かない
+- `PV_VAULT_KEY` は読み取った後Base64デコードし、32バイトであることを検証する。鍵の読み込み失敗でも他のサーバー機能は起動できる
 - 未設定の場合、同期APIは `503 Service Unavailable` を返す（同期不可の旨をメッセージに含める）
 - 鍵の値はログやエラーメッセージに含めない（J-3準拠）
 - フロントのlocalStorage `pv-vault-key` に設定されている鍵と同一の鍵である必要がある。鍵の同一性はユーザーの責任で管理する
@@ -236,7 +242,7 @@ PV_VAULT_KEY=<base64エンコードされた32バイト鍵>
 
 R2上の既存の暗号化PNG（約400枚、初回同期時の2026年9月2日アップロード分）は、保全不要と決定されている。以下の方針で扱う。
 
-- 同期の初回実行時、既存ハッシュと一致する画像は表示用WebPで上書きされる
+- 同期対象フォルダに含まれる既存ハッシュは、`data/sync-webp-state.json` に送信成功記録がなければ初回に暗号化WebPで上書きする。後から選択されたフォルダの既存PNGも同じ基準で処理する。成功記録を残した画像は次回差分同期でスキップし、クラウドから欠けていれば再送する
 - 同期対象フォルダに含まれない画像は上書きされずにR2に残る。D-3（削除しない）により、明示的な削除は行わない
 - 結果として、R2には新しいWebPと古いPNGが混在しうる。フロントの表示パイプラインはどちらも暗号化バイナリとして復号→Blob URLで表示するため、混在しても表示に支障はない
 
@@ -268,9 +274,10 @@ ai-family-foundation リポジトリの `scripts/pv-sync.mjs` を廃止する。
 
 ### §5.2 廃止の手順
 
-1. `scripts/pv-sync.mjs` の削除
-2. 関連するfire-runner設定の残骸があれば除去（`scripts/verify-decommission.mjs` の検査対象に含まれていれば更新）
-3. 同期契約v1.0の改訂（§4.4）
+1. **本件では `scripts/pv-sync.mjs` を削除しない**。既にfire-runnerから撤去され、自動実行されないことを確認して従来どおり不使用とする（停止報告S-2のPM裁定）
+2. 参照するverifier 16本・fixture 2本・共有ライブラリは変更・無効化せず、foundation既存検査の緑を維持する。foundation側の未コミット別件作業10ファイルには触れない
+3. 旧ファイルと関連検査の最終撤去は、フラン同期の稼働・検収後に別Issue・別指示書で扱う。旧スクリプトを手動で起動する運用は再開しない
+4. 同期契約v1.0の改訂（§4.4）は別途PMの文書作業とし、本件PGの完了条件を阻害しない
 
 ### §5.3 handbackの扱い
 
@@ -371,7 +378,7 @@ ai-family-foundation リポジトリの `scripts/pv-sync.mjs` を廃止する。
 | # | テスト対象 | 方法 | 合格条件 |
 |---|-----------|------|----------|
 | 1 | フォルダ選択API | `GET /api/sync/folders` をcurlで呼ぶ | フォルダ一覧と画像数が返る |
-| 2 | フォルダ保存 | `PUT /api/sync/folders` でフォルダを選択→再取得 | 選択状態が保持される |
+| 2 | フォルダ保存 | `PUT /api/sync/folders` でフォルダを選択→既存 `PUT /api/settings` による生成設定保存→再取得 | 選択状態が保持され、既存設定保存も壊れない |
 | 3 | 同期実行（空転） | 選択フォルダなしで `POST /api/sync/run` | `state` が `running` → `idle` に遷移し、`uploaded: 0` |
 | 4 | 暗号化互換性 | サーバーで暗号化したバイナリをフロントの `decrypt()` で復号 | 元のバイナリと一致 |
 | 5 | vault key未設定 | `PV_VAULT_KEY` 未設定で `/api/sync/run` | 503が返る |
@@ -380,6 +387,8 @@ ai-family-foundation リポジトリの `scripts/pv-sync.mjs` を廃止する。
 | 8 | 検査 | `npm run inspect` | 既存赤以外に新規赤なし |
 | 9 | Issue verifier | `npm run verify:issues` | 既存結果を維持 |
 | 10 | B-3 Blob URL | コンポーネントアンマウント後に `URL.revokeObjectURL` が呼ばれること | テストコードまたはconsole.logで確認 |
+
+**停止報告への追加検証（PG自己完結）**: (A) `CLOUD_TOKEN` 未設定・鍵未設定での安全な失敗と非漏洩、(B) Worker認証における有効トークンの200・無効トークンの401/403、(C) 既存クラウドhashの上書きとWebP復号、(D) 送信済みhashの再同期スキップ、(E) 同期途中失敗後の再試行、(F) 新たに選択したフォルダの既存クラウドhashの上書き、(G) 既存の明示削除済み画像を復活させないこと、(H) foundation verifierを壊さず旧スクリプトが自動起動されないこと。実クラウドの更新は安全なテスト対象と認証が確保されるまで実施しない。生ログ・negative controlを報告へ添付する。
 
 ### 8.2 実機テスト（発注者依頼）
 
@@ -405,7 +414,7 @@ ai-family-foundation リポジトリの `scripts/pv-sync.mjs` を廃止する。
 | リポジトリ | 作業内容 | 規模 |
 |-----------|----------|------|
 | prompt-vault-dev | 同期モジュール新設（server/sync.js）、フォルダ選択UI、同期ボタン、B-1〜B-3修正 | 主作業 |
-| ai-family-foundation | pv-sync.mjs廃止、Worker側変更があれば最小限 | 従作業 |
+| ai-family-foundation | Workerエンドポイント確認のみ。旧pv-sync.mjsの物理削除とverifier退役は別Issueに延期 | 従作業 |
 
 指示書はリポジトリ単位で分離するか、一枚にまとめるかはPMの判断に委ねる。
 
