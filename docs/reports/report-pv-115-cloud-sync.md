@@ -158,3 +158,8 @@
 - 実行したのは `node scripts/sync-auth-check.mjs`。`.bat` は末尾の `pause` で止まり、コメントの文字化けもある（派生 #118）ため、同じ処理を直接実行した。中身は読み取り（GET 4 回）だけ
 - クラウドの画像数は 590 件、R2 使用量は約 866 MiB（908,374,610 B）。既定の上限 5GB の範囲内
 - 画像アップロード（同期の実行）・Pages 配信・サーバー再起動・コード変更は、いずれもしていない。停止条件（権限拒否・秘密の不一致）には当たらなかった
+
+### 9.1 Pages 配信（2026-10-25・発注者の指示による）
+- 発注者の指示で、README の手順どおり `npm run build` → `npx wrangler pages deploy dist --project-name=prompt-vault --branch=main` を実行した（HEAD `f0a4738`。フロントのコードは `71b9717` と同じ）。デプロイ `https://320897dd.prompt-vault-6gr.pages.dev`
+- 公開の確認: `https://prompt-vault-6gr.pages.dev/sw.js` が `CACHE_NAME = 'prompt-vault-v4.2.0'`、`index.html` が読む JS が `index-CC_MCOQy.js`（手元のビルドと同じ）で、その中に `/sync/folders` がある
+- Pixel での表示・操作の確認は発注者が行う
