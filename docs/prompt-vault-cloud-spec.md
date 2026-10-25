@@ -70,7 +70,7 @@ prompt-vaultサーバーに同期モジュールを新設する。旧pv-sync（a
 
 **GET /api/sync/folders**
 
-ギャラリーインデックスから最上位フォルダの一覧を取得し、`sync.folders` の選択状態とあわせて返す。
+ギャラリーインデックスから最上位フォルダの一覧を取得し、`data/sync.json` の `folders` の選択状態とあわせて返す。
 
 ```json
 {
@@ -426,10 +426,11 @@ ai-family-foundation リポジトリの `scripts/pv-sync.mjs` を廃止する。
 
 ### 9.2 secrets.envの変更
 
-`D:\AI\secrets\secrets.env` に以下の環境変数を追加する。
+`D:\AI\secrets\secrets.env` のうち、同期モジュールが参照する秘密情報は以下のキーに限定する。既存の有効な `CLOUD_TOKEN` も同ファイルに設定する。
 
 ```
 PV_VAULT_KEY=<vault keyのbase64値>
+CLOUD_TOKEN=<旧pv-syncで使用していた既存の有効トークン>
 ```
 
 vault keyの値はフロントのlocalStorage `pv-vault-key` の `raw` フィールドと同一でなければならない。
