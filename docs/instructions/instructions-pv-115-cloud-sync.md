@@ -688,3 +688,5 @@ pv-sync.mjs was removed from fire-runner on 2026-09-22.
       → マニフェスト照合・inspect緑を確認して着工
 報告先: prompt-vault-dev の docs/reports/report-pv-115-cloud-sync.md（AC対応表様式）
 ```
+
+--------
