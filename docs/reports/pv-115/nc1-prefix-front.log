@@ -1,0 +1,52 @@
+
+> prompt-vault@4.1.0 verify:issues
+> node scripts/verify-issues.mjs pv#115
+
+repository_sha=c23add4b7a857356c16e043a72e1e99098ee1fbe
+
+pv#115 [AUTO_FAILURE_INJECTION] gate=true Fran→Cloud folder-selected WebP sync (S-1〜S-4) and cloud viewer fixes B-1〜B-3
+  VERIFIER tests/issues/pv-115-cloud-sync.mjs sha256=dfa33e21d4516ea425180e41330d2c8810023b11443eb79cdf195cbba59d0151
+  PASS    AC-6 server encrypt() → front decrypt() returns identical bytes (keyId vault:v1)
+  PASS    AC-6 negative control: a different key fails to decrypt
+  PASS    S-3 loader: process.env wins, missing keys come from secrets file, others are not exposed
+  PASS    S-3 loader: missing secrets file → not ok, CLOUD_BASE defaults to the old sync target
+  PASS    S-3 loader: a vault key that is not 32 bytes is rejected (reason has no key value)
+  PASS    AC-7 B-1: thumbnail 404 → viewer still loads the full image and clears loading (onDone once)
+  PASS    AC-7 B-1: both thumbnail and full 404 → loading is still cleared
+  PASS    AC-7 negative control: the pre-fix chain leaves loading on after a thumbnail 404
+  FAIL    AC-7 ImageViewer uses loadViewerImage with onDone → setImgLoading(false) — ImageViewer is not wired to loadViewerImage/onDone
+  PASS    AC-7 sniffImageType tells WebP from PNG (new WebP bodies are not labelled PNG)
+  PASS    AC-8 B-2: preview falls back to the full image when the thumbnail is missing (thumb_ok=0)
+  FAIL    AC-8 AlbumScreen PreviewThumb uses loadPreviewImage and regenerates the thumbnail from the full image — PreviewThumb not wired
+  PASS    AC-9 B-3 slot: nothing revoked while mounted (negative control), old URL revoked on swap, current URL revoked on unmount
+  PASS    AC-9 B-3 results tracker: evicted result URLs revoked, the rest revoked on unmount, non-blob ignored
+  FAIL    AC-9 components release Blob URLs on unmount (ThumbCell/PreviewThumb slot.release, no module-level thumbCache, GenerateScreen tracker) — cleanup wiring missing
+  PASS    AC-15 Fran starts normally without any sync secrets
+  PASS    AC-3/AC-15 no PV_VAULT_KEY → POST /api/sync/run is 503 with a reason
+  PASS    AC-15 vault key present but CLOUD_TOKEN missing → 503 and nothing sent
+  PASS    AC-15 invalid token → Worker 401 → run aborted, no PUT sent, reason has no token value
+  PASS    AC-5 no folder selected → run completes with uploaded:0
+  PASS    AC-15 valid token: authenticated GET /sync/images and /sync/r2-usage accepted (mock 200) — nothing sent with empty selection
+  PASS    AC-1 GET /api/sync/folders lists top-level folders with counts including subfolders
+  PASS    AC-2 PUT /api/sync/folders → existing PUT /api/settings → GET keeps the selection (unknown name recorded, not saved)
+  PASS    AC-2/AC-17 negative control: a selection stored in settings.json is lost by the existing settings save
+  PASS    AC-15 valid token → authenticated GET /sync/images is answered 200 and the run proceeds
+  PASS    AC-13 existing cloud hash (old PNG) is overwritten; decrypts with front decrypt() to WebP at original size
+  PASS    AC-13 thumbnail sent via PUT /thumbs/{hash}: WebP, long edge ≤ 320, not enlarged
+  PASS    AC-13 negative control: the old diff-only rule would not have re-sent the existing hash
+  PASS    AC-13 metadata header carries folder/filename (Worker contract X-PV-Meta)
+  PASS    AC-13 PNG is not sent: R2 body is WebP, never the original PNG
+  PASS    AC-14 second run skips hashes already sent as WebP (no PUT)
+  PASS    AC-14 failure injection: thumbnail PUT fails → counted as failed, hash NOT recorded as sent
+  PASS    AC-14 retry: the failed hash is re-sent next run; the later-selected folder's existing cloud hash is overwritten with WebP
+  PASS    S-4 a recorded hash missing from the cloud is re-sent
+  PASS    S-4 hash deleted in the cloud (deleted_at) is not revived
+  PASS    S-1 folder names match literally (x_y does not match xAy)
+  PASS    §3.7 R2 usage ≥ sync.r2_limit_gb → nothing sent this run (fail closed, reason recorded)
+  PASS    AC-4 POST /api/sync/run while running → 409 (negative control: first start from idle → 200); status reports progress
+  PASS    AC-15 no secret value (vault key / tokens / unrelated secret) appears in logs or /sync/status
+  PASS    AC-17 after restart + existing settings save: folder selection and WebP-sent records persist (no re-send)
+  PASS    AC-16 Fran sync does not invoke the old pv-sync script
+  VERDICT FAIL
+
+SUMMARY issues=1 gated=1 pass=38 fail=3 gated_fail=3 not_run=0 waived=0 unknown=0

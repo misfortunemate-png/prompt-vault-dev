@@ -1,0 +1,11 @@
+# AC-16 旧ジョブ停止の確認 2026-10-25T17:37:10+09:00
+## ai-family-ops runner.mjs の pv-sync 参照（0 件であること）
+0
+## ai-family-ops HEAD
+924bf50 dev-seat: ge-novel — novel スキルの適用は発注者の決定で承認済み（foundation#268 設計 §5.4）
+## foundation scripts/pv-sync.mjs は残置（物理削除は foundation#276）
+39988 bytes ai-family-foundation/scripts/pv-sync.mjs
+## foundation: 本件で変更したファイル（pv-sync・lib・fixture・verifier に差分がないこと）
+(空なら差分なし)
+## prompt-vault-dev が旧スクリプトを起動しないこと
+server/sync.js: 参照なし

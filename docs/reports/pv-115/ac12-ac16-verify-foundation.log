@@ -1,0 +1,32 @@
+# foundation AC-12/AC-16 2026-10-25T17:43:09+09:00
+## HEAD
+158c3b0 docs: #274 相互リンクと開発席の表示 — 仕様 v1.5 §11.1.3・§11.1.4 と指示書 v0.30.3
+## 本件による foundation の変更（追跡ファイルの差分のうち本件分）: なし
+## 作業ツリーの未コミット変更（別作業・本件では触れていない）
+ M src/App.jsx
+ M src/lib/chat-web/dev-seat/model.js
+ M src/lib/chat-web/drawer-tree.js
+ M src/lib/chat-web/route-hash.js
+ M src/pages/chat-web/ChatWebShell.jsx
+ M src/pages/chat-web/chat-web.css
+ M src/pages/chat-web/dev-seat/DevSeatChat.jsx
+ M src/pages/chat-web/dev-seat/DevSeatScreen.jsx
+ M src/pages/chat-web/dev-seat/dev-seat.css
+ M tests/issues/manifest.mjs
+?? docs/reports/evidence-links-devseat-v0.30.3/
+?? src/pages/chat-web/dev-seat/PlaceLabel.jsx
+?? tests/issues/chat-web-links-devseat.mjs
+## GitHub Actions（HEAD 158c3b0e5e83350a45c8ea5240829991d80a1765）
+Docs automerge	success	2026-10-18T06:37:35Z	https://github.com/misfortunemate-png/ai-family-foundation/actions/runs/39104706186
+Docs automerge	success	2026-10-18T06:37:12Z	https://github.com/misfortunemate-png/ai-family-foundation/actions/runs/39104683095
+CI	success	2026-10-18T06:36:59Z	https://github.com/misfortunemate-png/ai-family-foundation/actions/runs/39104668884
+Issue Verifier	success	2026-10-18T06:36:58Z	https://github.com/misfortunemate-png/ai-family-foundation/actions/runs/39104668837
+## Issue Verifier の要約（HEAD の CI ログ）
+run id: 39104668837
+
+✓ main Issue Verifier · 39104668837
+Triggered via push about 7 days ago
+
+JOBS
+✓ verify-issues (ubuntu-latest) in 7s (ID 117607843920)
+## ローカル全件実行（別作業の未コミット変更が載った作業ツリー）: 開始 17:26、CPU 0.8s のまま 20 分以上止まり、子プロセスもないため停止した。出力: ac12-ac16-verify-foundation-local-hung.log

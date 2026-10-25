@@ -1,0 +1,21 @@
+# 本番 Fran（再起動後）の読み取り確認 2026-10-25T17:40:43+09:00
+## healthz（localhost・tailnet）
+{"status":"ok","version":"4.2.0","sha":"71b9717"}
+{"status":"ok","version":"4.2.0","sha":"71b9717"}
+## AC-1 GET /api/sync/folders（本番インデックス）
+folders=8 total=3744 selected=0
+  {"name":"FF6","selected":false,"imageCount":2}
+  {"name":"Vチューバー","selected":false,"imageCount":22}
+  {"name":"その他","selected":false,"imageCount":1}
+  {"name":"イリヤ","selected":false,"imageCount":12}
+  {"name":"クリーデ","selected":false,"imageCount":1}
+  {"name":"フェイト","selected":false,"imageCount":15}
+  {"name":"旧","selected":false,"imageCount":3679}
+  {"name":"東方","selected":false,"imageCount":12}
+## AC-3/AC-15 POST /api/sync/run（秘密未配置 → 503・送信なし）
+{"error":"同期を開始できません: vault鍵（PV_VAULT_KEY）が設定されていません / クラウドのトークン（CLOUD_TOKEN）が設定されていません"} HTTP 503
+## GET /api/sync/status
+{"state":"idle","lastRun":null,"progress":null}
+## data/sync.json・data/sync-webp-state.json（未作成のはず）
+ls: cannot access 'data/sync.json': No such file or directory
+ls: cannot access 'data/sync-webp-state.json': No such file or directory

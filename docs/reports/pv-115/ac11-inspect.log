@@ -1,0 +1,18 @@
+
+> prompt-vault@4.2.0 inspect
+> node scripts/inspect.mjs
+
+  package.json version: 4.2.0
+  healthz version: 4.2.0
+  Lines: 11
+
+=== Inspect Results ===
+
+✅ マニフェスト照合
+✅ 支給物SHA-256照合
+✅ 版確認
+✅ _STATUS.md 行数
+✅ danbooru-filtered.csv SHA-256
+✅ ビルド確認
+
+=== ALL GREEN ===

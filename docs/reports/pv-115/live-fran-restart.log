@@ -1,0 +1,10 @@
+﻿[2026-10-25T17:40:30] == before ==
+[2026-10-25T17:40:30] pid=18548 started=2026/10/25 9:09:18 cmd="C:\Program Files\nodejs\node.exe" --env-file=.env server.js 
+[2026-10-25T17:40:30] healthz: {"status":"ok","version":"4.1.0","sha":"030a9f2"}
+[2026-10-25T17:40:30] queue: state=idle tasks=0
+[2026-10-25T17:40:30] == stop ==
+[2026-10-25T17:40:30] stopped pid=18548
+[2026-10-25T17:40:32] == start ==
+[2026-10-25T17:40:32] started pid=10732
+[2026-10-25T17:40:32] healthz: {"status":"ok","version":"4.2.0","sha":"71b9717"}
+[2026-10-25T17:40:32] == after ==
