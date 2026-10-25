@@ -161,30 +161,8 @@ AC-1〜12に加えてAC-13〜17もPG完了報告のAC対応表に列挙し、生
 
 ### Part 1: 同期モジュール新設（server/sync.js）
 
-#### 1-1: vault keyの読み込み
-
-`server/sync.js` を新設する。まずvault keyの読み込みを実装する。
-
-```javascript
-import { createCipheriv, randomBytes } from 'node:crypto';
-
-// secrets.env から PV_VAULT_KEY を読む（base64エンコードされた32バイト鍵）
-const VAULT_KEY_RAW = process.env.PV_VAULT_KEY
-  ? Buffer.from(process.env.PV_VAULT_KEY, 'base64')
-  : null;
-
-function assertVaultKey() {
-  if (!VAULT_KEY_RAW || VAULT_KEY_RAW.length !== 32) {
-    throw Object.assign(new Error('PV_VAULT_KEY が未設定または不正です'), { statusCode: 503 });
-  }
-  return VAULT_KEY_RAW;
-}
-```
-
-- `PV_VAULT_KEY` は `D:\AI\secrets\secrets.env` に追加する環境変数
-- 鍵の値はフロントの localStorage `pv-vault-key` の `raw` フィールドと同一
-- 鍵の値をログ・エラーメッセージに含めない（J-3）
-- 32バイトでない場合は503を返す
+#### 1-1: vault key・クラウド接続情報の読み込み
+`server/sync.js` を新設。秘密は同期専用ローダーで取得する（PM裁定S-3を参照）。`process.env` 優先、未指定の3キー `PV_VAULT_KEY`・`CLOUD_TOKEN`・`CLOUD_BASE` だけを `D:\\AI\\secrets\\secrets.env` から解析して取得する。秘密ファイルがなければ通常サーバー起動を続行する。認証情報や32バイトvault鍵が不正／欠落の場合、同期開始時は503、トークン認証401/403では転送しない。秘密値をログ・エラーに入れない。
 
 #### 1-2: 暗号化関数
 
@@ -222,58 +200,10 @@ function encrypt(plainBuffer, keyBuffer, keyId = DEFAULT_KEY_ID) {
 - `keyId` は `'vault:v1'` 固定（KEY_ID_ALIASESにより `'v1'` も許容されるが、サーバーは `'vault:v1'` で暗号化する）
 
 #### 1-3: フォルダ選択APIの実装
+`data/sync.json`（未作成なら `{ "folders": [] }`）を原子的に保存する。旧 `data/settings.json` の `sync.folders` には保存しない。既存の `PUT /api/settings` / `validateSettings` は無変更とする。
 
-`data/sync.json` に `folders` を保存する。旧settings.jsonと既存設定APIは触らない。
-
-**GET /api/sync/folders**
-
-SQLiteの `images` テーブルから最上位フォルダの一覧と画像数を取得し、`sync.folders` の選択状態と合わせて返す。
-
-```javascript
-// SQLiteクエリ例
-// folder列は "キャラA/サブフォルダ/..." の形式
-// 最上位 = folder を '/' で分割した先頭要素
-const rows = db.prepare(`
-  SELECT
-    substr(folder, 1, instr(folder || '/', '/') - 1) AS top,
-    COUNT(*) AS cnt
-  FROM images
-  GROUP BY top
-  ORDER BY top
-`).all();
-```
-
-レスポンス:
-```json
-{
-  "folders": [
-    { "name": "キャラA", "selected": true, "imageCount": 1200 },
-    { "name": "キャラB", "selected": false, "imageCount": 800 }
-  ]
-}
-```
-
-**PUT /api/sync/folders**
-
-リクエスト: `{ "folders": ["キャラA", "キャラB"] }`
-
-- `data/sync.json` の `folders` を原子的に上書き
-- 存在しないフォルダ名が含まれていた場合: C-1/C-2に従い、invalidとして集約先に記録しつつ、有効なフォルダ名のみ保存
-
-```javascript
-const knownFolders = new Set(rows.map(r => r.top));
-for (const f of requestedFolders) {
-  if (!knownFolders.has(f)) {
-    recordInvalid({
-      kind: 'sync-unknown-folder',
-      stage: 'PUT /api/sync/folders',
-      raw: f,
-      reason: '指定されたフォルダがギャラリーインデックスに存在しない',
-    });
-  }
-}
-const validFolders = requestedFolders.filter(f => knownFolders.has(f));
-```
+- `GET /api/sync/folders`: SQLite imagesテーブルから最上位フォルダと子フォルダを含めた画像数を集計し、`data/sync.json` に基づく選択状態とともに返す。従来どおり `{ "folders": [{ "name": "キャラA", "selected": true, "imageCount": 1200 }] }`。
+- `PUT /api/sync/folders`: `{ "folders": ["キャラA"] }` のうち存在するフォルダのみ保存。存在しない名はC-1/C-2 invalidへ記録。名前に `%`/`_` が含まれてもワイルドカード照合しない。
 
 #### 1-4: 同期実行API
 
@@ -316,127 +246,13 @@ app.post('/api/sync/run', (req, res) => {
 ```
 
 #### 1-5: 同期パイプライン（runSync）
-
-`runSync()` は以下の手順で実行する。
-
-**手順1: 対象画像の列挙（scanning）**
-
-1. `sync.folders` から選択済みフォルダを取得
-2. SQLiteから選択済みフォルダ（子フォルダ含む）の画像ハッシュを取得:
-
-```javascript
-const folders = readSyncSettings().folders ?? []; // data/sync.json
-if (folders.length === 0) {
-  syncState = { state: 'idle', lastRun: { finishedAt: new Date().toISOString(), uploaded: 0, skipped: 0, failed: 0, errors: [] } };
-  return;
-}
-
-// D-5: 最上位フォルダ選択は子フォルダを含む
-// folder LIKE 'キャラA/%' OR folder = 'キャラA'
-const placeholders = folders.map(() => "(folder = ? OR substr(folder,1,length(?) + 1) = ? || '/')").join(' OR ');
-const params = folders.flatMap(f => [f, f, f]);
-const localImages = db.prepare(`SELECT hash, folder, filename FROM images WHERE ${placeholders}`).all(...params);
-```
-
-3. クラウドの既存画像ハッシュを取得（GET /api/prompt-vault/sync/images、ページング対応）:
-
-```javascript
-const cloudHashes = new Set();
-let offset = 0;
-const limit = 500;
-while (true) {
-  const res = await fetch(`${CLOUD_BASE}/api/prompt-vault/sync/images?offset=${offset}&limit=${limit}`, {
-    headers: { 'Authorization': `Bearer ${CLOUD_TOKEN}` },
-  });
-  const data = await res.json();
-  for (const img of data.images) {
-    if (!img.deleted_at) cloudHashes.add(img.hash);
-  }
-  if (data.images.length < limit) break;
-  offset += limit;
-}
-```
-
-4. 差分を算出（フランにあってクラウドにない画像）:
-
-```javascript
-const toUpload = localImages.filter(img => !cloudHashes.has(img.hash));
-```
-
-D-3: クラウドにあってフランの選択フォルダにない画像は**そのまま残す**。削除しない。
-
-**手順2: 画像変換・暗号化・アップロード（uploading）**
-
-```javascript
-import sharp from 'sharp';
-
-syncState.progress = { phase: 'uploading', current: 0, total: toUpload.length, currentFolder: '' };
-const errors = [];
-let uploaded = 0;
-let skipped = 0;
-
-for (const img of toUpload) {
-  try {
-    syncState.progress.current++;
-    syncState.progress.currentFolder = img.folder.split('/')[0];
-
-    // 1. PNGをディスクから読む
-    const pngPath = resolveImagePath(img.hash, img.filename); // 既存の画像パス解決関数を使用
-    const pngBuffer = await fs.readFile(pngPath);
-
-    // 2. WebP q80 原寸（D-1: リサイズなし）
-    const webpBuffer = await sharp(pngBuffer).webp({ quality: 80 }).toBuffer();
-
-    // 3. サムネイル生成（長辺320px WebP q80）
-    const thumbBuffer = await sharp(pngBuffer)
-      .resize({ width: 320, height: 320, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer();
-
-    // 4. 暗号化
-    const keyBuffer = assertVaultKey();
-    const encryptedWebp = encrypt(webpBuffer, keyBuffer);
-    const encryptedThumb = encrypt(thumbBuffer, keyBuffer);
-
-    // 5. クラウドにアップロード（表示用画像）
-    await uploadImageToCloud(img.hash, encryptedWebp, {
-      filename: img.filename,
-      folder: img.folder,
-      // 必要に応じてpreset_id, created_at等のメタデータ
-    });
-
-    // 6. クラウドにサムネイルをアップロード
-    await uploadThumbToCloud(img.hash, encryptedThumb);
-
-    uploaded++;
-  } catch (err) {
-    errors.push(`hash ${img.hash}: ${err.message}`);
-    // 1件の失敗で全体を中断しない
-  }
-}
-```
-
-**uploadImageToCloud / uploadThumbToCloud**:
-
-旧pvImageUpが使用していたWorkerのアップロードエンドポイントを呼ぶ。具体的なエンドポイントは ai-family-foundation のWorkerコードで確認すること。分からない場合は**停止して報告する**。
-
-サムネイルは `PUT /api/prompt-vault/thumbs/{hash}` （既存エンドポイント、instructions-pv-v4.mdで追加済み）。
-
-**手順3: 完了処理**
-
-```javascript
-syncState = {
-  state: 'idle',
-  lastRun: {
-    finishedAt: new Date().toISOString(),
-    uploaded,
-    skipped,
-    failed: errors.length,
-    errors: errors.slice(0, 20), // エラーが大量の場合は先頭20件に制限
-  },
-  progress: null,
-};
-```
+1. `data/sync.json` の `folders` から選択フォルダの画像（子フォルダ含む）をSQLiteで列挙する。SQLの完全一致・子フォルダ接頭辞判定はLIKEワイルドカードを使わない。未選択ならuploaded:0で正常完了。
+2. `CLOUD_BASE` とBearer `CLOUD_TOKEN` で `GET /api/prompt-vault/sync/images`（ページング500件）を呼び、既存hashと `deleted_at` を取得する。認証失敗・容量取得失敗ではデータ送信せず、秘密を除いた理由を `lastRun.errors` に記録する。
+3. `GET /api/prompt-vault/sync/r2-usage` と既存settingsの `'sync.r2_limit_gb'`（既定5）で容量を確認。超過見込みならその回の上りを送らない。
+4. `data/sync-webp-state.json` から同期機構によるWebP本体+サムネイルの送信成功hashを読み込む（未作成なら空）。クラウドに**未登録**または**存在するが成功記録なし**の画像を対象とする。成功記録あり＋クラウドに存在すればskip。削除済み `deleted_at` の画像は復活させない。これにより**既存約400枚の選択対象も暗号化WebPに上書き**する。
+5. PNGをsharpで原寸WebP q80と長辺320px WebP q80サムネに変換。`src/lib/crypto.js` と同じ `[keyId長][vault:v1][IV12][ciphertext+tag16]` 形式でAES-256-GCM暗号化。`PUT /api/prompt-vault/sync/upload-image` に `Authorization: Bearer <CLOUD_TOKEN>`、`X-PV-Hash`、`X-PV-Meta`（base64 JSON）、multipart `image` で送信する。成功後、`PUT /api/prompt-vault/thumbs/{hash}` へ暗号化サムネイルを送る。Worker側の上書きは既存R2キーとD1のupsertを使う。
+6. **両アップロード成功後だけ** `data/sync-webp-state.json` にhashを追加し原子的に記録する。1件失敗しても他の画像は継続、失敗hashは次回再試行する。後から選択したフォルダでも同じ規則とし、毎回全件送信しない。
+7. `GET /api/sync/status` にscanning/uploading/cleanupと進捗を報告し、完了時にuploaded/skipped/failed/errors（最大20）を残す。クラウド画像削除、定期同期、逆同期、cards/presets/settings同期は行わない。
 
 #### 1-6: server.jsへのルーティング追加
 
@@ -451,16 +267,9 @@ setupSyncRoutes(app, db); // app: Expressインスタンス, db: better-sqlite3�
 またはexpressRouter形式でもよい。既存のルーティング構造に合わせること。
 
 #### 1-7: 環境変数の追加
-
-`.env.example` に以下を追記する（値は空にする。J-3: 鍵をハードコードしない）:
-
-```
-PV_VAULT_KEY=
-```
-
-実際の鍵は `D:\AI\secrets\secrets.env` に `PV_VAULT_KEY=<base64値>` として設定する。この設定は着工時点では不要（PGの自己完結テストでは空転テストとビルド成功を確認する）。
-
+`.env.example` に `PV_VAULT_KEY=`、`CLOUD_TOKEN=`、`CLOUD_BASE=`、`PV_SYNC_SECRETS_PATH=` の4キーを**空値で**追加する。実値を公開ファイルに置かない。実際の秘密は `D:\\AI\\secrets\\secrets.env` のうち上記の3キーだけを `server/sync.js` が読み込む。既存起動スクリプトは改変禁止。秘密なしで起動でき、同期時503を確認する。
 ---
+
 
 ### Part 2: フロントUI（src/）
 
@@ -607,11 +416,8 @@ batch2指示書の規定「Blob URLはメモリリークの原因になる。コ
 
 ### Part 4: ai-family-foundation（従作業）
 
-#### 4-1: pv-sync.mjs の廃止
-
-`scripts/pv-sync.mjs` を削除する。2026-09-22にfire-runnerから除去済みであり、本改修でフランサーバーに同期機能が内蔵されるため不要になる。
-
-fire-runner設定・verify-decommission.mjs等に pv-sync.mjs への参照が残っている場合は除去する。
+#### 4-1: pv-sync.mjs の物理削除延期（S-2）
+本件では `ai-family-foundation/scripts/pv-sync.mjs` を**削除しない**。2026-09-22からfire-runnerで停止中の旧ジョブを再開しない。旧実体・16 verifier・2 fixture・共有ライブラリはそのまま保持し、未コミット別作業に触れない。実体削除と旧検証器の整理は新同期稼働確認後の別Issue/別指示書とする。
 
 #### 4-2: Worker側の変更確認
 
@@ -642,12 +448,7 @@ feat(#115): add server-side sync module with folder selection and manual trigger
 
 #### ai-family-foundation
 
-```
-chore: remove deprecated pv-sync.mjs
-
-Sync functionality has moved to prompt-vault server (server/sync.js).
-pv-sync.mjs was removed from fire-runner on 2026-09-22.
-```
+本件ではfoundation側コードの変更コミットは不要。Worker契約・旧ジョブ停止・verifier維持の照合結果を完了報告に記す。
 
 ---
 
