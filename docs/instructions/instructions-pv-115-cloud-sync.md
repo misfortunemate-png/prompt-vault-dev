@@ -1,7 +1,7 @@
 # prompt-vault クラウド改修 作業指示書（prompt-vault v4.2.0 ／ foundation）
 文書種別: 権威文書
 
-作成日: 2026-10-25 ／ PM: クリーデ（技術顧問席） ／ 対応仕様: docs/prompt-vault-cloud-spec.md ／ 対応要件定義: docs/prompt-vault-cloud-requirements-approved.md ／ 関連Issue: pv#115 ／ 本書一枚で完結（追補なし）
+作成日: 2026-10-25 ／ PM改訂: 2026-10-25（S-1〜S-4裁定） ／ 対応仕様: docs/prompt-vault-cloud-spec.md ／ 対応要件定義: docs/prompt-vault-cloud-requirements-approved.md ／ 関連Issue: pv#115 ／ 本書一枚で完結（追補なし）
 
 ## 添付マニフェスト（着工前照合・必須）
 
@@ -16,6 +16,45 @@
 | 5 | docs/reference/prompt-vault-reference.md | 既存API参照 | — |
 
 支給物なし。
+
+## PM裁定（2026-10-25／PG停止報告S-1〜S-4）
+**本節を改訂後の正典とする。以下に残存する旧作業例・旧パス・旧削除指示が本節と矛盾する場合は、本節を優先し、旧記述を実施しない。** 参照先 `docs/prompt-vault-cloud-spec.md` も同じ裁定で改訂済みである。
+
+### S-1: 同期対象の保存
+- `data/settings.json` の `sync.folders` は**使用しない**。既存 `PUT /api/settings` が全置換するためである。`data/sync.json` の `{ "folders": [] }` に保存し、未作成なら空配列、原子的に書き込む。
+- 同期選択API（GET/PUT `/api/sync/folders`）はこの独立ファイルを使う。従来の `server/validate.js`、設定画面の既存保存処理、`PUT /api/settings` を変更しない。R2上限は従来のsettingsのフラットキー `'sync.r2_limit_gb'`（なければ5GB）。
+- SQLでフォルダの完全一致と子フォルダ接頭辞を照合し、名前に `%`/`_` が含まれてもワイルドカード扱いしない。
+- 追加変更範囲としてランタイムデータ `data/sync.json` を許可する。
+
+### S-2: 旧pv-syncの撤去
+- `ai-family-foundation/scripts/pv-sync.mjs` の**物理削除は本件では行わない**。2026-09-22以来fire-runnerから外れている旧ジョブは、稼働停止状態を継続する。手動実行の再開もしない。
+- verifier16本・fixture2本・共有ライブラリは無変更、waived化もしない。foundationの別件未コミット10ファイルには触れない。本件のfoundation作業はWorkerエンドポイントと旧ジョブ停止の**確認のみ**。foundation側の変更コミットは不要。
+- 物理削除とverifier整理は新同期の稼働・検収後に別Issue/別指示書で行う。今回の完了報告には削除延期を明記する。
+
+### S-3: クラウド送信先、トークン、vault鍵
+- `CLOUD_BASE` 既定: `https://ai-family-foundation.misfortunemate.workers.dev`。旧pv-syncの有効な **`CLOUD_TOKEN`** を同名で再利用する。`FA_TOKEN_MACHINE` を推測で代用しない。インフラPGが既存有効トークンを探し、可能なら認証付きGET `/api/prompt-vault/sync/images` の200を確認する。トークンが見つからない・認証に失敗する場合は、実データ送信せずPMへ停止報告。
+- `server/sync.js` 内に同期専用のsecretローダーを実装。`process.env` 優先、不足した `PV_VAULT_KEY`、`CLOUD_TOKEN`、`CLOUD_BASE` の3キーに限り `D:\\AI\\secrets\\secrets.env`（`PV_SYNC_SECRETS_PATH` 指定時はそのパス）から読み込む。Node.js v24の `node:util.parseEnv` 相当を使い、他の秘密をprocess.env全体に注入しない。既存package.jsonの起動コマンド・server.jsの既存設定ローダーは**変更しない**。
+- `PV_VAULT_KEY` はbase64の32バイト鍵。秘密未配置でもフラン通常起動は継続し、同期開始は503。`CLOUD_TOKEN` の欠落、Workerから401/403の場合は送信しない。鍵・トークン値はログ、エラーメッセージ、GitHubに記録しない。
+- `.env.example` に `PV_VAULT_KEY=`、`CLOUD_TOKEN=`、`CLOUD_BASE=`、`PV_SYNC_SECRETS_PATH=` を空値で追加する。
+- Worker画像転送は旧契約の `PUT /api/prompt-vault/sync/upload-image`（Bearer `CLOUD_TOKEN`、`X-PV-Hash`、base64 JSON `X-PV-Meta`、multipart `image`）。サムネイルは `PUT /api/prompt-vault/thumbs/{hash}`。API契約相違・Worker変更の必要が判明したら再停止。
+
+### S-4: 既存クラウドPNGのWebP上書き（発注者裁定）
+- **選択したフォルダの既存クラウドhashも表示用WebP（原寸q80）に上書きする**。対象外フォルダの既存画像は削除せず保持する。後から新たに選択されたフォルダも同じ扱い。
+- 同期モジュールが本体WebPとサムネイルを**両方とも送信成功**させたhashを、`data/sync-webp-state.json` の `{ "uploadedHashes": [] }` に原子的に永続化する。初期状態は空。ランタイムデータとして新設を許可する。フォルダ選択とは別ファイルにする。
+- 選択フォルダ画像のうち (A)クラウドに存在しないhash、または (B)クラウドにあってもWebP送信済み記録がないhash を送信する。両方に存在するhashは再同期時skip。片方でも転送失敗なら記録を残さず次回再試行する。送信済みhashがクラウドから消えていれば再送する。
+- クラウドで明示削除済み（`deleted_at`）のhashは無断で復活させない。クラウドインベントリ/容量取得失敗、R2上限超過見込みではfail closed（送信せず `lastRun.errors` に秘密なしで記録）。
+- PG報告N-1〜N-5も承認する。B-1の真の修正対象 `src/components/ImageViewer.jsx` は変更を許可。存在するサムネイル生成関数名は `generateAndUploadThumb`。フォルダ名は完全一致とする。
+
+### AC追加と報告
+- **AC-13**: 既存クラウドhashがWebPに上書きされ、復号でWebPバイナリと確認できる。旧差分だけの実装では失敗するnegative controlを残す。
+- **AC-14**: 2度目は送信済みhashをskip、失敗hashは再試行、後から選んだフォルダの既存hashは上書きされる。失敗注入ログを残す。
+- **AC-15**: secrets未配置でもフラン通常起動、同期503。有効トークン200と無効トークン401/403で送信停止を確認。秘密を伏せたログを残す。
+- **AC-16**: foundation既存verifier/fixtureが維持され、新規赤なし。旧ジョブ不使用を確認。
+- **AC-17**: 従来の設定保存とサーバー再起動を挟んでも、同期フォルダ選択とWebP送信成功記録が保持される。旧方式の消失をnegative controlとする。
+
+AC-1〜12に加えてAC-13〜17もPG完了報告のAC対応表に列挙し、生ログまたは証跡ファイルを付ける。既存 `AC-2` は `PUT /api/settings` による従来設定保存を挟む試験に拡張する。`AC-12` は**両リポジトリ**で実行する。実Workerを使う検証が秘密情報/環境不足で実施できない場合は未検証と明記し、未実施のまま完了扱いにしない。作業指示書の末尾に残る旧 `pv-sync.mjs` 削除の完了条件は**無効**とする。
+
+---
 
 ## PG運用規律（定型・全フェーズ共通）
 
@@ -184,7 +223,7 @@ function encrypt(plainBuffer, keyBuffer, keyId = DEFAULT_KEY_ID) {
 
 #### 1-3: フォルダ選択APIの実装
 
-`data/settings.json` に `sync` キーを追加する。既存の設定読み書き関数があればそれを利用する。
+`data/sync.json` に `folders` を保存する。旧settings.jsonと既存設定APIは触らない。
 
 **GET /api/sync/folders**
 
@@ -218,7 +257,7 @@ const rows = db.prepare(`
 
 リクエスト: `{ "folders": ["キャラA", "キャラB"] }`
 
-- `data/settings.json` の `sync.folders` を上書き
+- `data/sync.json` の `folders` を原子的に上書き
 - 存在しないフォルダ名が含まれていた場合: C-1/C-2に従い、invalidとして集約先に記録しつつ、有効なフォルダ名のみ保存
 
 ```javascript
@@ -286,7 +325,7 @@ app.post('/api/sync/run', (req, res) => {
 2. SQLiteから選択済みフォルダ（子フォルダ含む）の画像ハッシュを取得:
 
 ```javascript
-const folders = settings.sync?.folders ?? [];
+const folders = readSyncSettings().folders ?? []; // data/sync.json
 if (folders.length === 0) {
   syncState = { state: 'idle', lastRun: { finishedAt: new Date().toISOString(), uploaded: 0, skipped: 0, failed: 0, errors: [] } };
   return;
@@ -294,8 +333,8 @@ if (folders.length === 0) {
 
 // D-5: 最上位フォルダ選択は子フォルダを含む
 // folder LIKE 'キャラA/%' OR folder = 'キャラA'
-const placeholders = folders.map(() => '(folder = ? OR folder LIKE ?)').join(' OR ');
-const params = folders.flatMap(f => [f, f + '/%']);
+const placeholders = folders.map(() => "(folder = ? OR substr(folder,1,length(?) + 1) = ? || '/')").join(' OR ');
+const params = folders.flatMap(f => [f, f, f]);
 const localImages = db.prepare(`SELECT hash, folder, filename FROM images WHERE ${placeholders}`).all(...params);
 ```
 
@@ -494,7 +533,7 @@ useEffect(() => {
 
 **現象**: サムネイル取得が404で失敗するとローディングが解除されない。
 
-**修正箇所**: サムネイルのフェッチ処理（AlbumScreen またはビューア関連コンポーネント）のエラーハンドリング。
+**修正箇所**: `src/components/ImageViewer.jsx` のサムネイル404処理（PG調査に基づく追加変更許可）。
 
 **修正方針**:
 
@@ -630,7 +669,7 @@ pv-sync.mjs was removed from fire-runner on 2026-09-22.
 | AC | 検証項目（手順） | 手段 | 証跡様式 | negative control |
 |---|---|---|---|---|
 | AC-1 | GET /api/sync/folders → フォルダ一覧と画像数が返る | PG実行（curl） | 生ログ | 該当なし |
-| AC-2 | PUT /api/sync/folders → GET再取得で選択状態が保持される | PG実行（curl） | 生ログ | 該当なし |
+| AC-2 | PUT /api/sync/folders → 既存PUT /api/settings → GET再取得で選択状態保持 | PG実行（curl） | 生ログ | 有（旧方式で消失） |
 | AC-3 | PV_VAULT_KEY未設定で POST /api/sync/run → 503が返る | PG実行（curl） | 生ログ | 有（鍵設定時は200で開始） |
 | AC-4 | 同期中に POST /api/sync/run → 409が返る | PG実行（curl） | 生ログ | 有（idle時は200で開始） |
 | AC-5 | 選択フォルダなしで同期 → uploaded:0で正常完了 | PG実行（curl） | 生ログ | 該当なし |
@@ -640,7 +679,12 @@ pv-sync.mjs was removed from fire-runner on 2026-09-22.
 | AC-9 | B-3: コンポーネントunmount時にrevokeObjectURL呼出 | PG実行（console.logまたはテスト） | テスト出力 | 有（unmount前は未解放） |
 | AC-10 | npm run build 成功 | PG実行 | 生ログ | 該当なし |
 | AC-11 | npm run inspect 既存赤以外に新規赤なし | PG実行 | 生ログ | 該当なし |
-| AC-12 | npm run verify:issues 既存結果維持 | PG実行 | 生ログ | 該当なし |
+| AC-12 | npm run verify:issues 既存結果維持（両リポジトリ） | PG実行 | 生ログ | 該当なし |
+| AC-13 | 既存hashのWebP上書きと復号 | PG実行 | 生ログ | 有（旧差分のみ） |
+| AC-14 | 再同期skip・失敗再送・後選択フォルダ上書き | PG実行 | 生ログ | 有（失敗注入） |
+| AC-15 | secretなし通常起動、同期503、有効認証200、無効認証送信停止 | PG実行 | マスク済み生ログ | 有 |
+| AC-16 | foundation verifier維持、旧ジョブ停止 | PG実行 | 生ログ・diff | 有 |
+| AC-17 | 設定保存・再起動後の同期状態保持 | PG実行 | 生ログ | 有（従来方式） |
 
 - negative controlは「旧バグ相当で赤の記録→修正後に緑」の両方を証跡に残す
 - **実機系（発注者に依頼）**: フラン設定画面でのフォルダ選択→同期実行→Pixel端末でのクラウド閲覧確認、B-1/B-2実機確認、フラン回帰テスト
@@ -656,7 +700,7 @@ pv-sync.mjs was removed from fire-runner on 2026-09-22.
 - B-1（ビューアローディング停滞）が修正されていること
 - B-2（フォルダプレビュー空表示）が修正されていること
 - B-3（Blob URL未解放）が修正されていること
-- ai-family-foundationのpv-sync.mjsが削除されていること
+- 旧pv-sync.mjsは物理削除せず運用停止継続し、foundation既存verifier/fixtureを保つこと（最終削除は別Issue）
 - 検証計画の全項目を実行し、証跡を完了報告に添付済み
 - 操作スクリプト納品（起動・環境構築・検証はbat/sh＋.env.exampleで自己完結。発注者にコンソール操作をさせない）・サーバー再起動・pull・push実施済み
 - inspect緑・_STATUS.mdフロントマター更新
